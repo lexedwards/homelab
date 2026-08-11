@@ -1,0 +1,12 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - docker.io
+
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [docker, run, --detach, "--restart=unless-stopped", --name, uptime-kuma,
+     "--publish=3001:3001", "--volume=/var/lib/uptime-kuma:/app/data",
+     "louislam/uptime-kuma:2"]
