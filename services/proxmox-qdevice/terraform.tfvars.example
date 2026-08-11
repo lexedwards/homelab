@@ -1,0 +1,9 @@
+# Default image for this service. Uncomment only to override it.
+# incus_image = "images:debian/13/cloud"
+
+incus_remote     = "micro-node"
+instance_vlan_id = 100
+
+root_authorized_keys = [
+  "ssh-ed25519 AAAA... replace-me",
+]

@@ -1,0 +1,19 @@
+#cloud-config
+package_update: true
+packages:
+  - corosync-qnetd
+  - openssh-server
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-qdevice-hardening.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      PubkeyAuthentication yes
+
+runcmd:
+  - [systemctl, enable, --now, corosync-qnetd]
