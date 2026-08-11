@@ -1,0 +1,15 @@
+#cloud-config
+package_update: true
+packages:
+  - curl
+  - nginx
+
+write_files:
+  - path: /var/www/html/hello-world
+    permissions: "0644"
+    owner: root:root
+    content: |
+      hello world
+
+runcmd:
+  - [systemctl, enable, --now, nginx]

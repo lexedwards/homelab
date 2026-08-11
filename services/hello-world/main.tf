@@ -29,20 +29,20 @@ data "incus_network" "br0" {
   }
 }
 
-resource "incus_instance" "technitium_dns" {
-  name     = "technitium-dns"
+resource "incus_instance" "hello_world" {
+  name     = "hello-world"
   image    = var.incus_image
   project  = "default"
   profiles = []
   running  = true
 
   config = {
-    "boot.autostart"       = "true"
-    "cloud-init.user-data" = trimspace(templatefile("${path.module}/cloud-init/user-data.tftpl", {}))
-    "limits.cpu"           = "1"
-    "limits.memory"        = "512MiB"
-    "raw.apparmor"         = "signal (send),"
-    "security.nesting"     = "true"
+    "boot.autostart"            = "true"
+    "cloud-init.network-config" = trimspace(file("${path.module}/cloud-init/network-config.tftpl"))
+    "cloud-init.user-data"      = trimspace(file("${path.module}/cloud-init/user-data.tftpl"))
+    "limits.cpu"                = "1"
+    "limits.memory"             = "256MiB"
+    "security.nesting"          = "true"
   }
 
   device {
@@ -69,10 +69,27 @@ resource "incus_instance" "technitium_dns" {
   wait_for {
     type = "cloud-init"
   }
+
+  exec = {
+    "00-check-http" = {
+      command = [
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--retry", "30",
+        "--retry-delay", "2",
+        "--retry-all-errors",
+        "http://127.0.0.1/hello-world",
+      ]
+      timeout = "2m"
+      trigger = "once"
+    }
+  }
 }
 
 output "ipv4_address" {
-  description = "IPv4 address reported by Incus for the Technitium DNS instance."
+  description = "IPv4 address reported by Incus for the Hello World instance."
   sensitive   = true
-  value       = incus_instance.technitium_dns.ipv4_address
+  value       = incus_instance.hello_world.ipv4_address
 }

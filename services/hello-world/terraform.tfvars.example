@@ -1,0 +1,6 @@
+# Default image and VLAN for this service. Uncomment only to override them.
+# incus_image      = "images:debian/13/cloud"
+# incus_remote     = "micro-node"
+
+instance_vlan_id = 1
+

@@ -54,6 +54,7 @@ resource "incus_instance" "proxmox_qdevice" {
     "cloud-init.user-data" = trimspace(templatefile("${path.module}/cloud-init/user-data.tftpl", {}))
     "limits.cpu"           = "1"
     "limits.memory"        = "256MiB"
+    "security.nesting"     = "true"
   }
 
   device {
