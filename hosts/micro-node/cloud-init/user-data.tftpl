@@ -1,0 +1,76 @@
+#cloud-config
+disable_root: true
+ssh_pwauth: false
+
+users:
+  - name: ${jsonencode(admin_username)}
+    groups:
+      - sudo
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+%{ for key in admin_authorized_keys ~}
+      - ${jsonencode(trimspace(key))}
+%{ endfor ~}
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-cloud-init-hardening.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      PubkeyAuthentication yes
+  - path: /etc/systemd/network/10-netplan-br0.netdev.d/10-vlan-filtering.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Bridge]
+      VLANFiltering=yes
+      DefaultPVID=none
+  - path: /etc/systemd/network/10-netplan-br0.network.d/10-management-vlan.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [BridgeVLAN]
+      VLAN=${management_vlan_id}
+      PVID=no
+  - path: /etc/systemd/network/10-netplan-${parent_interface}.network.d/10-trunk.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [BridgeVLAN]
+      VLAN=1-4094
+      PVID=no
+  - path: /etc/incus/preseed.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      config:
+        core.https_address: ${management_address}:8443
+        core.remote_token_expiry: 10m
+      storage_pools:
+        - name: default
+          driver: dir
+
+package_update: true
+packages:
+  - incus
+  - openssh-server
+  - ufw
+
+runcmd:
+  - [sh, -c, 'mac_suffix=$(tr -d ":\n" < /sys/class/net/${parent_interface}/address | tail -c 4); hostnamectl set-hostname "${hostname_prefix}-$${mac_suffix}"']
+  - [sh, -c, 'rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && systemctl restart ssh']
+  - [sh, -c, 'ip link set dev br0 type bridge vlan_filtering 1 vlan_default_pvid 0 && bridge vlan add dev br0 vid ${management_vlan_id} self && bridge vlan add dev ${parent_interface} vid 1-4094']
+  - [sh, -c, 'incus admin init --preseed < /etc/incus/preseed.yaml']
+  - [usermod, -aG, incus-admin, ${jsonencode(admin_username)}]
+  - [ufw, default, deny, incoming]
+  - [ufw, default, allow, outgoing]
+  - [ufw, default, deny, routed]
+  - [ufw, allow, in, "on", br0.${management_vlan_id}, from, ${management_subnet}]
+  - [ufw, deny, in, "on", br0]
+  - [ufw, --force, enable]

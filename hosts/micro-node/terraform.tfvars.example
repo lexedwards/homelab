@@ -1,0 +1,11 @@
+# Defaults for this Raspberry Pi. Uncomment a value only to override it.
+# instance_id      = "micro-node"
+# hostname_prefix  = "micro-node"
+# parent_interface = "eth0"
+
+admin_username          = "operator"
+admin_authorized_keys   = ["ssh-ed25519 AAAA... replace-me"]
+management_vlan_id      = 100
+management_address_cidr = "192.168.2.16/24"
+gateway_ipv4            = "192.168.2.1"
+dns_servers             = ["1.1.1.1"]
