@@ -8,6 +8,7 @@
     - [Storage](#storage)
   - [Services](#services)
     - [Hypervisor Cluster and Quorum Device](#hypervisor-cluster-and-quorum-device)
+    - [Image Catalogue](#image-catalogue)
     - [Local DNS](#local-dns)
     - [Lightweight status page](#lightweight-status-page)
     - [Networked Storage](#networked-storage)
@@ -57,6 +58,11 @@ persisted data intensive applications and multi-threaded workloads.
 ## Services
 
 ### Hypervisor Cluster and Quorum Device
+
+### Image Catalogue
+
+[Image Catalogue](services/image-catalogue/README.md) downloads curated cloud
+images and exposes them as uniform Proxmox VM templates on the storage host.
 
 ### Local DNS
 

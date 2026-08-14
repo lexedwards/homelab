@@ -1,0 +1,32 @@
+# proxmox_endpoint =
+# proxmox_api_token =
+# proxmox_ssh_username =
+# proxmox_ssh_private_key_file =
+
+# Set these to values available on the store Proxmox host.
+vm_datastore_id = "local-lvm"
+cloud_user      = "operator"
+cloud_ssh_public_keys = [
+  "ssh-ed25519 replace-with-a-real-public-key",
+]
+
+# These defaults target the store node's standard local datastore and bridge.
+# node_name           = "store"
+# import_datastore_id = "local"
+# vm_bridge           = "vmbr0"
+
+# Set this only when the host certificate cannot be verified.
+# proxmox_insecure = true
+
+# Release metadata is resolved from official publisher endpoints during plan.
+# Supported channels are amazon-linux-2023, fedora-44, rocky-linux-10, and
+# ubuntu-26.04. VM IDs must remain unique across the Proxmox cluster.
+# cloud_images = {
+#   ubuntu26 = {
+#     vm_id           =
+#     release_channel = "ubuntu-26.04"
+#     file_name       = "ubuntu-cloud-26_04.x86_64.qcow2"
+#     disk_size_gb    = 8
+#     agent_enabled   = true
+#   }
+# }

@@ -1,0 +1,15 @@
+terraform {
+  required_version = ">= 1.6.0"
+
+  required_providers {
+    http = {
+      source  = "hashicorp/http"
+      version = "= 3.6.1"
+    }
+
+    proxmox = {
+      source  = "bpg/proxmox"
+      version = "= 0.111.1"
+    }
+  }
+}
