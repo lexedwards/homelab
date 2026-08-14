@@ -10,7 +10,8 @@
     - [Hypervisor Cluster and Quorum Device](#hypervisor-cluster-and-quorum-device)
     - [Image Catalogue](#image-catalogue)
     - [Local DNS](#local-dns)
-    - [Lightweight status page](#lightweight-status-page)
+    - [Lightweight Status Page](#lightweight-status-page)
+    - [Tailscale Exit Node](#tailscale-exit-node)
     - [Networked Storage](#networked-storage)
     - [Service Proxy](#service-proxy)
     - [Home Assistant](#home-assistant)
@@ -59,6 +60,10 @@ persisted data intensive applications and multi-threaded workloads.
 
 ### Hypervisor Cluster and Quorum Device
 
+[Proxmox QDevice](services/proxmox-qdevice/README.md) runs `corosync-qnetd` in
+an Incus instance on `micro-node`. It gives the even-sized Proxmox cluster an
+external quorum vote outside the cluster itself.
+
 ### Image Catalogue
 
 [Image Catalogue](services/image-catalogue/README.md) downloads curated cloud
@@ -66,7 +71,21 @@ images and exposes them as uniform Proxmox VM templates on the storage host.
 
 ### Local DNS
 
-### Lightweight status page
+[Technitium DNS](services/technitium-dns/README.md) runs in an Incus instance on
+`micro-node`. It provides local name resolution independently of the Proxmox
+cluster.
+
+### Lightweight Status Page
+
+[Uptime Kuma](services/uptime-kuma/README.md) runs in an Incus instance on
+`micro-node`. It monitors service availability and hosts the homelab's
+lightweight status page outside the Proxmox cluster.
+
+### Tailscale Exit Node
+
+[Tailscale Exit Node](services/tailscale-exit-node/README.md) runs in an Incus
+instance on `micro-node`. It lets tailnet clients use the homelab's internet
+connection while away from home.
 
 ### Networked Storage
 
