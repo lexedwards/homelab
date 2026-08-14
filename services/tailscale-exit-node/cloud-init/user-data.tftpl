@@ -1,0 +1,9 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+
+runcmd:
+  - "curl -fsSL https://tailscale.com/install.sh | sh"
+  - [systemctl, enable, --now, tailscaled]
