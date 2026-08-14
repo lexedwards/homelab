@@ -103,7 +103,6 @@ Normally create:
 
 ```text
 services/<service-name>/
-|-- .gitignore
 |-- .yamllint
 |-- Makefile
 |-- README.md
@@ -119,9 +118,9 @@ Add `cloud-init/network-config.tftpl` only when explicit guest network behavior
 is needed. Use DHCP by default and keep stable addressing in upstream DHCP/DNS,
 not in tracked guest configuration. Never embed a static topology value.
 
-Generate `.terraform.lock.hcl` with `tofu init`; do not hand-write it. Keep the
-same local-state and saved-plan ignore rules and Makefile workflow used by the
-other service roots.
+Generate `.terraform.lock.hcl` with `tofu init`; do not hand-write it. Rely on
+the repository root's local-state and saved-plan ignore rules, and use the
+Makefile workflow from the other service roots.
 
 ## Implement The Incus Baseline
 

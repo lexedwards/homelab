@@ -1,3 +1,4 @@
+# OpenTofu working data and local configuration
 .terraform/
 *.tfstate
 *.tfstate.*

@@ -170,7 +170,6 @@ Normally create:
 
 ```text
 services/<service-name>/
-|-- .gitignore
 |-- Makefile
 |-- README.md
 |-- main.tf
@@ -184,9 +183,9 @@ For VM cloud-init, also create `.yamllint` and
 encode their rendered content into cloud-init rather than constructing YAML in
 shell commands.
 
-Generate `.terraform.lock.hcl` with `tofu init`; do not hand-write it. Keep the
-same local-state, saved-plan, override, and local-variable ignore rules used by
-the reference service roots. Use their Makefile workflow: `init`, `fmt`,
+Generate `.terraform.lock.hcl` with `tofu init`; do not hand-write it. Rely on
+the repository root's local-state, saved-plan, override, and local-variable
+ignore rules. Use the reference roots' Makefile workflow: `init`, `fmt`,
 `fmt-check`, `tofu-validate`, `validate`, `plan`, and saved-plan-only `apply`.
 Add `yaml-validate` when the root tracks YAML or cloud-init templates.
 
