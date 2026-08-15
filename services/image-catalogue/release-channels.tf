@@ -2,6 +2,14 @@ data "http" "amazon_linux_2023" {
   url = "https://cdn.amazonlinux.com/al2023/os-images/latest/kvm/SHA256SUMS"
 }
 
+data "http" "debian_13_metadata" {
+  url = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.json"
+}
+
+data "http" "debian_13_checksums" {
+  url = "https://cloud.debian.org/images/cloud/trixie/${local.debian_13_version}/SHA512SUMS"
+}
+
 data "http" "fedora_releases" {
   url = "https://fedoraproject.org/releases.json"
 }
@@ -23,6 +31,17 @@ locals {
     "^([0-9a-f]{64})  (al2023-kvm-([0-9][0-9.]+)-kernel-6\\.1-x86_64\\.xfs\\.gpt\\.qcow2)$",
     trimspace(data.http.amazon_linux_2023.response_body),
   )
+
+  debian_13_build = one([
+    for item in jsondecode(data.http.debian_13_metadata.response_body).items : item.data.info
+    if item.kind == "Build"
+  ])
+  debian_13_version    = local.debian_13_build.version
+  debian_13_image_name = "debian-13-genericcloud-amd64-${local.debian_13_version}.qcow2"
+  debian_13_checksum = one(regex(
+    "(?m)^([0-9a-f]{128})  debian-13-genericcloud-amd64-${local.debian_13_version}\\.qcow2$",
+    data.http.debian_13_checksums.response_body,
+  ))
 
   fedora_44_matches = [
     for image in jsondecode(data.http.fedora_releases.response_body) : image
@@ -51,20 +70,29 @@ locals {
 
   release_channels = {
     "amazon-linux-2023" = {
-      url             = "https://cdn.amazonlinux.com/al2023/os-images/${local.amazon_linux_2023_match[2]}/kvm/${local.amazon_linux_2023_match[1]}"
-      sha256_checksum = local.amazon_linux_2023_match[0]
+      url                = "https://cdn.amazonlinux.com/al2023/os-images/${local.amazon_linux_2023_match[2]}/kvm/${local.amazon_linux_2023_match[1]}"
+      checksum           = local.amazon_linux_2023_match[0]
+      checksum_algorithm = "sha256"
+    }
+    "debian-13" = {
+      url                = "https://cloud.debian.org/images/cloud/trixie/${local.debian_13_version}/${local.debian_13_image_name}"
+      checksum           = local.debian_13_checksum
+      checksum_algorithm = "sha512"
     }
     "fedora-44" = {
-      url             = local.fedora_44.link
-      sha256_checksum = local.fedora_44.sha256
+      url                = local.fedora_44.link
+      checksum           = local.fedora_44.sha256
+      checksum_algorithm = "sha256"
     }
     "rocky-linux-10" = {
-      url             = "https://download.rockylinux.org/pub/rocky/10/images/x86_64/${local.rocky_linux_10_match[0]}"
-      sha256_checksum = local.rocky_linux_10_match[2]
+      url                = "https://download.rockylinux.org/pub/rocky/10/images/x86_64/${local.rocky_linux_10_match[0]}"
+      checksum           = local.rocky_linux_10_match[2]
+      checksum_algorithm = "sha256"
     }
     "ubuntu-26.04" = {
-      url             = "https://cloud-images.ubuntu.com/releases/resolute/release-${local.ubuntu_26_04_serial}/ubuntu-26.04-server-cloudimg-amd64.img"
-      sha256_checksum = local.ubuntu_26_04_checksum
+      url                = "https://cloud-images.ubuntu.com/releases/resolute/release-${local.ubuntu_26_04_serial}/ubuntu-26.04-server-cloudimg-amd64.img"
+      checksum           = local.ubuntu_26_04_checksum
+      checksum_algorithm = "sha256"
     }
   }
 

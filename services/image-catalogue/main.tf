@@ -18,8 +18,8 @@ resource "proxmox_download_file" "cloud_image" {
   content_type        = "import"
   url                 = each.value.url
   file_name           = each.value.file_name
-  checksum_algorithm  = "sha256"
-  checksum            = lower(each.value.sha256_checksum)
+  checksum_algorithm  = each.value.checksum_algorithm
+  checksum            = lower(each.value.checksum)
   overwrite           = true
   overwrite_unmanaged = true
 }
@@ -111,11 +111,12 @@ output "cloud_image_templates" {
 }
 
 output "cloud_image_sources" {
-  description = "Publisher-resolved immutable image URLs and SHA-256 checksums."
+  description = "Publisher-resolved immutable image URLs, checksums, and checksum algorithms."
   value = {
     for name, image in local.cloud_images : name => {
-      url             = image.url
-      sha256_checksum = image.sha256_checksum
+      url                = image.url
+      checksum           = image.checksum
+      checksum_algorithm = image.checksum_algorithm
     }
   }
 }

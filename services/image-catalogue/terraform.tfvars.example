@@ -19,13 +19,14 @@ cloud_ssh_public_keys = [
 # proxmox_insecure = true
 
 # Release metadata is resolved from official publisher endpoints during plan.
-# Supported channels are amazon-linux-2023, fedora-44, rocky-linux-10, and
-# ubuntu-26.04. VM IDs must remain unique across the Proxmox cluster.
+# Supported channels are amazon-linux-2023, debian-13, fedora-44,
+# rocky-linux-10, and ubuntu-26.04. VM IDs must remain unique across the
+# Proxmox cluster.
 # cloud_images = {
-#   ubuntu26 = {
+#   debian13 = {
 #     vm_id           =
-#     release_channel = "ubuntu-26.04"
-#     file_name       = "ubuntu-cloud-26_04.x86_64.qcow2"
+#     release_channel = "debian-13"
+#     file_name       = "debian-cloud-13.x86_64.qcow2"
 #     disk_size_gb    = 8
 #     agent_enabled   = true
 #   }

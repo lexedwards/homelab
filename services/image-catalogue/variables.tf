@@ -167,6 +167,7 @@ variable "cloud_images" {
       for image in values(var.cloud_images) :
       contains([
         "amazon-linux-2023",
+        "debian-13",
         "fedora-44",
         "rocky-linux-10",
         "ubuntu-26.04",
