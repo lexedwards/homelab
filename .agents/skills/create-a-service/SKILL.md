@@ -106,7 +106,7 @@ isolation or data lifecycle, ask the user to choose.
 | Evidence | Classification | Read next |
 | --- | --- | --- |
 | `incus_instance`, the Incus provider, or explicit `micro-node` placement | Micro Node Incus | [Incus](references/incus.md) |
-| `bpg/proxmox`, a `proxmox_virtual_environment_*` resource, or explicit `compute`/`store` placement | Proxmox | [Proxmox](references/proxmox.md) |
+| `bpg/proxmox`, `proxmox_cloned_vm`, a `proxmox_virtual_environment_*` resource, or explicit `compute`/`store` placement | Proxmox | [Proxmox](references/proxmox.md) |
 
 Cloud-init, user-data, package managers, systemd, Docker, VM, container, and the
 `services/` directory are not sufficient platform evidence. If the request,

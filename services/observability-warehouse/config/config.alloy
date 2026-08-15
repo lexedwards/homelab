@@ -1,0 +1,90 @@
+prometheus.remote_write "warehouse" {
+	endpoint {
+		name = "mimir"
+		url  = sys.env("MIMIR_URL")
+	}
+
+	wal {
+		min_keepalive_time = "5m"
+		max_keepalive_time = "8h"
+	}
+}
+
+prometheus.receive_http "remote_write" {
+	http {
+		listen_address = "0.0.0.0"
+		listen_port    = 9090
+	}
+
+	forward_to = [prometheus.remote_write.warehouse.receiver]
+}
+
+loki.write "warehouse" {
+	endpoint {
+		name = "loki"
+		url  = sys.env("LOKI_URL")
+	}
+}
+
+loki.source.api "push" {
+	http {
+		listen_address = "0.0.0.0"
+		listen_port    = 3100
+	}
+
+	forward_to             = [loki.write.warehouse.receiver]
+	use_incoming_timestamp = true
+}
+
+otelcol.exporter.prometheus "warehouse" {
+	forward_to                           = [prometheus.remote_write.warehouse.receiver]
+	keep_identifying_resource_attributes = true
+}
+
+otelcol.processor.attributes "loki_labels" {
+	action {
+		key    = "loki.resource.labels"
+		action = "insert"
+		value  = "service.name, service.namespace, deployment.environment.name, host.name"
+	}
+
+	output {
+		logs = [otelcol.exporter.loki.warehouse.input]
+	}
+}
+
+otelcol.exporter.loki "warehouse" {
+	forward_to = [loki.write.warehouse.receiver]
+}
+
+otelcol.exporter.otlp "warehouse" {
+	client {
+		endpoint = sys.env("TEMPO_ENDPOINT")
+
+		tls {
+			insecure = true
+		}
+	}
+}
+
+otelcol.processor.batch "traces" {
+	output {
+		traces = [otelcol.exporter.otlp.warehouse.input]
+	}
+}
+
+otelcol.receiver.otlp "default" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		metrics = [otelcol.exporter.prometheus.warehouse.input]
+		logs    = [otelcol.processor.attributes.loki_labels.input]
+		traces  = [otelcol.processor.batch.traces.input]
+	}
+}

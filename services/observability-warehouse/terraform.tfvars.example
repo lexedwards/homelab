@@ -1,0 +1,92 @@
+# Assign required environment-specific values after copying this file to
+# terraform.tfvars. Do not commit that file.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+# Required
+# proxmox_endpoint             =
+# proxmox_api_token            =
+# proxmox_ssh_username         =
+# proxmox_ssh_private_key_file =
+
+# Optional
+# proxmox_insecure = false
+
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
+
+# Required
+# template_vm_id        =
+# template_node_name    =
+# proxmox_nodes = {
+#   compute = {
+#     ssh_address          =
+#     snippet_datastore_id =
+#     vm_datastore_id      =
+#     vm_bridge            =
+#   }
+#   store = {
+#     ssh_address          =
+#     snippet_datastore_id =
+#     vm_datastore_id      =
+#     vm_bridge            =
+#   }
+# }
+# cloud_user            =
+# cloud_ssh_public_keys = []
+
+# Optional
+# vm_vlan_id = null
+
+# -----------------------------------------------------------------------------
+# Collector
+# -----------------------------------------------------------------------------
+
+# Required
+# collector_vm_id =
+
+# Optional
+# collector_node_name       = "compute"
+# collector_vm_cpu_cores    = 2
+# collector_vm_memory_mb    = 2048
+# collector_vm_disk_size_gb = 32
+# alloy_version             = "1.18.1-1"
+
+# -----------------------------------------------------------------------------
+# Store
+# -----------------------------------------------------------------------------
+
+# Required
+# warehouse_vm_id =
+# nfs_server      =
+# nfs_export      =
+# s3_endpoint     =
+
+# Optional
+# warehouse_node_name       = "store"
+# warehouse_vm_cpu_cores    = 8
+# warehouse_vm_memory_mb    = 16384
+# warehouse_vm_disk_size_gb = 128
+# nfs_mount_options         = "rw,_netdev,nofail,x-systemd.automount,x-systemd.device-timeout=10s"
+# s3_insecure               = true
+# mimir_bucket_name         = "mimir"
+# loki_bucket_name          = "loki"
+# tempo_bucket_name         = "tempo"
+# retention_hours           = 720
+
+# -----------------------------------------------------------------------------
+# UI
+# -----------------------------------------------------------------------------
+
+# Required
+# grafana_vm_id =
+
+# Optional
+# grafana_node_name       = "compute"
+# grafana_vm_cpu_cores    = 2
+# grafana_vm_memory_mb    = 4096
+# grafana_vm_disk_size_gb = 32
+# grafana_version         = "13.1.1"

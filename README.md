@@ -101,6 +101,11 @@ connection while away from home.
 
 ### Observability Warehouse
 
+[Grafana Alloy, Mimir, Loki, and Tempo](services/observability-warehouse/README.md)
+form one observability service with Grafana on three Debian 13 VMs. Alloy runs
+in a dedicated collector VM, Mimir, Loki, and Tempo run in a warehouse VM, and
+Grafana runs in a separate visualization VM.
+
 ## Network
 
 - Unifi Dream Machine

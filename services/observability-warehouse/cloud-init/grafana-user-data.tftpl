@@ -1,0 +1,49 @@
+#cloud-config
+hostname: grafana
+manage_etc_hosts: true
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: ${cloud_user}
+    lock_passwd: true
+    shell: /bin/bash
+    ssh_authorized_keys: ${cloud_ssh_public_keys}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - openssl
+  - qemu-guest-agent
+
+write_files:
+  - path: /var/lib/cloud/instance/install-grafana.sh
+    permissions: "0700"
+    owner: root:root
+    encoding: b64
+    content: ${grafana_installer_base64}
+  - path: /var/lib/cloud/instance/observability-warehouse-datasources.yaml
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${grafana_datasources_base64}
+  - path: /etc/systemd/system/grafana-server.service.d/observability.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Service]
+      EnvironmentFile=/etc/grafana/grafana-admin.env
+      Environment=GF_AUTH_BASIC_PASSWORD_POLICY=true
+      Environment=GF_ANALYTICS_REPORTING_ENABLED=false
+      Environment=GF_ANALYTICS_CHECK_FOR_UPDATES=false
+
+runcmd:
+  - [bash, /var/lib/cloud/instance/install-grafana.sh, "${grafana_version}"]
+  - [install, -o, root, -g, grafana, -m, "0640", /var/lib/cloud/instance/observability-warehouse-datasources.yaml, /etc/grafana/provisioning/datasources/observability-warehouse.yaml]
+  - [bash, -ec, "umask 077; password=$(openssl rand -hex 32); test -n \"$password\"; temporary=$(mktemp /etc/grafana/.grafana-admin.env.XXXXXX); printf 'GF_SECURITY_ADMIN_PASSWORD=%s\\n' \"$password\" > \"$temporary\"; mv \"$temporary\" /etc/grafana/grafana-admin.env"]
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, grafana-server]
+  - [bash, -c, "for attempt in $(seq 1 60); do curl --fail --silent http://127.0.0.1:3000/api/health && exit 0; sleep 2; done; exit 1"]

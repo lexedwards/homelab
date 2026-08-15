@@ -1,0 +1,77 @@
+services:
+  mimir:
+    image: grafana/mimir:3.1.4
+    command:
+      - -config.file=/etc/mimir/mimir.yaml
+      - -config.expand-env=true
+    restart: unless-stopped
+    env_file:
+      - /etc/observability-warehouse/object-storage.env
+    ports:
+      - "9009:9009"
+    volumes:
+      - /etc/observability-warehouse/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir-data:/data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 2m
+    logging:
+      options:
+        max-size: 20m
+        max-file: "3"
+
+  loki:
+    image: grafana/loki:3.7.6
+    command:
+      - -config.file=/etc/loki/loki.yaml
+      - -config.expand-env=true
+    restart: unless-stopped
+    env_file:
+      - /etc/observability-warehouse/object-storage.env
+    ports:
+      - "3100:3100"
+    volumes:
+      - /etc/observability-warehouse/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 2m
+    logging:
+      options:
+        max-size: 20m
+        max-file: "3"
+
+  tempo:
+    image: grafana/tempo:3.0.3
+    command:
+      - -target=all
+      - -config.file=/etc/tempo/tempo.yaml
+      - -config.expand-env=true
+    restart: unless-stopped
+    env_file:
+      - /etc/observability-warehouse/object-storage.env
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - /etc/observability-warehouse/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 2m
+    logging:
+      options:
+        max-size: 20m
+        max-file: "3"
+
+volumes:
+  loki-data:
+  mimir-data:
+  tempo-data:

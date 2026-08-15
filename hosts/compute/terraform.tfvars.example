@@ -1,0 +1,4 @@
+proxmox_endpoint = "https://compute.example.com:8006/"
+
+# Set this only when the host certificate cannot be verified.
+# proxmox_insecure = true

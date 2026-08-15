@@ -1,0 +1,45 @@
+#cloud-config
+hostname: telemetry-collector
+manage_etc_hosts: true
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: ${cloud_user}
+    lock_passwd: true
+    shell: /bin/bash
+    ssh_authorized_keys: ${cloud_ssh_public_keys}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - qemu-guest-agent
+
+write_files:
+  - path: /var/lib/cloud/instance/install-alloy.sh
+    permissions: "0700"
+    owner: root:root
+    encoding: b64
+    content: ${alloy_installer_base64}
+  - path: /var/lib/cloud/instance/telemetry-collector.alloy
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${alloy_config_base64}
+  - path: /var/lib/cloud/instance/alloy-default
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${alloy_environment_base64}
+
+runcmd:
+  - [bash, /var/lib/cloud/instance/install-alloy.sh, "${alloy_version}"]
+  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/telemetry-collector.alloy, /etc/alloy/config.alloy]
+  - [install, -o, root, -g, root, -m, "0644", /var/lib/cloud/instance/alloy-default, "${alloy_environment_path}"]
+  - [bash, -c, "set -a; . ${alloy_environment_path}; set +a; alloy validate /etc/alloy/config.alloy"]
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [systemctl, enable, alloy]
+  - [systemctl, restart, alloy]
+  - [bash, -c, "for attempt in $(seq 1 30); do curl --fail --silent http://127.0.0.1:12345/-/ready && exit 0; sleep 2; done; exit 1"]

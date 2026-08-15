@@ -1,0 +1,62 @@
+target: all
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+  log_level: info
+
+common:
+  storage:
+    backend: s3
+    s3:
+      endpoint: ${s3_endpoint}
+      access_key_id: $${AWS_ACCESS_KEY_ID}
+      secret_access_key: $${AWS_SECRET_ACCESS_KEY}
+      insecure: ${s3_insecure}
+      bucket_name: ${mimir_bucket}
+      bucket_lookup_type: path
+
+blocks_storage:
+  storage_prefix: blocks
+  tsdb:
+    dir: /data/tsdb
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+ruler:
+  rule_path: /data/ruler
+  ring:
+    kvstore:
+      store: inmemory
+
+ruler_storage:
+  storage_prefix: ruler
+
+limits:
+  compactor_blocks_retention_period: ${retention_period}
+
+usage_stats:
+  enabled: false

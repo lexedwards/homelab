@@ -1,0 +1,81 @@
+#cloud-config
+hostname: observability-warehouse
+manage_etc_hosts: true
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: ${cloud_user}
+    groups: [adm, sudo]
+    lock_passwd: true
+    shell: /bin/bash
+    ssh_authorized_keys: ${cloud_ssh_public_keys}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - docker-compose
+  - docker.io
+  - nfs-common
+  - qemu-guest-agent
+
+mounts:
+  - ["${nfs_source}", /mnt/warehouse, nfs, "${nfs_mount_options}", "0", "0"]
+
+write_files:
+  - path: /opt/observability-warehouse/compose.yaml
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${compose_config_base64}
+  - path: /etc/observability-warehouse/mimir.yaml
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${mimir_config_base64}
+  - path: /etc/observability-warehouse/loki.yaml
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${loki_config_base64}
+  - path: /etc/observability-warehouse/tempo.yaml
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${tempo_config_base64}
+  - path: /etc/observability-warehouse/object-storage.env.example
+    permissions: "0600"
+    owner: root:root
+    content: |
+      AWS_ACCESS_KEY_ID=<rustfs-access-key>
+      AWS_SECRET_ACCESS_KEY=<rustfs-secret-key>
+  - path: /etc/systemd/system/observability-warehouse.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Grafana observability warehouse
+      Wants=network-online.target
+      After=network-online.target docker.service
+      Requires=docker.service
+      ConditionPathExists=/etc/observability-warehouse/object-storage.env
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      WorkingDirectory=/opt/observability-warehouse
+      ExecStart=/usr/bin/docker compose --env-file /etc/observability-warehouse/object-storage.env up --detach --remove-orphans
+      ExecStop=/usr/bin/docker compose --env-file /etc/observability-warehouse/object-storage.env down
+      TimeoutStartSec=0
+      TimeoutStopSec=5min
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, observability-warehouse.service]

@@ -13,10 +13,12 @@ roots are candidate examples and cannot override tracked conventions.
    node boundaries and provider workflow.
 2. Read `services/image-catalogue/` for curated VM image inputs, cloud-init-ready
    template defaults, explicit IDs, and current provider constraints.
-3. When tracked, read `services/observability-warehouse/` for an end-to-end VM
-   baseline, snippet upload, cross-node clone, guest-agent address wait,
-   protection, validation, and credential enrollment. Otherwise treat it only
-   as a candidate example.
+3. When tracked, read `services/observability-warehouse/` for an end-to-end
+   legacy VM-resource baseline, snippet upload, cross-node clone, guest-agent
+   address wait, protection, validation, and credential enrollment. Its
+   `proxmox_virtual_environment_vm` clone model is evidence for capabilities
+   that `proxmox_cloned_vm` does not manage, not the default for every new
+   clone. Otherwise treat it only as a candidate example.
 4. Inspect the schema of the provider version pinned by current roots before
    using an argument not present in those examples.
 
@@ -74,9 +76,15 @@ unless the appliance supports them.
 - Attach one enabled NIC to a required bridge. Validate VLAN as `null` or an
   integer from 1 through 4094.
 - Use DHCP, start immediately and on host boot, and add startup ordering only
-  for a real dependency.
-- Set `protection = true` for a long-lived guest. Explain that protection must
-  be deliberately disabled before destroy and is not a backup.
+  for a real dependency. With `proxmox_cloned_vm`, verify every required setting
+  absent from its schema is inherited from the template or choose the
+  full-control VM resource.
+- Set `protection = true` for a long-lived guest when the selected resource can
+  manage it. When `proxmox_cloned_vm` cannot manage protection, verify that it
+  is inherited from the source template or choose the full-control VM resource;
+  do not imply that inherited or operator-managed protection is tracked by
+  OpenTofu. Protection must be deliberately disabled before destroy and is not
+  a backup.
 - Use lowercase tags containing `iac` and the service identity.
 - Expose discovered addresses only as sensitive outputs.
 

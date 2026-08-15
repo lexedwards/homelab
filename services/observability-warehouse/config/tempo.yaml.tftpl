@@ -1,0 +1,40 @@
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: info
+
+memory:
+  automemlimit_enabled: true
+  automemlimit_ratio: 0.8
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+storage:
+  trace:
+    backend: s3
+    wal:
+      path: /var/tempo/wal
+    s3:
+      bucket: ${tempo_bucket}
+      endpoint: ${s3_endpoint}
+      access_key: $${AWS_ACCESS_KEY_ID}
+      secret_key: $${AWS_SECRET_ACCESS_KEY}
+      insecure: ${s3_insecure}
+      forcepathstyle: true
+
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: ${retention_period}
+
+usage_report:
+  reporting_enabled: false
