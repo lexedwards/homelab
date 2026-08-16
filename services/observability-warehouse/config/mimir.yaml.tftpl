@@ -15,6 +15,8 @@ common:
       insecure: ${s3_insecure}
       bucket_name: ${mimir_bucket}
       bucket_lookup_type: path
+      http:
+        insecure_skip_verify: ${s3_insecure_skip_verify}
 
 blocks_storage:
   storage_prefix: blocks

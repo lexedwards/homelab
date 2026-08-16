@@ -29,6 +29,7 @@ storage:
       secret_key: $${AWS_SECRET_ACCESS_KEY}
       insecure: ${s3_insecure}
       forcepathstyle: true
+      tls_insecure_skip_verify: ${s3_insecure_skip_verify}
 
 backend_scheduler:
   provider:

@@ -23,23 +23,32 @@ locals {
   host_config = var.proxmox_nodes
 
   service_config = {
-    s3_endpoint      = jsonencode(var.s3_endpoint)
-    s3_insecure      = var.s3_insecure
-    mimir_bucket     = jsonencode(var.mimir_bucket_name)
-    loki_bucket      = jsonencode(var.loki_bucket_name)
-    tempo_bucket     = jsonencode(var.tempo_bucket_name)
-    retention_period = "${var.retention_hours}h"
+    s3_endpoint             = jsonencode(var.s3_endpoint)
+    s3_insecure             = var.s3_insecure
+    s3_insecure_skip_verify = var.s3_insecure_skip_verify
+    mimir_bucket            = jsonencode(var.mimir_bucket_name)
+    loki_bucket             = jsonencode(var.loki_bucket_name)
+    tempo_bucket            = jsonencode(var.tempo_bucket_name)
+    retention_period        = "${var.retention_hours}h"
   }
 
+  s3_credentials_configured  = var.s3_access_key_id != "" && var.s3_secret_access_key != ""
+  object_storage_environment = <<-EOT
+    AWS_ACCESS_KEY_ID=${jsonencode(var.s3_access_key_id)}
+    AWS_SECRET_ACCESS_KEY=${jsonencode(var.s3_secret_access_key)}
+  EOT
+
   cloud_init_user_data = templatefile("${path.module}/cloud-init/user-data.tftpl", {
-    cloud_user            = var.cloud_user
-    cloud_ssh_public_keys = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
-    nfs_source            = "${var.nfs_server}:${var.nfs_export}"
-    nfs_mount_options     = var.nfs_mount_options
-    compose_config_base64 = base64encode(file("${path.module}/config/compose.yaml"))
-    mimir_config_base64   = base64encode(templatefile("${path.module}/config/mimir.yaml.tftpl", local.service_config))
-    loki_config_base64    = base64encode(templatefile("${path.module}/config/loki.yaml.tftpl", local.service_config))
-    tempo_config_base64   = base64encode(templatefile("${path.module}/config/tempo.yaml.tftpl", local.service_config))
+    cloud_user                        = var.cloud_user
+    cloud_ssh_public_keys             = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
+    nfs_source                        = "${var.nfs_server}:${var.nfs_export}"
+    nfs_mount_options                 = var.nfs_mount_options
+    compose_config_base64             = base64encode(file("${path.module}/config/compose.yaml"))
+    mimir_config_base64               = base64encode(templatefile("${path.module}/config/mimir.yaml.tftpl", local.service_config))
+    loki_config_base64                = base64encode(templatefile("${path.module}/config/loki.yaml.tftpl", local.service_config))
+    tempo_config_base64               = base64encode(templatefile("${path.module}/config/tempo.yaml.tftpl", local.service_config))
+    s3_credentials_configured         = local.s3_credentials_configured
+    object_storage_environment_base64 = base64encode(local.object_storage_environment)
   })
 
   warehouse_network_interface_index = index(
@@ -96,6 +105,16 @@ resource "proxmox_virtual_environment_file" "cloud_init" {
   source_raw {
     data      = local.cloud_init_user_data
     file_name = "observability-warehouse_cloud-config.yaml"
+  }
+
+  lifecycle {
+    precondition {
+      condition = (
+        (var.s3_access_key_id == "" && var.s3_secret_access_key == "") ||
+        (var.s3_access_key_id != "" && var.s3_secret_access_key != "")
+      )
+      error_message = "s3_access_key_id and s3_secret_access_key must either both be set or both be empty."
+    }
   }
 }
 
@@ -207,7 +226,7 @@ resource "proxmox_virtual_environment_vm" "telemetry_collector" {
   clone {
     vm_id        = var.template_vm_id
     node_name    = var.template_node_name
-    datastore_id = local.host_config[var.warehouse_node_name].vm_datastore_id
+    datastore_id = local.host_config[var.collector_node_name].vm_datastore_id
     full         = true
     retries      = 3
   }
@@ -295,7 +314,7 @@ resource "proxmox_virtual_environment_vm" "grafana" {
   clone {
     vm_id        = var.template_vm_id
     node_name    = var.template_node_name
-    datastore_id = local.host_config[var.warehouse_node_name].vm_datastore_id
+    datastore_id = local.host_config[var.grafana_node_name].vm_datastore_id
     full         = true
     retries      = 3
   }

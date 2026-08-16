@@ -51,6 +51,11 @@ write_files:
     content: |
       AWS_ACCESS_KEY_ID=<rustfs-access-key>
       AWS_SECRET_ACCESS_KEY=<rustfs-secret-key>
+  - path: /var/lib/cloud/instance/object-storage.env
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${object_storage_environment_base64}
   - path: /etc/systemd/system/observability-warehouse.service
     permissions: "0644"
     owner: root:root
@@ -78,4 +83,4 @@ runcmd:
   - [systemctl, enable, --now, docker]
   - [systemctl, enable, --now, qemu-guest-agent]
   - [systemctl, daemon-reload]
-  - [systemctl, enable, observability-warehouse.service]
+  - [bash, -c, "if ${s3_credentials_configured}; then install -o root -g root -m 0600 /var/lib/cloud/instance/object-storage.env /etc/observability-warehouse/object-storage.env && rm -f /var/lib/cloud/instance/object-storage.env && systemctl enable --now observability-warehouse.service; else rm -f /var/lib/cloud/instance/object-storage.env && systemctl enable observability-warehouse.service; fi"]

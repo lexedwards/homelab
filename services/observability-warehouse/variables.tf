@@ -249,8 +249,41 @@ variable "s3_endpoint" {
   }
 }
 
+variable "s3_access_key_id" {
+  description = "RustFS S3 access key ID shared by Mimir, Loki, and Tempo."
+  type        = string
+  default     = ""
+  nullable    = false
+  sensitive   = true
+
+  validation {
+    condition     = var.s3_access_key_id == "" || (length(trimspace(var.s3_access_key_id)) > 0 && !strcontains(var.s3_access_key_id, "\n"))
+    error_message = "s3_access_key_id must be empty or a non-empty single-line value."
+  }
+}
+
+variable "s3_secret_access_key" {
+  description = "RustFS S3 secret access key shared by Mimir, Loki, and Tempo."
+  type        = string
+  default     = ""
+  nullable    = false
+  sensitive   = true
+
+  validation {
+    condition     = var.s3_secret_access_key == "" || (length(trimspace(var.s3_secret_access_key)) > 0 && !strcontains(var.s3_secret_access_key, "\n"))
+    error_message = "s3_secret_access_key must be empty or a non-empty single-line value."
+  }
+}
+
 variable "s3_insecure" {
-  description = "Use plaintext HTTP when connecting to the RustFS S3 endpoint."
+  description = "Use plaintext HTTP instead of HTTPS when connecting to RustFS."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "s3_insecure_skip_verify" {
+  description = "Skip verification of the RustFS HTTPS certificate."
   type        = bool
   default     = true
   nullable    = false

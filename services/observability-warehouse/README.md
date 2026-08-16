@@ -33,7 +33,8 @@ data.
 - Proxmox must be able to full-clone the source template to each target
   datastore. Cluster membership does not make node-local storage shared.
 - DHCP, routing, and any configured VLANs must cover all three VMs.
-- A RustFS S3 endpoint and three existing buckets for Mimir, Loki, and Tempo.
+- A RustFS HTTPS S3 endpoint with a self-signed certificate and three existing
+  buckets for Mimir, Loki, and Tempo.
 - An NFS export reachable from the warehouse VM.
 - OpenTofu 1.6 or newer, `make`, `yamllint`, and an Alloy binary matching the
   configured package version.
@@ -71,8 +72,10 @@ the guest. The password does not enter OpenTofu state.
    cloud-user, and SSH-key values are shared. Define each target node once in
    `proxmox_nodes`; the provider generates its SSH mappings from that map. Set
    the API token, PAM SSH username, and private-key path using the same provider
-   contract as the image catalogue. The
-   ignored variable file contains the API token and node addresses in plaintext
+   contract as the image catalogue. Set `s3_access_key_id` and
+   `s3_secret_access_key` together to provision the root-owned credential file
+   and start the warehouse service on first boot. The ignored variable file
+   contains these credentials, the API token, and node addresses in plaintext
    and must remain readable only by its owner; keep the private key outside this
    repository.
 
@@ -95,15 +98,17 @@ the guest. The password does not enter OpenTofu state.
    ```
 
 4. In RustFS, create the configured Mimir, Loki, and Tempo buckets and grant one
-   service identity access only to those buckets. Install its credentials in the
-   warehouse VM without passing them through OpenTofu state:
+   service identity access only to those buckets. When both S3 credential
+   variables were assigned, verify the automatically started service:
 
    ```bash
    ssh <cloud-user>@<warehouse-address>
-   sudo install -m 0600 -o root -g root /etc/observability-warehouse/object-storage.env.example /etc/observability-warehouse/object-storage.env
-   sudoedit /etc/observability-warehouse/object-storage.env
-   sudo systemctl start observability-warehouse
+   sudo systemctl status observability-warehouse
    ```
+
+   When both variables retain their empty defaults, first boot writes only
+   `object-storage.env.example` and leaves the service stopped. Enroll the
+   credentials manually in `object-storage.env` and start the service.
 
 5. Retrieve Grafana's guest-generated initial password over SSH, sign in as
    `admin`, and change the password immediately:
@@ -243,16 +248,20 @@ service HA, replication, cross-node startup ordering, or automatic failover.
 
 The collector and warehouse use plaintext, unauthenticated protocols on their
 private network. Restrict collector ports `9090`, `3100`, `4317`, and `4318` to
-approved telemetry producers. Restrict warehouse ingestion ports to the
+approved telemetry producers, and restrict the Alloy administration port
+`12345` to approved administrators. Restrict warehouse ingestion ports to the
 collector and warehouse query ports to Grafana and approved administrators. Do
 not expose these VMs to an untrusted network. Restrict Grafana's plaintext HTTP
 port `3000` to approved users or a trusted reverse proxy.
 
-The Alloy administration server listens only on `127.0.0.1:12345`. Application
-credentials are not rendered into cloud-init. RustFS credentials are enrolled
-after deployment in a root-owned file on the warehouse VM. Grafana's initial
-administrator password is generated in the guest and stored in a root-owned
-file rather than OpenTofu state.
+The Alloy administration server listens on all collector interfaces at port
+`12345` without authentication or TLS. When the S3 credential variables are
+assigned, RustFS credentials are rendered into cloud-init, the uploaded Proxmox
+snippet, saved plans, and OpenTofu state before being installed in a root-owned
+file on the warehouse VM. Marking the variables sensitive redacts normal CLI
+output but does not encrypt those locations. Grafana's initial administrator
+password is generated in the guest and stored in a root-owned file rather than
+OpenTofu state.
 
 ## Backup Boundary
 
@@ -290,6 +299,8 @@ sudo journalctl -u alloy
 sudo bash -c 'set -a; . /etc/default/alloy; set +a; alloy validate /etc/alloy/config.alloy'
 sudo systemctl reload alloy
 curl --fail http://127.0.0.1:12345/-/ready
+# From an approved administrator host:
+curl --fail http://<collector-address>:12345/-/ready
 ```
 
 The validation command above uses Debian's APT package environment path.
