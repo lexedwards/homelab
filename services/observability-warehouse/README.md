@@ -48,6 +48,12 @@ verifies the repository key fingerprint and installs the exact `alloy_version`,
 which defaults to `1.18.1-1`. The repository definition follows Grafana's
 [Alloy Linux installation] instructions.
 
+The collector loads `config/alloy/config.alloy` and
+`config/alloy/copilot.alloy` as one Alloy configuration. Component names must
+therefore remain unique across both files. The Copilot span-to-metrics pipeline
+uses an experimental Alloy component, so both runtime and validation enable
+Alloy's experimental stability level.
+
 Grafana OSS uses the same signed repository and key verification described in
 the [Grafana Debian installation] instructions. First boot
 installs the exact `grafana_version`, which defaults to `13.1.1`, provisions the
@@ -190,6 +196,10 @@ the consolidated root has completed a successful refresh and apply.
 | OTLP logs | gRPC `:4317` or HTTP `:4318/v1/logs` | Converted to Loki entries and sent to Loki |
 | OTLP traces | gRPC `:4317` or HTTP `:4318/v1/traces` | Tempo OTLP/gRPC `:4317` |
 
+All OTLP traces continue to Tempo. Spans carrying the GitHub Copilot AI-credit
+attribute also generate request, token, duration, error, and AI-credit metrics
+that Alloy writes to Mimir.
+
 OTLP log conversion promotes `service.name`, `service.namespace`,
 `deployment.environment.name`, and `host.name` to Loki labels. Other attributes
 remain in the converted entry rather than becoming high-cardinality labels.
@@ -296,7 +306,7 @@ Check and reload Alloy on the collector:
 ```bash
 sudo systemctl status alloy
 sudo journalctl -u alloy
-sudo bash -c 'set -a; . /etc/default/alloy; set +a; alloy validate /etc/alloy/config.alloy'
+sudo bash -c 'set -a; . /etc/default/alloy; set +a; alloy validate --stability.level=experimental /etc/alloy'
 sudo systemctl reload alloy
 curl --fail http://127.0.0.1:12345/-/ready
 # From an approved administrator host:
@@ -315,12 +325,13 @@ curl --fail http://127.0.0.1:3000/api/health
 
 Upgrade one pinned component at a time after reviewing release notes and backup
 status. Update `config/compose.yaml` for warehouse images, `alloy_version` for
-the collector, or `grafana_version` for Grafana. Cloud-init changes update
-uploaded snippets but do not reconfigure existing VMs; apply equivalent changes
-in the guest or replace the affected VM after reviewing the plan. Replacement
-discards that VM's local state and causes a component-specific interruption. A
-Grafana replacement also discards users and UI-managed dashboards unless they
-are restored from backup.
+the collector package, files under `config/alloy/` for collector pipelines, or
+`grafana_version` for Grafana. Cloud-init changes update uploaded snippets but
+do not reconfigure existing VMs; apply equivalent changes in the guest or
+replace the affected VM after reviewing the plan. Replacement discards that
+VM's local state and causes a component-specific interruption. A Grafana
+replacement also discards users and UI-managed dashboards unless they are
+restored from backup.
 
 ## Troubleshooting
 

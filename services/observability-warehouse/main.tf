@@ -65,13 +65,14 @@ locals {
   })
 
   collector_cloud_init_user_data = templatefile("${path.module}/cloud-init/collector-user-data.tftpl", {
-    alloy_config_base64      = base64encode(file("${path.module}/config/config.alloy"))
-    alloy_environment_base64 = base64encode(local.collector_alloy_environment)
-    alloy_environment_path   = "/etc/default/alloy"
-    alloy_installer_base64   = base64encode(file("${path.module}/cloud-init/install-alloy-debian.sh"))
-    alloy_version            = var.alloy_version
-    cloud_user               = var.cloud_user
-    cloud_ssh_public_keys    = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
+    alloy_config_base64         = base64encode(file("${path.module}/config/alloy/config.alloy"))
+    alloy_environment_base64    = base64encode(local.collector_alloy_environment)
+    alloy_environment_path      = "/etc/default/alloy"
+    alloy_installer_base64      = base64encode(file("${path.module}/cloud-init/install-alloy-debian.sh"))
+    alloy_version               = var.alloy_version
+    cloud_user                  = var.cloud_user
+    cloud_ssh_public_keys       = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
+    copilot_alloy_config_base64 = base64encode(file("${path.module}/config/alloy/copilot.alloy"))
   })
 
   grafana_datasources_config = templatefile("${path.module}/config/grafana-datasources.yaml.tftpl", {

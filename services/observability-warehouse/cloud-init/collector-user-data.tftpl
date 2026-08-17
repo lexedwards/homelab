@@ -23,11 +23,16 @@ write_files:
     owner: root:root
     encoding: b64
     content: ${alloy_installer_base64}
-  - path: /var/lib/cloud/instance/telemetry-collector.alloy
+  - path: /var/lib/cloud/instance/alloy/config.alloy
     permissions: "0600"
     owner: root:root
     encoding: b64
     content: ${alloy_config_base64}
+  - path: /var/lib/cloud/instance/alloy/copilot.alloy
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${copilot_alloy_config_base64}
   - path: /var/lib/cloud/instance/alloy-default
     permissions: "0600"
     owner: root:root
@@ -36,9 +41,11 @@ write_files:
 
 runcmd:
   - [bash, /var/lib/cloud/instance/install-alloy.sh, "${alloy_version}"]
-  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/telemetry-collector.alloy, /etc/alloy/config.alloy]
+  - [bash, -c, "rm -f /etc/alloy/*.alloy"]
+  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/alloy/config.alloy, /etc/alloy/config.alloy]
+  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/alloy/copilot.alloy, /etc/alloy/copilot.alloy]
   - [install, -o, root, -g, root, -m, "0644", /var/lib/cloud/instance/alloy-default, "${alloy_environment_path}"]
-  - [bash, -c, "set -a; . ${alloy_environment_path}; set +a; alloy validate /etc/alloy/config.alloy"]
+  - [bash, -c, "set -a; . ${alloy_environment_path}; set +a; alloy validate --stability.level=experimental /etc/alloy"]
   - [systemctl, enable, --now, qemu-guest-agent]
   - [systemctl, enable, alloy]
   - [systemctl, restart, alloy]

@@ -1,0 +1,179 @@
+// Requires Alloy to run with --stability.level=experimental.
+// If Copilot uses different gen_ai attribute names, update them to match Tempo.
+otelcol.connector.signaltometrics "copilot" {
+	spans {
+		name        = "github.copilot.nano_aiu"
+		description = "GitHub Copilot AI Credits consumed, in nano-AIC"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		sum {
+			value = `attributes["github.copilot.nano_aiu"]`
+		}
+	}
+
+	spans {
+		name        = "github.copilot.requests"
+		description = "Number of billable GitHub Copilot model requests"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		sum {
+			value = "1"
+		}
+	}
+
+	spans {
+		name        = "github.copilot.input_tokens"
+		description = "Number of input tokens consumed by GitHub Copilot"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil and attributes["gen_ai.usage.input_tokens"] != nil`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		sum {
+			value = `attributes["gen_ai.usage.input_tokens"]`
+		}
+	}
+
+	spans {
+		name        = "github.copilot.output_tokens"
+		description = "Number of output tokens produced by GitHub Copilot"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil and attributes["gen_ai.usage.output_tokens"] != nil`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		sum {
+			value = `attributes["gen_ai.usage.output_tokens"]`
+		}
+	}
+
+	spans {
+		name        = "github.copilot.request.duration"
+		description = "Duration of billable GitHub Copilot model requests"
+		unit        = "ms"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		histogram {
+			value   = "Milliseconds(end_time - start_time)"
+			buckets = [100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000]
+		}
+	}
+
+	spans {
+		name        = "github.copilot.errors"
+		description = "Number of failed billable GitHub Copilot model requests"
+		conditions  = [
+			`attributes["github.copilot.nano_aiu"] != nil and status.code == STATUS_CODE_ERROR`,
+		]
+
+		attributes {
+			key = "gen_ai.request.model"
+		}
+
+		attributes {
+			key      = "gen_ai.request.reasoning.level"
+			optional = true
+		}
+
+		include_resource_attributes {
+			key      = "service.name"
+			optional = true
+		}
+
+		sum {
+			value = "1"
+		}
+	}
+
+	output {
+		metrics = [otelcol.processor.deltatocumulative.copilot.input]
+	}
+}
+
+otelcol.processor.deltatocumulative "copilot" {
+	output {
+		metrics = [otelcol.processor.interval.copilot.input]
+	}
+}
+
+otelcol.processor.interval "copilot" {
+	interval = "60s"
+
+	output {
+		metrics = [otelcol.exporter.prometheus.warehouse.input]
+	}
+}

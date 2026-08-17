@@ -2,6 +2,7 @@ TOFU ?= tofu
 YAMLLINT ?= yamllint
 ALLOY ?= alloy
 PLAN_FILE ?= deployment.tfplan
+ALLOY_CONFIGS := config/alloy/config.alloy config/alloy/copilot.alloy
 
 .PHONY: help init fmt fmt-check tofu-validate yaml-validate shell-validate alloy-validate validate plan apply
 
@@ -38,11 +39,12 @@ shell-validate:
 	bash -n cloud-init/install-grafana-debian.sh
 
 alloy-validate:
-	$(ALLOY) fmt --test config/config.alloy
+	test -n "$(ALLOY_CONFIGS)"
+	for config in $(ALLOY_CONFIGS); do $(ALLOY) fmt --test "$$config"; done
 	MIMIR_URL=http://warehouse.invalid:9009/api/v1/push \
 	LOKI_URL=http://warehouse.invalid:3100/loki/api/v1/push \
 	TEMPO_ENDPOINT=warehouse.invalid:4317 \
-	$(ALLOY) validate config/config.alloy
+	$(ALLOY) validate --stability.level=experimental config/alloy
 
 validate: fmt-check tofu-validate yaml-validate shell-validate alloy-validate
 

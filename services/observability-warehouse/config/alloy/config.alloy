@@ -69,7 +69,10 @@ otelcol.exporter.otlp "warehouse" {
 
 otelcol.processor.batch "traces" {
 	output {
-		traces = [otelcol.exporter.otlp.warehouse.input]
+		traces = [
+			otelcol.exporter.otlp.warehouse.input,
+			otelcol.connector.signaltometrics.copilot.input,
+		]
 	}
 }
 
