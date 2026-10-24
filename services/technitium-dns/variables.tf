@@ -82,3 +82,47 @@ variable "technitium_settings" {
     error_message = "Every adopted setting must be non-null. Use an explicit empty list only when the existing server list is empty."
   }
 }
+
+variable "technitium_zones" {
+  description = "Existing unsigned Primary zones keyed by stable opaque labels, not DNS names. Supply every policy value from the reviewed inventory; no zone names or ACLs are inferred from infrastructure."
+  type = map(object({
+    name                       = string
+    type                       = string
+    disabled                   = bool
+    soa_serial_date_scheme     = bool
+    query_access               = string
+    query_access_network_acl   = list(string)
+    dynamic_update             = string
+    dynamic_update_network_acl = list(string)
+  }))
+  sensitive = true
+  nullable  = false
+
+  validation {
+    condition = alltrue([
+      for zone in values(var.technitium_zones) : try(alltrue([for value in zone : value != null]), false)
+    ])
+    error_message = "Every adopted zone and all its attributes must be non-null. Use an explicit empty ACL only when the existing ACL is empty."
+  }
+
+  validation {
+    condition = alltrue([
+      for label, zone in var.technitium_zones : can(regex("^[a-z][a-z0-9_]*$", label)) && try(
+        zone.type == "Primary" && length(trimspace(zone.name)) > 0 && zone.name == trimspace(zone.name) &&
+        contains(["Allow", "Deny", "AllowOnlyPrivateNetworks", "AllowOnlyZoneNameServers", "UseSpecifiedNetworkACL", "AllowZoneNameServersAndUseSpecifiedNetworkACL"], zone.query_access) &&
+        contains(["Deny", "Allow", "AllowOnlyZoneNameServers", "UseSpecifiedNetworkACL", "AllowZoneNameServersAndUseSpecifiedNetworkACL"], zone.dynamic_update) &&
+        alltrue([for entry in concat(zone.query_access_network_acl, zone.dynamic_update_network_acl) : entry != null && length(trimspace(entry)) > 0]),
+        false
+      )
+    ])
+    error_message = "Use stable opaque snake_case labels, existing Primary zone names without surrounding whitespace, valid query/update modes, and ACLs without null or blank entries."
+  }
+
+  validation {
+    condition = try(
+      length(distinct([for zone in values(var.technitium_zones) : lower(trimsuffix(zone.name, "."))])) == length(var.technitium_zones),
+      false
+    )
+    error_message = "Each zone must have exactly one owner; zone names must be unique regardless of case or a trailing dot."
+  }
+}

@@ -67,3 +67,22 @@
 #   zone_transfer_allowed_networks =
 #   notify_allowed_networks        =
 # }
+
+# -----------------------------------------------------------------------------
+# Existing zones (all fields required; preserve existing values)
+# -----------------------------------------------------------------------------
+
+# Use stable opaque labels, never DNS names, as map keys. Keep labels unchanged
+# after import and add another object for each inventoried supported zone.
+# technitium_zones = {
+#   zone_0 = {
+#     name                       =
+#     type                       =
+#     disabled                   =
+#     soa_serial_date_scheme     =
+#     query_access               =
+#     query_access_network_acl   =
+#     dynamic_update             =
+#     dynamic_update_network_acl =
+#   }
+# }
