@@ -156,11 +156,8 @@ imports into this service's **existing authoritative state**. Follow the
 partial reruns, and legacy handoff. Import addresses are
 `technitium_record.managed["collector"]` and
 `technitium_record.managed["grafana_alias"]`; the tested A/CNAME ID format is
-`zone::name::type::value`. Preserve the actual proxy target and TTLs. Normally
-require a full-root exit-`0` plan, including the Proxmox resources. The existing
-deployment's [DNS-only verification exception] explicitly defers unrelated
-cloud-init/VM replacement drift: DNS adoption uses record-scoped no-change plans,
-not a claim of VM convergence. Do not apply that full-root replacement plan.
+`zone::name::type::value`. Preserve the actual proxy target and TTLs, then verify
+that both DNS records plan no changes after import.
 
 Both resources set `overwrite = false` to avoid clobbering sibling values.
 Omitted/null comments remain server-managed; explicit `""` clears them.
@@ -169,8 +166,7 @@ shared zone or other services' records. Guest deletion alone does not remove
 independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
 The offline tests target DNS records with mocked providers. They do not
 exercise VM provisioning or establish full-root production convergence.
-No permanent infrastructure ignore rules were added for DNS adoption. Use the
-[DNS recovery guidance] for application/state backup and recovery boundaries.
+Use the [DNS recovery guidance] for application/state backup and recovery.
 
 ## Node Placement
 
@@ -400,7 +396,6 @@ entry, SSH agent or private key, PAM username, and target snippet datastore.
 [image catalogue]: ../image-catalogue/README.md
 [Technitium DNS root]: ../technitium-dns/README.md
 [DNS import and transfer procedure]: ../technitium-dns/README.md#import-and-reconcile
-[DNS-only verification exception]: ../technitium-dns/README.md#dns-only-verification-exception
 [DNS recovery guidance]: ../technitium-dns/README.md#backup-and-recovery
 [Alloy Linux installation]: https://grafana.com/docs/alloy/latest/set-up/install/linux/
 [Grafana Debian installation]: https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/

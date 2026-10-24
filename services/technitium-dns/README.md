@@ -260,7 +260,7 @@ sibling TTLs. These checks do not discover competing writers in other states.
    An import failure can leave earlier entries bound: keep the state, inspect
    the partial result, and resume only unbound identities. Never apply a create
    action to adopt a record that already exists.
-5. Review a saved plan for the agreed scope in **each** affected root. Record
+5. Review a saved DNS plan in **each** affected root. Record
    imports must not need a server initialization write. OpenTofu can report an
    in-place update solely to mark imported fields sensitive: the tested plan had
    identical complete `before`/`after` values, no unknown fields, and different
@@ -268,12 +268,9 @@ sibling TTLs. These checks do not discover competing writers in other states.
    mutation, verified through a read-only sandbox proxy. Do not assume other
    updates are metadata-only; stop on any value drift or unrelated action.
    Obtain separate approval for any apply, including state normalization.
-6. Normally require final full-root exit-`0` plans in both roots. The existing
-   deployment has an explicit [DNS-only verification exception]: unrelated
-   observability cloud-init/VM replacement drift is deferred by the operator.
-   Under that exception, require exit-`0` DNS-scoped plans and unchanged DNS
-   behavior, not a claim of full-root convergence. Compare all records, apex
-   data, zone policies, and before/after answers. Parent zones stay in this root.
+6. Verify that adopted DNS resources plan no changes in both roots. Compare all
+   records, apex data, zone policies, and before/after DNS answers. Parent zones
+   stay in this root.
 
 Native imports are sufficient for this fixed inventory; no import script or
 tracked import IDs are required. Maps and state use the normal root inputs.
@@ -313,35 +310,9 @@ explicit state-transfer authorization, use `tofu state rm` on the old binding
 without destroying the live record, then import into the receiving state.
 Never apply between those steps or temporarily bind it in both states. Move
 all sibling values and related forward/reverse entries together. Require
-no-change plans for the agreed scope in both roots and unchanged DNS answers before
-releasing the freeze. If import fails, freeze remains in place; restore the old
-declaration and import its live identity back rather than recreating the record.
-Record any pre-existing infrastructure-drift exception explicitly; do not apply
-an unrelated replacement plan as part of a record transfer.
-
-### DNS-only Verification Exception
-
-The operator deferred existing observability cloud-init drift, whose full-root
-plan proposes replacing all three VMs. Do not apply that plan for DNS work.
-No permanent ignore rules or bootstrap changes were added. When planning is
-authorized, use these DNS-scoped plans from the respective existing roots:
-
-```bash
-# From services/technitium-dns
-tofu plan -detailed-exitcode -out=dns-review.tfplan \
-  -target=technitium_server_settings.existing \
-  -target=technitium_zone.managed \
-  -target=technitium_record.managed
-
-# From services/observability-warehouse
-tofu plan -detailed-exitcode -out=dns-review.tfplan \
-  -target=technitium_record.managed
-```
-
-Inspect each saved plan with `tofu show dns-review.tfplan`. Targeting proves only
-DNS convergence, not a clean infrastructure plan. Require unchanged DNS answers
-and exit `0` for the agreed scope; any apply needs separate approval. Return to
-full-root verification when the unrelated drift is resolved.
+no-change DNS plans in both roots and unchanged answers before releasing the
+freeze. If import fails, freeze remains in place; restore the old declaration
+and import its live identity back rather than recreating the record.
 
 ## Manage DNS Zones
 
@@ -511,4 +482,3 @@ Changing `cloud-init.user-data` does not rerun it on an existing instance.
 [Micro Node]: ../../hosts/micro-node/README.md
 [Observability Warehouse]: ../observability-warehouse/README.md
 [ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md
-[DNS-only verification exception]: #dns-only-verification-exception
