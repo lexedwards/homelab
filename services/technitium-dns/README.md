@@ -86,19 +86,22 @@ after the corresponding authorization.
 
 ```mermaid
 flowchart LR
-    T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Incus instance]
-    I -->|first-boot cloud-init| D[Technitium DNS Server]
-    I -->|tagged VLAN| N[DNS clients and upstream network]
-    T -->|Technitium API: audited settings and zone policies| D
-    O[Operator] -->|Other attributes, records and recovery| D
+    T["DNS root and existing state"] -->|Incus API| I["Existing Incus instance"]
+    I -->|hosts| D["Technitium DNS Server"]
+    T -->|"26 settings, 3 shared zones, 16 records"| D
+    S["Observability root and existing state"] -->|"Collector A and proxy-routed Grafana CNAME"| D
+    S -->|Proxmox API| V["Collector, warehouse and Grafana VMs"]
+    O["Operator"] -->|"6 apex SOA/NS records, other configuration and recovery"| D
+    C["DNS clients"] -->|UDP/TCP 53| D
+    D -->|configured forwarding| U["Upstream resolvers"]
 ```
 
 Incus, adopted server settings, and shared zones use the existing state ([ownership decision]).
 This preserves the current infrastructure ownership boundary rather than introducing a second
 configuration root or moving the instance. Declarations are separated in
-`main.tf`, `settings.tf`, and `zones.tf`; the explicit API endpoint does not change
-instance configuration. Service-owned records belong in their service roots when
-adopted, with exactly one owner per recordset. A service can supply its parent
+`main.tf`, `settings.tf`, `zones.tf`, and `records.tf`; the explicit API endpoint
+does not change instance configuration. Service-owned records belong in their
+service roots, with exactly one owner per recordset. A service can supply its parent
 zone name privately without owning that zone or depending on this root's state.
 
 `technitium_settings` explicitly represents:
@@ -257,17 +260,17 @@ sibling TTLs. These checks do not discover competing writers in other states.
    An import failure can leave earlier entries bound: keep the state, inspect
    the partial result, and resume only unbound identities. Never apply a create
    action to adopt a record that already exists.
-5. Review a full saved plan in **each** affected root. Record imports must not
-   need a server initialization write. OpenTofu can report an in-place update
-   solely to mark imported fields sensitive: the tested metadata-only plan had
+5. Review a saved DNS plan in **each** affected root. Record
+   imports must not need a server initialization write. OpenTofu can report an
+   in-place update solely to mark imported fields sensitive: the tested plan had
    identical complete `before`/`after` values, no unknown fields, and different
    sensitivity marks. Applying that saved plan updated state without any API
    mutation, verified through a read-only sandbox proxy. Do not assume other
    updates are metadata-only; stop on any value drift or unrelated action.
    Obtain separate approval for any apply, including state normalization.
-6. Require final full-root exit-`0` plans in both roots, not targeted plans or
-   infrastructure creates/updates. Compare all records, apex data, zone policies,
-   and before/after DNS answers. The parent zones remain owned only by this root.
+6. Verify that adopted DNS resources plan no changes in both roots. Compare all
+   records, apex data, zone policies, and before/after DNS answers. Parent zones
+   stay in this root.
 
 Native imports are sufficient for this fixed inventory; no import script or
 tracked import IDs are required. Maps and state use the normal root inputs.
@@ -307,9 +310,9 @@ explicit state-transfer authorization, use `tofu state rm` on the old binding
 without destroying the live record, then import into the receiving state.
 Never apply between those steps or temporarily bind it in both states. Move
 all sibling values and related forward/reverse entries together. Require
-no-change full-root plans in both roots and unchanged DNS answers before
-releasing the freeze. If import fails, freeze remains in place; restore the old
-declaration and import its live identity back rather than recreating the record.
+no-change DNS plans in both roots and unchanged answers before releasing the
+freeze. If import fails, freeze remains in place; restore the old declaration
+and import its live identity back rather than recreating the record.
 
 ## Manage DNS Zones
 
@@ -406,6 +409,25 @@ OpenTofu state; state cannot reconstruct operator-managed configuration or DNS
 data. Neither backup is a substitute for the other. OpenTofu does not manage
 the files under `/etc/dns` or apply application upgrades after first boot.
 
+Include authentication, web/DNS/log settings, zones, allowed/blocked lists, and
+block-list caches in application backups; include scopes, apps, cluster data,
+and external certificate/key files when used. ZIP CRC validation detects
+corruption, not completeness or usable credentials.
+
+Freeze concurrent operations before state recovery. Export each owning root
+with `tofu state pull` into a protected file outside Git; reject failed or
+invalid exports and check lineage, serial, and resource bindings. Restore a
+candidate copy in an isolated directory first and reconcile both roots' current
+ownership before an authorized backend restore. Do not force an older snapshot
+over newer ownership. State rollback alone does not undo a server write.
+
+Rehearse application recovery in a fresh rootless, network-none sandbox with no
+published ports. After restoring, verify authentication, settings, records/apex
+data, and UDP/TCP answers across restart. Network isolation cannot establish
+external forwarding or client routing. Production recovery/cutover needs
+separate approval; reconcile state and desired inputs before applying so stale
+inputs do not overwrite restored configuration.
+
 Restore using a distinct temporary recovery-administrator identity, not a name
 present in the backup. Technitium retains the restoring user/session as an
 administrator and replaces a backed-up user with the same name. Validate
@@ -437,6 +459,11 @@ Import also omits the local creation-only `wait_for` policy. With a protected
 state snapshot, review state-only alignment of that metadata separately. Do not
 apply an Incus update merely to initialize it: the provider's update path sends
 the instance configuration back to Incus even for a readiness-only difference.
+
+Before a provider upgrade, review schema/default/import changes and rehearse
+against an isolated restore. Check both roots' no-change plans, sibling records,
+comments, exclusions, and permissions. Do not change live DNS semantics merely
+to accommodate a provider.
 
 ## Troubleshooting
 
