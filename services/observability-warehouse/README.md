@@ -169,8 +169,8 @@ shared zone or other services' records. Guest deletion alone does not remove
 independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
 The offline tests target DNS records with mocked providers. They do not
 exercise VM provisioning or establish full-root production convergence.
-Use the [DNS operations runbook] for scoped drift review, changes, and recovery;
-no permanent infrastructure ignore rules were added for DNS adoption.
+No permanent infrastructure ignore rules were added for DNS adoption. Use the
+[DNS recovery guidance] for application/state backup and recovery boundaries.
 
 ## Node Placement
 
@@ -400,7 +400,7 @@ entry, SSH agent or private key, PAM username, and target snippet datastore.
 [image catalogue]: ../image-catalogue/README.md
 [Technitium DNS root]: ../technitium-dns/README.md
 [DNS import and transfer procedure]: ../technitium-dns/README.md#import-and-reconcile
-[DNS-only verification exception]: ../technitium-dns/operations.md#dns-only-verification-exception
-[DNS operations runbook]: ../technitium-dns/operations.md
+[DNS-only verification exception]: ../technitium-dns/README.md#dns-only-verification-exception
+[DNS recovery guidance]: ../technitium-dns/README.md#backup-and-recovery
 [Alloy Linux installation]: https://grafana.com/docs/alloy/latest/set-up/install/linux/
 [Grafana Debian installation]: https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/

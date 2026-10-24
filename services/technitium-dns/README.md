@@ -18,7 +18,6 @@ upgrades remain operator-managed.
   bridge, and a trusted Incus remote on the management workstation
 - DHCP, routing, and initial DNS on the service VLAN
 - OpenTofu 1.9 or newer, `make`, and `yamllint`; tested with OpenTofu 1.13.1
-- Python 3 for protected state snapshots and their offline checks
 - UDP and TCP `53` from DNS clients; administration access only from trusted clients
 - The existing Technitium server; adoption was audited against version 15.6.2
 - `registry.terraform.io/darkhonor/technitium` pinned to `1.3.0`
@@ -86,7 +85,7 @@ after the corresponding authorization.
 ## Architecture And Ownership
 
 ```mermaid
-    flowchart LR
+flowchart LR
     T["DNS root and existing state"] -->|Incus API| I["Existing Incus instance"]
     I -->|hosts| D["Technitium DNS Server"]
     T -->|"26 settings, 3 shared zones, 16 records"| D
@@ -104,9 +103,6 @@ configuration root or moving the instance. Declarations are separated in
 does not change instance configuration. Service-owned records belong in their
 service roots, with exactly one owner per recordset. A service can supply its parent
 zone name privately without owning that zone or depending on this root's state.
-
-See [DNS operations] for the adopted scope, DNS-only verification exception,
-routine changes, provider upgrades, and application versus state recovery.
 
 `technitium_settings` explicitly represents:
 
@@ -264,9 +260,9 @@ sibling TTLs. These checks do not discover competing writers in other states.
    An import failure can leave earlier entries bound: keep the state, inspect
    the partial result, and resume only unbound identities. Never apply a create
    action to adopt a record that already exists.
-5. Review a full saved plan in **each** affected root. Record imports must not
-   need a server initialization write. OpenTofu can report an in-place update
-   solely to mark imported fields sensitive: the tested metadata-only plan had
+5. Review a saved plan for the agreed scope in **each** affected root. Record
+   imports must not need a server initialization write. OpenTofu can report an
+   in-place update solely to mark imported fields sensitive: the tested plan had
    identical complete `before`/`after` values, no unknown fields, and different
    sensitivity marks. Applying that saved plan updated state without any API
    mutation, verified through a read-only sandbox proxy. Do not assume other
@@ -322,6 +318,30 @@ releasing the freeze. If import fails, freeze remains in place; restore the old
 declaration and import its live identity back rather than recreating the record.
 Record any pre-existing infrastructure-drift exception explicitly; do not apply
 an unrelated replacement plan as part of a record transfer.
+
+### DNS-only Verification Exception
+
+The operator deferred existing observability cloud-init drift, whose full-root
+plan proposes replacing all three VMs. Do not apply that plan for DNS work.
+No permanent ignore rules or bootstrap changes were added. When planning is
+authorized, use these DNS-scoped plans from the respective existing roots:
+
+```bash
+# From services/technitium-dns
+tofu plan -detailed-exitcode -out=dns-review.tfplan \
+  -target=technitium_server_settings.existing \
+  -target=technitium_zone.managed \
+  -target=technitium_record.managed
+
+# From services/observability-warehouse
+tofu plan -detailed-exitcode -out=dns-review.tfplan \
+  -target=technitium_record.managed
+```
+
+Inspect each saved plan with `tofu show dns-review.tfplan`. Targeting proves only
+DNS convergence, not a clean infrastructure plan. Require unchanged DNS answers
+and exit `0` for the agreed scope; any apply needs separate approval. Return to
+full-root verification when the unrelated drift is resolved.
 
 ## Manage DNS Zones
 
@@ -412,14 +432,30 @@ per-record permission boundary. Never remove it merely to make adoption pass.
 
 ## Backup And Recovery
 
-Follow the [recovery runbook] for backup coverage, protected state snapshots,
-isolated restore order, verification, and approval boundaries.
-
 Technitium stores its durable configuration on the instance root disk. Replacing
 the instance deletes it. Back up application configuration separately from
 OpenTofu state; state cannot reconstruct operator-managed configuration or DNS
 data. Neither backup is a substitute for the other. OpenTofu does not manage
 the files under `/etc/dns` or apply application upgrades after first boot.
+
+Include authentication, web/DNS/log settings, zones, allowed/blocked lists, and
+block-list caches in application backups; include scopes, apps, cluster data,
+and external certificate/key files when used. ZIP CRC validation detects
+corruption, not completeness or usable credentials.
+
+Freeze concurrent operations before state recovery. Export each owning root
+with `tofu state pull` into a protected file outside Git; reject failed or
+invalid exports and check lineage, serial, and resource bindings. Restore a
+candidate copy in an isolated directory first and reconcile both roots' current
+ownership before an authorized backend restore. Do not force an older snapshot
+over newer ownership. State rollback alone does not undo a server write.
+
+Rehearse application recovery in a fresh rootless, network-none sandbox with no
+published ports. After restoring, verify authentication, settings, records/apex
+data, and UDP/TCP answers across restart. Network isolation cannot establish
+external forwarding or client routing. Production recovery/cutover needs
+separate approval; reconcile state and desired inputs before applying so stale
+inputs do not overwrite restored configuration.
 
 Restore using a distinct temporary recovery-administrator identity, not a name
 present in the backup. Technitium retains the restoring user/session as an
@@ -453,6 +489,11 @@ state snapshot, review state-only alignment of that metadata separately. Do not
 apply an Incus update merely to initialize it: the provider's update path sends
 the instance configuration back to Incus even for a readiness-only difference.
 
+Before a provider upgrade, review schema/default/import changes and rehearse
+against an isolated restore. Check both roots' no-change plans, sibling records,
+comments, exclusions, and permissions. Do not change live DNS semantics merely
+to accommodate a provider.
+
 ## Troubleshooting
 
 ```bash
@@ -470,6 +511,4 @@ Changing `cloud-init.user-data` does not rerun it on an existing instance.
 [Micro Node]: ../../hosts/micro-node/README.md
 [Observability Warehouse]: ../observability-warehouse/README.md
 [ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md
-[DNS operations]: operations.md
-[DNS-only verification exception]: operations.md#dns-only-verification-exception
-[recovery runbook]: operations.md#backup-and-recovery
+[DNS-only verification exception]: #dns-only-verification-exception
