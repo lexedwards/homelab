@@ -1,5 +1,69 @@
-# Default image for this service. Uncomment only to override it.
+# Assign required environment-specific values after copying this file to
+# terraform.tfvars. Do not commit that file.
+# For adoption, copy existing values from the reviewed inventory, not provider
+# defaults. Empty lists clear server lists; use them only when actually empty.
+
+# -----------------------------------------------------------------------------
+# Providers
+# -----------------------------------------------------------------------------
+
+# Required
+# incus_remote          =
+# technitium_server_url =
+
+# Supply the admin-level API token through TECHNITIUM_API_TOKEN outside this file.
+# Verified HTTPS or a separately reviewed secure access path is required.
+
+# -----------------------------------------------------------------------------
+# Instance
+# -----------------------------------------------------------------------------
+
+# Required
+# instance_vlan_id =
+
+# Optional
 # incus_image = "images:debian/13/cloud"
 
-incus_remote     = "micro-node"
-instance_vlan_id = 200
+# -----------------------------------------------------------------------------
+# Server settings (all required; preserve existing values)
+# -----------------------------------------------------------------------------
+
+# technitium_settings = {
+#   # Resolution
+#   dnssec_validation     =
+#   recursion             =
+#   recursion_network_acl =
+#   qname_minimization    =
+#   randomize_name        =
+#
+#   # Logging
+#   log_queries       =
+#   logging_type      =
+#   max_log_file_days =
+#
+#   # Blocking
+#   enable_blocking                  =
+#   allow_txt_blocking_report        =
+#   blocking_bypass_list             =
+#   blocking_type                    =
+#   blocking_answer_ttl              =
+#   custom_blocking_addresses        =
+#   block_list_urls                  =
+#   block_list_update_interval_hours =
+#
+#   # Cache and forwarding
+#   serve_stale              =
+#   forwarders               =
+#   forwarder_protocol       =
+#   udp_payload_size         =
+#   cache_minimum_record_ttl =
+#   cache_maximum_record_ttl =
+#
+#   # Encrypted DNS listeners
+#   enable_dns_over_tls   =
+#   enable_dns_over_https =
+#
+#   # Transfers and notifications
+#   zone_transfer_allowed_networks =
+#   notify_allowed_networks        =
+# }
