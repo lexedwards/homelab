@@ -60,6 +60,7 @@ resource "incus_instance" "technitium_dns" {
     type = "nic"
 
     properties = {
+      name    = "eth0"
       nictype = "bridged"
       parent  = data.incus_network.br0.name
       vlan    = tostring(var.instance_vlan_id)

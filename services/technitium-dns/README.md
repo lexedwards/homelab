@@ -58,7 +58,7 @@ online operations; a private VLAN alone does not encrypt the admin token.
    ```
 
    Initialization downloads providers and updates their lock file. Validation
-   checks formatting, OpenTofu, cloud-init YAML, and three plan-only tests with
+   checks formatting, OpenTofu, cloud-init YAML, and plan-only tests with
    **both providers mocked**. It does not contact Incus or Technitium and does
    not prove live import safety or a no-change plan. The test inputs are synthetic.
 
@@ -77,7 +77,7 @@ after the corresponding authorization.
 
 ```mermaid
 flowchart LR
-    T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Debian instance]
+    T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Incus instance]
     I -->|first-boot cloud-init| D[Technitium DNS Server]
     I -->|tagged VLAN| N[DNS clients and upstream network]
     T -->|Technitium API: audited settings| D
@@ -110,8 +110,14 @@ not implicitly adopted. No STIG compliance or new hardening policy is enabled.
 The unchanged instance uses 1 vCPU and 512 MiB of memory, no Incus profile, and
 `br0`. Its AppArmor rule permits .NET thread-management signals to avoid a
 repeated `SIGTRAP` loop. Cloud-init runs Technitium's unpinned installation
-script and needs Debian repositories and `download.technitium.com`. This change
+script and needs distribution repositories and `download.technitium.com`. This change
 does not rerun it, pin a fresh-install release, or authorize replacement.
+
+The NIC device and guest interface are both explicitly named `eth0`, preserving
+the imported interface configuration. Debian 13 is the default for a new
+instance, not evidence of an imported guest's operating system. Set the private
+`incus_image` input to its actual original image reference before import; do not
+relabel an existing guest with the default image.
 
 ## Adopt Existing Server Settings
 
@@ -204,6 +210,16 @@ import ID to avoid replacement:
 ```bash
 tofu import 'incus_instance.technitium_dns' 'default/technitium-dns,image=<actual-image>'
 ```
+
+Include both the explicit project and original image in the import ID. The
+provider does not reconstruct these values from the running guest; missing
+values can propose replacement. If using an original image fingerprint, confirm
+that its source is still available before any future rebuild.
+
+Import also omits the local creation-only `wait_for` policy. With a protected
+state snapshot, review state-only alignment of that metadata separately. Do not
+apply an Incus update merely to initialize it: the provider's update path sends
+the instance configuration back to Incus even for a readiness-only difference.
 
 ## Troubleshooting
 

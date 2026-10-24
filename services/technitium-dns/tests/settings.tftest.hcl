@@ -115,3 +115,15 @@ run "reject_non_http_api_endpoints" {
 
   expect_failures = [var.technitium_server_url]
 }
+
+run "preserve_existing_guest_interface_name" {
+  command = plan
+
+  assert {
+    condition = one([
+      for device in incus_instance.technitium_dns.device : try(device.properties["name"], null)
+      if device.name == "eth0"
+    ]) == "eth0"
+    error_message = "The imported guest interface name must remain explicitly configured, not removed on apply."
+  }
+}
