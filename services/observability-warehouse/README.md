@@ -36,7 +36,7 @@ data.
 - A RustFS HTTPS S3 endpoint with a self-signed certificate and three existing
   buckets for Mimir, Loki, and Tempo.
 - An NFS export reachable from the warehouse VM.
-- OpenTofu 1.6 or newer, `make`, `yamllint`, and an Alloy binary matching the
+- OpenTofu 1.9 or newer, `make`, `yamllint`, and an Alloy binary matching the
   configured package version.
 - A least-privilege Proxmox API token and a PAM user with an SSH private key
   that can access every target node for uploading cloud-init snippets.
@@ -129,6 +129,44 @@ the guest. The password does not enter OpenTofu state.
 
 OpenTofu state is local, may contain private infrastructure data, and must be
 backed up securely.
+
+## DNS Ownership
+
+This service owns two explicit DNS records through
+`technitium_record.managed`: `collector` is an A record for Alloy;
+`grafana_alias` is a CNAME whose target remains the shared reverse proxy, not
+the Grafana guest address. Supply names, target values, TTLs, and optional
+comments in the private `technitium_records` map. Nothing is inferred from VM
+outputs, Incus resources, or another root's state. An explicitly empty map owns
+no records; it does not discover existing ones. Parent zones remain owned by
+the [Technitium DNS root].
+
+Set the required private `technitium_server_url` and inject
+`TECHNITIUM_API_TOKEN` with View, Modify, and Delete on the records' zones.
+Global server settings/administration permissions are unnecessary. Permissions
+are zone-wide rather than record-scoped; code review and exclusive state
+ownership protect unrelated records and apex data. Do not ingest central DNS
+state for credentials. For a private CA use `TECHNITIUM_CACERT` or
+`TECHNITIUM_CAPATH`. TLS verification is explicit; plain HTTP requires a
+separately reviewed secure access path, not merely a private VLAN.
+
+New entries use normal create/plan/apply. Existing entries require one-time
+imports into this service's **existing authoritative state**. Follow the
+[DNS import and transfer procedure] for backups, live authorization, collisions,
+partial reruns, and legacy handoff. Import addresses are
+`technitium_record.managed["collector"]` and
+`technitium_record.managed["grafana_alias"]`; the tested A/CNAME ID format is
+`zone::name::type::value`. Preserve the actual proxy target and TTLs, then
+require a full-root exit-`0` plan, including the Proxmox resources. DNS-only
+sandbox verification is not proof of an unchanged production VM plan.
+
+Both resources set `overwrite = false` to avoid clobbering sibling values.
+Omitted/null comments remain server-managed; explicit `""` clears them.
+Removing a record entry or destroying this service deletes its record, not the
+shared zone or other services' records. Guest deletion alone does not remove
+independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
+The offline tests target DNS records with mocked providers. They do not
+exercise VM provisioning or replace the required full-root production plan.
 
 ## Node Placement
 
@@ -356,5 +394,7 @@ datastore, and confirm that the configured template is the catalogue's Debian
 entry, SSH agent or private key, PAM username, and target snippet datastore.
 
 [image catalogue]: ../image-catalogue/README.md
+[Technitium DNS root]: ../technitium-dns/README.md
+[DNS import and transfer procedure]: ../technitium-dns/README.md#import-and-reconcile
 [Alloy Linux installation]: https://grafana.com/docs/alloy/latest/set-up/install/linux/
 [Grafana Debian installation]: https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/

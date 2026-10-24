@@ -11,6 +11,7 @@ mock_provider "incus" {
 mock_provider "technitium" {}
 
 variables {
+  technitium_records    = {}
   incus_remote          = "test-remote"
   instance_vlan_id      = 100
   technitium_server_url = "https://dns.example.invalid"
@@ -64,6 +65,242 @@ variables {
     udp_payload_size                 = 1400
     zone_transfer_allowed_networks   = []
   }
+}
+
+run "manage_static_records_without_clobbering_siblings" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      administration = {
+        zone      = "example.invalid"
+        name      = "dns.example.invalid"
+        type      = "CNAME"
+        value     = "host.example.invalid"
+        ttl       = 47
+        comments  = "Administration"
+        ownership = "dns_administration"
+      }
+      legacy_address = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 123
+        ownership = "legacy_compute_store"
+      }
+      legacy_pointer = {
+        zone      = "2.0.192.in-addr.arpa"
+        name      = "10.2.0.192.in-addr.arpa"
+        type      = "PTR"
+        value     = "host.example.invalid"
+        ttl       = 0
+        comments  = ""
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  assert {
+    condition = nonsensitive(alltrue([
+      for label, record in var.technitium_records :
+      technitium_record.managed[label].zone == record.zone &&
+      technitium_record.managed[label].name == record.name &&
+      technitium_record.managed[label].type == record.type &&
+      technitium_record.managed[label].value == record.value &&
+      technitium_record.managed[label].ttl == record.ttl &&
+      (try(record.comments, null) == null ? true : technitium_record.managed[label].comments == record.comments) &&
+      technitium_record.managed[label].overwrite == false
+    ]))
+    error_message = "Records must retain private identities, explicit TTLs and comments without recordset overwrite."
+  }
+}
+
+run "reject_duplicate_record_identity" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      first = {
+        zone      = "example.invalid"
+        name      = "alias.example.invalid"
+        type      = "CNAME"
+        value     = "proxy.example.invalid"
+        ttl       = 60
+        ownership = "legacy_untracked_service"
+      }
+      second = {
+        zone      = "EXAMPLE.INVALID."
+        name      = "ALIAS.EXAMPLE.INVALID."
+        type      = "CNAME"
+        value     = "PROXY.EXAMPLE.INVALID."
+        ttl       = 60
+        ownership = "legacy_untracked_service"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "allow_distinct_sibling_values_without_overwrite" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      first = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 60
+        ownership = "legacy_compute_store"
+      }
+      second = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.11"
+        ttl       = 60
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  assert {
+    condition     = length(technitium_record.managed) == 2 && alltrue([for record in technitium_record.managed : record.overwrite == false])
+    error_message = "Distinct sibling values must be independently addressable without enabling overwrite."
+  }
+}
+
+run "reject_conflicting_sibling_ttls" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      first = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 60
+        ownership = "legacy_compute_store"
+      }
+      second = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.11"
+        ttl       = 61
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "reject_unrepresented_record_type" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      apex = {
+        zone      = "example.invalid"
+        name      = "example.invalid"
+        type      = "NS"
+        value     = "ns.example.invalid"
+        ttl       = 60
+        ownership = "dns_administration"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "reject_missing_ttl" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      invalid = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = null
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "reject_unclassified_ownership" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      invalid = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 60
+        ownership = "unknown"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "reject_cname_conflicting_with_address" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      alias = {
+        zone      = "example.invalid"
+        name      = "host.example.invalid"
+        type      = "CNAME"
+        value     = "proxy.example.invalid"
+        ttl       = 60
+        ownership = "legacy_untracked_service"
+      }
+      address = {
+        zone      = "example.invalid"
+        name      = "HOST.EXAMPLE.INVALID."
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 60
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
+}
+
+run "reject_outside_zone_record" {
+  command = plan
+
+  variables {
+    technitium_records = {
+      invalid = {
+        zone      = "example.invalid"
+        name      = "host.other.invalid"
+        type      = "A"
+        value     = "192.0.2.10"
+        ttl       = 60
+        ownership = "legacy_compute_store"
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_records]
 }
 
 run "preserve_explicit_settings_instead_of_provider_defaults" {
