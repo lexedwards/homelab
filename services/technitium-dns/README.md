@@ -1,106 +1,208 @@
 # Technitium DNS
 
-Technitium DNS provides name resolution from outside the Proxmox cluster. This
-OpenTofu root deploys one Technitium DNS Server instance on the [Micro Node].
+Technitium DNS provides name resolution independently of the Proxmox cluster.
+This OpenTofu root manages its existing Incus instance on the [Micro Node] and
+declares the audited subset of server settings for adoption. **The declarations
+do not mean that live import or operational verification has been completed.**
 
-The root manages the Incus instance. DNS zones, forwarding, filtering,
-certificates, clustering, and application upgrades remain operator-managed.
+Zones and records are not yet adopted. Other server settings, web/authentication
+configuration, certificates, applications, DHCP, clustering, and application
+upgrades remain operator-managed.
 
 ## Dependencies
 
 - A prepared [Micro Node] with its `default` directory pool and unmanaged `br0`
-  bridge
-- A trusted Incus remote on the management workstation
+  bridge, and a trusted Incus remote on the management workstation
 - DHCP, routing, and initial DNS on the service VLAN
-- OpenTofu 1.6 or newer, `make`, and `yamllint`
-- UDP and TCP `53` from DNS clients, and TCP `5380` from administrators
+- OpenTofu 1.9 or newer, `make`, and `yamllint`; tested with OpenTofu 1.13.1
+- UDP and TCP `53` from DNS clients; administration access only from trusted clients
+- The existing Technitium server; adoption was audited against version 15.6.2
+- `registry.terraform.io/darkhonor/technitium` pinned to `1.3.0`
+- An admin-level API token supplied privately as `TECHNITIUM_API_TOKEN`
+- Verified HTTPS to the API, or a separately reviewed secure access path
 
-## Quick Start
+Do not upgrade the server or change its listeners to make adoption work. For a
+private CA, set `TECHNITIUM_CACERT` or `TECHNITIUM_CAPATH` to the appropriate
+local trust material. `skip_tls_verify = false` is explicit and overrides the
+provider's environment fallback. Do not disable verification to bypass an error.
+If the existing API only serves HTTP, stop and agree a secure access path before
+online operations; a private VLAN alone does not encrypt the admin token.
 
-> [!CAUTION]
-> Technitium configuration is stored on the instance root disk. Replacing the
-> instance deletes that configuration. Create and test an application backup
-> before any replacement.
+## Quick Start: Local Preparation
 
-1. Create the local configuration.
+1. Create private inputs in an isolated checkout. For the existing deployment,
+   preserve the existing local state and inputs rather than starting a second
+   production state.
 
    ```bash
    cp terraform.tfvars.example terraform.tfvars
+   chmod 600 terraform.tfvars
    ```
 
-   Set `incus_remote` to the trusted Micro Node remote and select the service
-   VLAN. Reserve a stable DHCP lease before configuring DNS clients.
+   Set `incus_remote`, `instance_vlan_id`, and `technitium_server_url` privately.
+   The provider requires the URL in HCL; `TECHNITIUM_SERVER_URL` alone is not
+   sufficient. Populate `technitium_settings` using the 26 attributes and types
+   in `variables.tf`, with values from the reviewed existing-server inventory.
+   `TF_VAR_technitium_server_url` and `TF_VAR_technitium_settings` can supply
+   those inputs instead of the local file. No DNS settings or API addresses
+   are inferred from the Incus instance.
+   Do not copy defaults from provider examples. Use `[]` only for an actually
+   empty server list: it instructs the API to clear that list. Null values are
+   rejected because they could restore provider defaults or leave lists unmanaged.
 
-2. Initialize and validate the root.
+2. Initialize and run offline checks.
 
    ```bash
    make init
    make validate
    ```
 
-3. Create and review a saved plan.
+   Initialization downloads providers and updates their lock file. Validation
+   checks formatting, OpenTofu, cloud-init YAML, and three plan-only tests with
+   **both providers mocked**. It does not contact Incus or Technitium and does
+   not prove live import safety or a no-change plan. The test inputs are synthetic.
 
-   ```bash
-   make plan
-   tofu show deployment.tfplan
-   ```
+3. Enroll an admin-level API token through the existing administration interface
+   when online access is authorized. Supply it through a private environment or
+   secret-store session, not a shell-history literal, tracked input, token
+   resource, or output. This root does not create users or tokens. Revoke and
+   replace a lost token using an existing administrator; do not reset server
+   settings to recover provider access.
 
-   Planning contacts the Incus host and confirms that its storage pool and
-   bridge match the expected Micro Node configuration.
+Planning, importing, and applying are separate online operations. Do not run
+them merely to validate this change. Follow the adoption procedure below only
+after the corresponding authorization.
 
-4. Apply the reviewed plan.
-
-   ```bash
-   make apply
-   tofu output -raw ipv4_address
-   ```
-
-5. Open `http://<technitium-address>:5380/`, change the administrator password,
-   and configure the server. Restrict the administration UI to trusted clients.
-   Do not enable Technitium DHCP unless this instance is intended to provide it.
-
-## Architecture
+## Architecture And Ownership
 
 ```mermaid
 flowchart LR
-    T[OpenTofu root] -->|reads| H[Micro Node pool and bridge]
-    T -->|creates| I[Debian Incus instance]
-    I -->|cloud-init| D[Technitium DNS Server]
+    T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Debian instance]
+    I -->|first-boot cloud-init| D[Technitium DNS Server]
     I -->|tagged VLAN| N[DNS clients and upstream network]
+    T -->|Technitium API: audited settings| D
+    O[Operator] -->|Other settings, zones, records and recovery| D
 ```
 
-The instance uses 1 vCPU and 512 MiB of memory. It has no Incus profile and
-joins the configured VLAN through `br0`. The extra AppArmor rule permits the
-.NET runtime to send thread-management signals; without it, Technitium can enter
-a repeated `SIGTRAP` loop.
+Incus and adopted server settings share the existing state. This preserves the
+current infrastructure ownership boundary rather than introducing a second
+configuration root or moving the instance. Declarations are separated in
+`main.tf` and `settings.tf`; the explicit API endpoint does not change instance
+configuration. Shared zones are later work in this root. Service-owned records
+belong in their service roots when adopted, with exactly one owner per record.
 
-Cloud-init downloads and runs Technitium's current installation script. The
-script and installed release are not pinned by this repository, so a fresh
-deployment can change without an OpenTofu change. Deployment also requires
-working access to Debian package repositories and `download.technitium.com`.
+`technitium_settings` explicitly represents:
 
-OpenTofu uses local state in this directory. State is ignored by Git and must be
-backed up with the rest of the operator's infrastructure state.
+| Concern | Managed attributes |
+| --- | --- |
+| Resolution | `dnssec_validation`, `recursion`, `recursion_network_acl`, `qname_minimization`, `randomize_name` |
+| Logging | `log_queries`, `logging_type`, `max_log_file_days` |
+| Blocking | `enable_blocking`, `allow_txt_blocking_report`, `blocking_bypass_list`, `blocking_type`, `blocking_answer_ttl`, `custom_blocking_addresses`, `block_list_urls`, `block_list_update_interval_hours` |
+| Cache and forwarding | `serve_stale`, `forwarders`, `forwarder_protocol`, `udp_payload_size`, `cache_minimum_record_ttl`, `cache_maximum_record_ttl` |
+| Encrypted DNS listeners | `enable_dns_over_tls`, `enable_dns_over_https` |
+| Transfers and notifications | `zone_transfer_allowed_networks`, `notify_allowed_networks` |
 
-## Operations
+All provider-defaulted server-setting attributes are explicitly supplied. The
+eight optional `web_service_*` attributes are omitted and have no provider
+defaults; they stay operator-managed. Other settings outside this subset are
+not implicitly adopted. No STIG compliance or new hardening policy is enabled.
 
-Use Technitium's backup and restore functions to keep a tested copy of the
-server configuration outside the Micro Node. OpenTofu does not manage the files
-under `/etc/dns` or apply application upgrades after first boot.
+The unchanged instance uses 1 vCPU and 512 MiB of memory, no Incus profile, and
+`br0`. Its AppArmor rule permits .NET thread-management signals to avoid a
+repeated `SIGTRAP` loop. Cloud-init runs Technitium's unpinned installation
+script and needs Debian repositories and `download.technitium.com`. This change
+does not rerun it, pin a fresh-install release, or authorize replacement.
 
-To adopt an existing instance, use its actual image in the import ID:
+## Adopt Existing Server Settings
+
+> [!CAUTION]
+> Never apply a create action for `technitium_server_settings.existing` against
+> the populated server. Import it first. A singleton create writes settings;
+> it does not create a separate safe copy of the server.
+
+1. Before an authorized import, retain a current Technitium application backup
+   outside the Micro Node and confirm tested isolated recovery. Preserve the
+   existing local OpenTofu state with a private snapshot. Use `umask 077` for
+   operational sessions and store state, exports, and plans in a protected
+   location. Keep all artifacts out of Git and Linear.
+
+2. Confirm the reviewed endpoint and admin token reach the intended server.
+   Reconcile all 26 private input values with the inventory. First rehearse
+   import and a full plan against an isolated restored server, using isolated
+   inputs and state; never mix rehearsal and production state or endpoints.
+
+3. After separate live-import authorization, import into the **existing** root
+   and state, with the existing Incus instance already tracked:
+
+   ```bash
+   tofu import 'technitium_server_settings.existing' 'server-settings'
+   ```
+
+   Import reads the server and writes local state; it does not apply settings.
+
+4. After planning authorization, generate a full saved plan:
+
+   ```bash
+   tofu plan -detailed-exitcode -out=deployment.tfplan
+   tofu show deployment.tfplan
+   ```
+
+   Exit `0` means no changes, `2` means changes, and `1` means an error. Reject
+   Incus changes/replacement, creates, deletes, unexpected settings changes, or
+   changes outside the audited scope. Do not use targeting as the normal
+   verification path. Sensitive markings hide normal output but do not encrypt
+   artifacts; inspect protected values only in a private review session.
+
+5. Optional list attributes can remain null after import even when populated on
+   the server. Matching declarations may therefore propose initialization
+   updates. The audit's sandbox initialization preserved returned configuration,
+   but that is not authorization for production writes. Review every proposed
+   value against the before-export and obtain separate apply authorization.
+   Apply only the current, inspected saved plan, with unchanged configuration,
+   inputs, and state since review:
+
+   ```bash
+   make apply
+   ```
+
+6. Compare before/after server configuration and DNS behavior, including any
+   operator-managed settings. Repeat the full detailed-exitcode plan; require
+   exit `0`, no infrastructure changes, and preserved DNS behavior before
+   recording operational adoption as complete. Retain evidence privately.
+
+`prevent_destroy` guards the settings resource while its declaration is present.
+It is not a backup, does not protect the Incus instance, and does not prevent
+someone from removing configuration or losing state. The provider's settings
+delete only forgets state; it does not restore a previous configuration.
+
+## Backup And Recovery
+
+Technitium stores its durable configuration on the instance root disk. Replacing
+the instance deletes it. Back up application configuration separately from
+OpenTofu state; state cannot reconstruct operator-managed configuration or DNS
+data. Neither backup is a substitute for the other. OpenTofu does not manage
+the files under `/etc/dns` or apply application upgrades after first boot.
+
+Keep recovery-administrator access distinct from the provider token. A restored
+backup can restore authentication configuration, and a token alone is not a
+recovery-administrator credential. Retain the credentials needed to administer
+the restored backup privately and verify access during isolated recovery.
+
+State and saved plans can contain private settings and locators despite
+`sensitive = true`. Local `*.tfvars`, `.terraform/`, state files, and `*.tfplan`
+are ignored by Git. Store backups and exports outside the checkout; their names
+are not necessarily covered by those ignore rules. Never attach them to issues
+or PRs. Backup destination, retention, and scheduling remain operator choices.
+
+If the existing Incus instance itself is missing from state, stop settings
+adoption and review its import separately. Its actual image must appear in the
+import ID to avoid replacement:
 
 ```bash
-tofu import 'incus_instance.technitium_dns' 'default/technitium-dns,image=images:debian/13/cloud'
-make plan
+tofu import 'incus_instance.technitium_dns' 'default/technitium-dns,image=<actual-image>'
 ```
 
-Omitting `image=...`, or declaring a different image, causes replacement on the
-next apply.
-
 ## Troubleshooting
-
-Check the instance, cloud-init, and DNS service:
 
 ```bash
 incus config show <remote-name>:technitium-dns
@@ -109,11 +211,9 @@ incus exec <remote-name>:technitium-dns -- systemctl status dns --no-pager
 incus exec <remote-name>:technitium-dns -- journalctl -u dns --no-pager
 ```
 
-If clients cannot resolve names, confirm the DHCP reservation, VLAN policy, and
-both UDP and TCP firewall rules for port `53`.
-
-Changing `cloud-init.user-data` does not rerun cloud-init on an existing
-instance. Restore from backup after a reviewed replacement when first-boot
-provisioning must run again.
+If clients cannot resolve names, confirm DHCP, VLAN policy, and UDP/TCP port
+`53`. For API errors, confirm the authorized secure path, certificate trust,
+admin token, and explicit endpoint; do not enable bypasses or reset listeners.
+Changing `cloud-init.user-data` does not rerun it on an existing instance.
 
 [Micro Node]: ../../hosts/micro-node/README.md
