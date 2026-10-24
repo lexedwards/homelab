@@ -84,8 +84,8 @@ flowchart LR
     O[Operator] -->|Other settings, zones, records and recovery| D
 ```
 
-Incus and adopted server settings share the existing state. This preserves the
-current infrastructure ownership boundary rather than introducing a second
+Incus and adopted server settings share the existing state ([ownership decision]).
+This preserves the current infrastructure ownership boundary rather than introducing a second
 configuration root or moving the instance. Declarations are separated in
 `main.tf` and `settings.tf`; the explicit API endpoint does not change instance
 configuration. Shared zones are later work in this root. Service-owned records
@@ -183,10 +183,13 @@ OpenTofu state; state cannot reconstruct operator-managed configuration or DNS
 data. Neither backup is a substitute for the other. OpenTofu does not manage
 the files under `/etc/dns` or apply application upgrades after first boot.
 
-Keep recovery-administrator access distinct from the provider token. A restored
-backup can restore authentication configuration, and a token alone is not a
-recovery-administrator credential. Retain the credentials needed to administer
-the restored backup privately and verify access during isolated recovery.
+Restore using a distinct temporary recovery-administrator identity, not a name
+present in the backup. Technitium retains the restoring user/session as an
+administrator and replaces a backed-up user with the same name. Validate
+intended operator access before removing the temporary recovery administrator.
+Keep these credentials private and distinct from the provider token, which is
+not a recovery-administrator credential. The audit tested temporary recovery
+access, not the original operator password.
 
 State and saved plans can contain private settings and locators despite
 `sensitive = true`. Local `*.tfvars`, `.terraform/`, state files, and `*.tfplan`
@@ -217,3 +220,4 @@ admin token, and explicit endpoint; do not enable bypasses or reset listeners.
 Changing `cloud-init.user-data` does not rerun it on an existing instance.
 
 [Micro Node]: ../../hosts/micro-node/README.md
+[ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md
