@@ -11,7 +11,7 @@ help:
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
 		'cloud-init-validate   Validate the cloud-init template' \
-		'test                  Check settings with mocked providers (no infrastructure access)' \
+		'test                  Check mocked DNS configuration and state snapshot instructions offline' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE' \
 		'apply                 Apply the previously reviewed PLAN_FILE'
@@ -33,6 +33,7 @@ cloud-init-validate:
 
 test:
 	$(TOFU) test
+	python3 -B -m unittest discover -s tests -p 'test_*.py'
 
 validate: fmt-check tofu-validate cloud-init-validate test
 

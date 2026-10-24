@@ -18,6 +18,7 @@ upgrades remain operator-managed.
   bridge, and a trusted Incus remote on the management workstation
 - DHCP, routing, and initial DNS on the service VLAN
 - OpenTofu 1.9 or newer, `make`, and `yamllint`; tested with OpenTofu 1.13.1
+- Python 3 for protected state snapshots and their offline checks
 - UDP and TCP `53` from DNS clients; administration access only from trusted clients
 - The existing Technitium server; adoption was audited against version 15.6.2
 - `registry.terraform.io/darkhonor/technitium` pinned to `1.3.0`
@@ -85,21 +86,27 @@ after the corresponding authorization.
 ## Architecture And Ownership
 
 ```mermaid
-flowchart LR
-    T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Incus instance]
-    I -->|first-boot cloud-init| D[Technitium DNS Server]
-    I -->|tagged VLAN| N[DNS clients and upstream network]
-    T -->|Technitium API: audited settings and zone policies| D
-    O[Operator] -->|Other attributes, records and recovery| D
+    flowchart LR
+    T["DNS root and existing state"] -->|Incus API| I["Existing Incus instance"]
+    I -->|hosts| D["Technitium DNS Server"]
+    T -->|"26 settings, 3 shared zones, 16 records"| D
+    S["Observability root and existing state"] -->|"Collector A and proxy-routed Grafana CNAME"| D
+    S -->|Proxmox API| V["Collector, warehouse and Grafana VMs"]
+    O["Operator"] -->|"6 apex SOA/NS records, other configuration and recovery"| D
+    C["DNS clients"] -->|UDP/TCP 53| D
+    D -->|configured forwarding| U["Upstream resolvers"]
 ```
 
 Incus, adopted server settings, and shared zones use the existing state ([ownership decision]).
 This preserves the current infrastructure ownership boundary rather than introducing a second
 configuration root or moving the instance. Declarations are separated in
-`main.tf`, `settings.tf`, and `zones.tf`; the explicit API endpoint does not change
-instance configuration. Service-owned records belong in their service roots when
-adopted, with exactly one owner per recordset. A service can supply its parent
+`main.tf`, `settings.tf`, `zones.tf`, and `records.tf`; the explicit API endpoint
+does not change instance configuration. Service-owned records belong in their
+service roots, with exactly one owner per recordset. A service can supply its parent
 zone name privately without owning that zone or depending on this root's state.
+
+See [DNS operations] for the adopted scope, DNS-only verification exception,
+routine changes, provider upgrades, and application versus state recovery.
 
 `technitium_settings` explicitly represents:
 
@@ -265,9 +272,12 @@ sibling TTLs. These checks do not discover competing writers in other states.
    mutation, verified through a read-only sandbox proxy. Do not assume other
    updates are metadata-only; stop on any value drift or unrelated action.
    Obtain separate approval for any apply, including state normalization.
-6. Require final full-root exit-`0` plans in both roots, not targeted plans or
-   infrastructure creates/updates. Compare all records, apex data, zone policies,
-   and before/after DNS answers. The parent zones remain owned only by this root.
+6. Normally require final full-root exit-`0` plans in both roots. The existing
+   deployment has an explicit [DNS-only verification exception]: unrelated
+   observability cloud-init/VM replacement drift is deferred by the operator.
+   Under that exception, require exit-`0` DNS-scoped plans and unchanged DNS
+   behavior, not a claim of full-root convergence. Compare all records, apex
+   data, zone policies, and before/after answers. Parent zones stay in this root.
 
 Native imports are sufficient for this fixed inventory; no import script or
 tracked import IDs are required. Maps and state use the normal root inputs.
@@ -307,9 +317,11 @@ explicit state-transfer authorization, use `tofu state rm` on the old binding
 without destroying the live record, then import into the receiving state.
 Never apply between those steps or temporarily bind it in both states. Move
 all sibling values and related forward/reverse entries together. Require
-no-change full-root plans in both roots and unchanged DNS answers before
+no-change plans for the agreed scope in both roots and unchanged DNS answers before
 releasing the freeze. If import fails, freeze remains in place; restore the old
 declaration and import its live identity back rather than recreating the record.
+Record any pre-existing infrastructure-drift exception explicitly; do not apply
+an unrelated replacement plan as part of a record transfer.
 
 ## Manage DNS Zones
 
@@ -400,6 +412,9 @@ per-record permission boundary. Never remove it merely to make adoption pass.
 
 ## Backup And Recovery
 
+Follow the [recovery runbook] for backup coverage, protected state snapshots,
+isolated restore order, verification, and approval boundaries.
+
 Technitium stores its durable configuration on the instance root disk. Replacing
 the instance deletes it. Back up application configuration separately from
 OpenTofu state; state cannot reconstruct operator-managed configuration or DNS
@@ -455,3 +470,6 @@ Changing `cloud-init.user-data` does not rerun it on an existing instance.
 [Micro Node]: ../../hosts/micro-node/README.md
 [Observability Warehouse]: ../observability-warehouse/README.md
 [ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md
+[DNS operations]: operations.md
+[DNS-only verification exception]: operations.md#dns-only-verification-exception
+[recovery runbook]: operations.md#backup-and-recovery
