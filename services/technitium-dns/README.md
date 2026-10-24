@@ -6,8 +6,9 @@ server settings, and DNS zones. New and imported zones use the same managed
 resources. **Declarations alone do not establish completed live imports or
 operational verification.**
 
-Service-specific records belong to the services that deploy their instances;
-existing record migration is separate work. Other server/zone attributes, web/authentication
+Service-specific records belong to the services that deploy their instances.
+This root also declares DNS administration and explicitly classified legacy
+records. Other server/zone attributes, web/authentication
 configuration, certificates, applications, DHCP, clustering, and application
 upgrades remain operator-managed.
 
@@ -190,6 +191,126 @@ It is not a backup, does not protect the Incus instance, and does not prevent
 someone from removing configuration or losing state. The provider's settings
 delete only forgets state; it does not restore a previous configuration.
 
+## Manage DNS Records
+
+`technitium_record.managed` owns only records explicitly declared in the private
+`technitium_records` map. It is not a reconciliation of the complete zone.
+An explicit empty map means this root owns no records, not that the server has
+none. Stable labels are visible in resource addresses; never use DNS names as
+labels. All names, target values, TTLs, and optional comments remain private
+inputs. New entries are created normally; existing entries need one import.
+
+### Ownership
+
+The reviewed inventory accounts for 24 records:
+
+| Owner | Records | Reason |
+| --- | ---: | --- |
+| This root: `dns_administration` | 1 CNAME | DNS administration alias |
+| This root: `legacy_compute_store` | 4 A/PTR | Shared compute/store hosts, no service-root owner |
+| This root: `legacy_shared_ingress` | 3 A/PTR | Shared proxy ingress, no tracked proxy root |
+| This root: `legacy_untracked_service` | 2 CNAME | Home automation and media services have no tracked roots |
+| This root: `legacy_unconfirmed_application` | 6 CNAME | Application ownership is unconfirmed; abbreviations are not identity evidence |
+| [Observability Warehouse] | 2 | Collector A and proxy-routed Grafana CNAME |
+| Operator-managed exclusions | 6 | Three apex NS and three SOA records |
+
+The 18 static entries are five A, ten CNAME, and three PTR records. Each
+name/type recordset has one owning root, including all its values. Keep related
+forward/reverse records in that root. Do not import NS targets that fail the
+provider's FQDN validation, approximate full SOA data, or rename them to make
+validation pass. Leave dynamic/generated/disabled records and unsupported
+metadata with their existing owner until a safe transfer is established.
+No FWD records occur in this inventory; conditional-forwarding adoption needs
+separate identity/semantics checks, not conversion into A/CNAME/PTR entries.
+
+`ownership` is a required classification, not a server record comment. It
+documents why a fallback remains central. The map validates supported types,
+duplicate identities, parent-zone containment, CNAME conflicts, and matching
+sibling TTLs. These checks do not discover competing writers in other states.
+
+### Import and Reconcile
+
+1. Obtain authorization for current inventory, backups, state imports, and
+   planning. Take fresh application and owning-root state backups. Check the
+   pinned server/provider versions and all records' values, TTLs, comments,
+   enabled/static status, and type-specific metadata. Stop for an unsupported
+   field or ambiguous identity rather than dropping it.
+2. Reconcile the private maps across both roots with the current inventory.
+   Compare DNS identities case-insensitively and without trailing dots. Reject
+   duplicate identities, competing name/type owners, or an entry already bound
+   to another address. Keep six excluded apex records and all unrelated records
+   outside the declarations. Preserve Grafana's existing proxy target.
+3. Initialize and validate each root using its ordinary provider inputs and
+   authoritative state. Never copy the DNS/Incus state into the observability
+   root or create a second production state. A DNS-only test root proves the
+   DNS declarations, not the full service's production plan.
+4. Use native imports from each owning root. A, CNAME, and PTR share the tested
+   ID format `zone::name::type::value` (use full DNS names for PTR names/targets):
+
+   ```bash
+   tofu import 'technitium_record.managed["record_0"]' '<zone>::<name>::<type>::<value>'
+   ```
+
+   In the observability root, use labels `collector` and `grafana_alias` instead.
+   Keep populated identifiers and command output private. On a rerun, inspect
+   state first and skip an exact existing binding; stop if its identity differs.
+   An import failure can leave earlier entries bound: keep the state, inspect
+   the partial result, and resume only unbound identities. Never apply a create
+   action to adopt a record that already exists.
+5. Review a full saved plan in **each** affected root. Record imports must not
+   need a server initialization write. OpenTofu can report an in-place update
+   solely to mark imported fields sensitive: the tested metadata-only plan had
+   identical complete `before`/`after` values, no unknown fields, and different
+   sensitivity marks. Applying that saved plan updated state without any API
+   mutation, verified through a read-only sandbox proxy. Do not assume other
+   updates are metadata-only; stop on any value drift or unrelated action.
+   Obtain separate approval for any apply, including state normalization.
+6. Require final full-root exit-`0` plans in both roots, not targeted plans or
+   infrastructure creates/updates. Compare all records, apex data, zone policies,
+   and before/after DNS answers. The parent zones remain owned only by this root.
+
+Native imports are sufficient for this fixed inventory; no import script or
+tracked import IDs are required. Maps and state use the normal root inputs.
+
+### Credentials and Lifecycle
+
+Record-owning services require `TECHNITIUM_API_TOKEN` with View, Modify, and
+Delete on their required zones; include reverse zones for PTR records. Global
+Settings/Administration and global zone Modify/Delete are not required for
+record lifecycle. The central settings/zone root still needs admin-level access.
+Use a separate process environment for each root's token. Tokens inherit group
+permissions; sharing versus separate tokens is an operator decision.
+
+Zone-scoped permission is not per-record isolation: a token can alter apex SOA
+data in its allowed zone. Configuration review and single state ownership still
+protect exclusions. Do not read another root's state to obtain credentials.
+
+Every record sets `overwrite = false`; the provider default is unsafe for
+siblings. This prevents create-time recordset replacement, not duplicate owners
+or every possible provider update hazard. Omitted/null comments remain
+server-managed and are preserved by in-place updates; an explicit empty string
+clears them. Set comments explicitly to manage their drift. Sensitivity hides
+normal plan values but does not encrypt state or JSON plans.
+
+Removing a record's map entry or destroying its owning service deletes that
+record. Records have no `prevent_destroy` so their lifecycle can follow the
+service; always review deletion, especially for shared legacy fallbacks.
+Changing zone/name/type can replace a record. No record resource owns or deletes
+the parent zone, and deleting a guest alone does not remove an independent
+explicit-input DNS declaration. Zone deletion protection is not record backup.
+
+### Transfer a Legacy Record to a Service
+
+Freeze both roots' applies and back up both states. Prepare identical desired
+fields in the receiving service and remove the fallback declaration. With
+explicit state-transfer authorization, use `tofu state rm` on the old binding
+without destroying the live record, then import into the receiving state.
+Never apply between those steps or temporarily bind it in both states. Move
+all sibling values and related forward/reverse entries together. Require
+no-change full-root plans in both roots and unchanged DNS answers before
+releasing the freeze. If import fails, freeze remains in place; restore the old
+declaration and import its live identity back rather than recreating the record.
+
 ## Manage DNS Zones
 
 `technitium_zone.managed["zone_0"]` and other stable labels own shared zone
@@ -332,4 +453,5 @@ admin token, and explicit endpoint; do not enable bypasses or reset listeners.
 Changing `cloud-init.user-data` does not rerun it on an existing instance.
 
 [Micro Node]: ../../hosts/micro-node/README.md
+[Observability Warehouse]: ../observability-warehouse/README.md
 [ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md

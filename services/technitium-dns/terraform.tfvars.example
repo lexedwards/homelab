@@ -75,6 +75,25 @@
 # Declare new zones here; import already-existing zones into the same resources.
 # Use stable opaque labels, never DNS names, as map keys. Keep labels unchanged
 # once managed. For an import, first match the zone's current properties.
+
+# -----------------------------------------------------------------------------
+# DNS administration and legacy records
+# -----------------------------------------------------------------------------
+
+# Required
+# technitium_records = {
+#   record_0 = {
+#     zone      =
+#     name      =
+#     type      =
+#     value     =
+#     ttl       =
+#     ownership =
+#     comments  = null
+#   }
+# }
+# Add one object per record. Ownership classifications are in record-variables.tf.
+# Omit comments or use null to preserve server-managed comments; "" clears them.
 # technitium_zones = {
 #   zone_0 = {
 #     name                       =

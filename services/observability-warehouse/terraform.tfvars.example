@@ -15,6 +15,34 @@
 # proxmox_insecure = false
 
 # -----------------------------------------------------------------------------
+# DNS
+# -----------------------------------------------------------------------------
+
+# Authentication: inject TECHNITIUM_API_TOKEN outside OpenTofu input files.
+# Required
+# technitium_server_url =
+# technitium_records = {
+#   collector = {
+#     zone     =
+#     name     =
+#     type     = "A"
+#     value    =
+#     ttl      =
+#     comments = null
+#   }
+#   grafana_alias = {
+#     zone     =
+#     name     =
+#     type     = "CNAME"
+#     value    =
+#     ttl      =
+#     comments = null
+#   }
+# }
+# Grafana's alias targets the proxy, not the Grafana guest.
+# Omit comments or use null to preserve server-managed comments; "" clears them.
+
+# -----------------------------------------------------------------------------
 # Core
 # -----------------------------------------------------------------------------
 
