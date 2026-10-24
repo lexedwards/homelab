@@ -14,6 +14,28 @@ variables {
   incus_remote          = "test-remote"
   instance_vlan_id      = 100
   technitium_server_url = "https://dns.example.invalid"
+  technitium_zones = {
+    zone_0 = {
+      name                       = "example.invalid"
+      type                       = "Primary"
+      disabled                   = false
+      soa_serial_date_scheme     = false
+      query_access               = "UseSpecifiedNetworkACL"
+      query_access_network_acl   = ["192.0.2.0/24"]
+      dynamic_update             = "Deny"
+      dynamic_update_network_acl = []
+    }
+    zone_1 = {
+      name                       = "2.0.192.in-addr.arpa"
+      type                       = "Primary"
+      disabled                   = true
+      soa_serial_date_scheme     = true
+      query_access               = "Allow"
+      query_access_network_acl   = []
+      dynamic_update             = "UseSpecifiedNetworkACL"
+      dynamic_update_network_acl = ["192.0.2.1/32"]
+    }
+  }
   technitium_settings = {
     allow_txt_blocking_report        = false
     block_list_update_interval_hours = 12
@@ -126,4 +148,126 @@ run "preserve_existing_guest_interface_name" {
     ]) == "eth0"
     error_message = "The imported guest interface name must remain explicitly configured, not removed on apply."
   }
+}
+
+run "preserve_explicit_zone_properties_without_adopting_excluded_policies" {
+  command = plan
+
+  assert {
+    condition = nonsensitive(alltrue([
+      for label, zone in var.technitium_zones : jsonencode({
+        for name, value in zone : name => technitium_zone.managed[label][name]
+      }) == jsonencode(zone)
+    ]))
+    error_message = "Every zone must preserve its explicit identity, disabled state, serial mode, query/update policies, and ACLs."
+  }
+
+  assert {
+    condition = alltrue([
+      for zone in technitium_zone.managed :
+      zone.dnssec == null && zone.notify == null && zone.allow_transfer == null &&
+      zone.zone_transfer_tsig_key_names == null && zone.primary_zone_transfer_tsig_key_name == null
+    ])
+    error_message = "DNSSEC transitions, transfer/notify settings, and TSIG references must remain outside this adoption slice."
+  }
+}
+
+run "plan_new_zone_without_preexisting_zone_metadata" {
+  command = plan
+
+  variables {
+    technitium_zones = {
+      new_zone = {
+        name                       = "new-zone.example.invalid"
+        type                       = "Primary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
+    }
+  }
+
+  assert {
+    condition = (
+      technitium_zone.managed["new_zone"].name == "new-zone.example.invalid" &&
+      technitium_zone.managed["new_zone"].type == "Primary"
+    )
+    error_message = "Declaring a new zone must plan its managed resource without requiring that zone to exist first."
+  }
+}
+
+run "reject_unsupported_declared_zone_types" {
+  command = plan
+
+  variables {
+    technitium_zones = {
+      zone_0 = {
+        name                       = "example.invalid"
+        type                       = "Secondary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_zones]
+}
+
+run "reject_null_zone_policy_inputs" {
+  command = plan
+
+  variables {
+    technitium_zones = {
+      zone_0 = {
+        name                       = "example.invalid"
+        type                       = "Primary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = null
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_zones]
+}
+
+run "reject_multiple_owners_of_the_same_zone" {
+  command = plan
+
+  variables {
+    technitium_zones = {
+      zone_0 = {
+        name                       = "example.invalid"
+        type                       = "Primary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
+      zone_1 = {
+        name                       = "EXAMPLE.INVALID."
+        type                       = "Primary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
+    }
+  }
+
+  expect_failures = [var.technitium_zones]
 }

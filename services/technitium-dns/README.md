@@ -1,11 +1,13 @@
 # Technitium DNS
 
 Technitium DNS provides name resolution independently of the Proxmox cluster.
-This OpenTofu root manages its existing Incus instance on the [Micro Node] and
-declares the audited subset of server settings for adoption. **The declarations
-do not mean that live import or operational verification has been completed.**
+This OpenTofu root manages its Incus instance on the [Micro Node], the audited
+server settings, and DNS zones. New and imported zones use the same managed
+resources. **Declarations alone do not establish completed live imports or
+operational verification.**
 
-Zones and records are not yet adopted. Other server settings, web/authentication
+Service-specific records belong to the services that deploy their instances;
+existing record migration is separate work. Other server/zone attributes, web/authentication
 configuration, certificates, applications, DHCP, clustering, and application
 upgrades remain operator-managed.
 
@@ -46,6 +48,12 @@ online operations; a private VLAN alone does not encrypt the admin token.
    `TF_VAR_technitium_server_url` and `TF_VAR_technitium_settings` can supply
    those inputs instead of the local file. No DNS settings or API addresses
    are inferred from the Incus instance.
+   Declare the zones this DNS service owns in `technitium_zones`, using the
+   commented object shape in `terraform.tfvars.example`. When importing a zone,
+   first match its current properties. `TF_VAR_technitium_zones`
+   is also supported. Its stable map keys are public resource labels, not DNS
+   names; only these keys are declassified for iteration. Zone names and ACLs
+   remain sensitive private inputs. Do not renumber labels after import.
    Do not copy defaults from provider examples. Use `[]` only for an actually
    empty server list: it instructs the API to clear that list. Null values are
    rejected because they could restore provider defaults or leave lists unmanaged.
@@ -80,16 +88,17 @@ flowchart LR
     T[Technitium OpenTofu root and local state] -->|Incus API| I[Existing Incus instance]
     I -->|first-boot cloud-init| D[Technitium DNS Server]
     I -->|tagged VLAN| N[DNS clients and upstream network]
-    T -->|Technitium API: audited settings| D
-    O[Operator] -->|Other settings, zones, records and recovery| D
+    T -->|Technitium API: audited settings and zone policies| D
+    O[Operator] -->|Other attributes, records and recovery| D
 ```
 
-Incus and adopted server settings share the existing state ([ownership decision]).
+Incus, adopted server settings, and shared zones use the existing state ([ownership decision]).
 This preserves the current infrastructure ownership boundary rather than introducing a second
 configuration root or moving the instance. Declarations are separated in
-`main.tf` and `settings.tf`; the explicit API endpoint does not change instance
-configuration. Shared zones are later work in this root. Service-owned records
-belong in their service roots when adopted, with exactly one owner per record.
+`main.tf`, `settings.tf`, and `zones.tf`; the explicit API endpoint does not change
+instance configuration. Service-owned records belong in their service roots when
+adopted, with exactly one owner per recordset. A service can supply its parent
+zone name privately without owning that zone or depending on this root's state.
 
 `technitium_settings` explicitly represents:
 
@@ -180,6 +189,93 @@ relabel an existing guest with the default image.
 It is not a backup, does not protect the Incus instance, and does not prevent
 someone from removing configuration or losing state. The provider's settings
 delete only forgets state; it does not restore a previous configuration.
+
+## Manage DNS Zones
+
+`technitium_zone.managed["zone_0"]` and other stable labels own shared zone
+identity and these explicitly supplied attributes: `name`, `type`, `disabled`,
+`soa_serial_date_scheme`, `query_access`, `query_access_network_acl`,
+`dynamic_update`, and `dynamic_update_network_acl`. There are no zone defaults
+in this root. Declare desired properties for new zones and match current
+properties when importing existing ones. An explicit empty map means this root
+owns no zones; removing a tracked key is a destructive lifecycle change.
+
+There is no pre-existence lookup, adoption flag, or separate existing-zone
+resource. A zone absent from state is planned for creation. Importing an already
+running zone establishes its state binding once; subsequent plans and applies
+use exactly the same lifecycle as a zone originally created by this root.
+
+The DNS service owns zone lifecycle, not an exhaustive record set. Creating a
+zone lets Technitium generate its apex SOA/NS data; service-specific records
+remain owned in their deploying service roots. Adding or changing a record in
+another root does not transfer its ownership to the zone resource.
+
+### New Zones
+
+1. Add a stable label and desired zone properties to the private
+   `technitium_zones` map. No manual creation in Technitium is required.
+2. Generate and review a full saved plan using the commands above. Expect a
+   create action for the new zone, not changes to existing infrastructure,
+   server settings, or other zones.
+3. With apply authorization, apply that saved plan. The service that deploys an
+   instance can then create its own records in the zone using separate state.
+
+### Existing Zones: One-Time Import
+
+If a zone already exists but is not in this root's state, import it rather than
+applying a conflicting create action. Use the same `technitium_zones` entry and
+`technitium_zone.managed` address that would be used to create a new zone.
+
+Before import, inspect its actual type, DNSSEC status, and transfer/notify
+policies. The verified migration scope is unsigned Primary zones with
+`ZoneNameServers` notification and `AllowOnlyZoneNameServers` transfer modes.
+Other types, signed zones, or different modes require compatibility review.
+These are migration preflight checks, not permanent existence requirements.
+
+Transfer/notify settings and TSIG references remain operator-managed and are
+omitted from resource arguments. The provider's list representation cannot
+preserve every transfer/notify mode; writing a matching-looking list can narrow
+a combined policy. No `dnssec` block, signing/unsigning acknowledgment, or key
+rotation is configured. Full SOA data and apex NS records remain operator-owned;
+do not rename existing NS targets to satisfy record-provider validation.
+
+1. Complete the backup, state protection, credential, and secure-access checks
+   above. Populate all eight fields for each supported zone from the inventory,
+   preserving exact names/types, enabled state, SOA serial scheme, and ACLs.
+   Reconcile the current transfer/notify modes and TSIG usage. Keep a private
+   mapping from each stable label to its zone name; each zone has exactly one
+   zone-lifecycle owner.
+
+2. Rehearse against an isolated backup restore with separate inputs/state. Then,
+   with separate live-import authorization, import each zone by its actual name
+   into the existing production root/state:
+
+   ```bash
+   tofu import 'technitium_zone.managed["zone_0"]' '<zone-name>'
+   ```
+
+   Repeat only for zones that already exist. New entries are created normally;
+   do not import records as a side effect of zone adoption.
+
+3. With planning authorization, generate and inspect a full saved plan using
+   the commands above. Require no Incus/server-setting changes, zone replacement,
+   DNSSEC transition, record removal, or unexpected policy/SOA change. Provider
+   import can leave query/update policies and ACLs null; matching declarations
+   can require initialization writes. Compare every proposed value to the
+   before-export and obtain separate apply approval, even if it looks unchanged.
+
+4. After any authorized initialization, compare all records, apex NS and full
+   SOA data, serials, zone options, DNSSEC state, and representative UDP/TCP
+   answers. Confirm that neither omitted policies nor server settings changed.
+   Require a full `tofu plan -detailed-exitcode` exit of `0` before recording
+   operational adoption as complete. Retain raw evidence privately.
+
+Zone deletion or replacement removes its records and keys, including records
+owned in other roots or not managed by OpenTofu. `prevent_destroy` blocks such
+plans while this resource declaration is present, including removal of a map
+key. It cannot protect against removing the entire declaration, losing/removing
+state bindings, direct API actions, or another writer. It is not a backup or a
+per-record permission boundary. Never remove it merely to make adoption pass.
 
 ## Backup And Recovery
 
