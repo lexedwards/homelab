@@ -1,12 +1,13 @@
 # Technitium DNS
 
 Technitium DNS provides name resolution independently of the Proxmox cluster.
-This OpenTofu root manages its existing Incus instance on the [Micro Node] and
-the audited server settings, and provides adoption declarations for existing
-unsigned Primary zones. **Declarations alone do not establish completed live
-imports or operational verification.**
+This OpenTofu root manages its Incus instance on the [Micro Node], the audited
+server settings, and DNS zones. New and imported zones use the same managed
+resources. **Declarations alone do not establish completed live imports or
+operational verification.**
 
-Records are not yet adopted. Other server/zone attributes, web/authentication
+Service-specific records belong to the services that deploy their instances;
+existing record migration is separate work. Other server/zone attributes, web/authentication
 configuration, certificates, applications, DHCP, clustering, and application
 upgrades remain operator-managed.
 
@@ -47,8 +48,9 @@ online operations; a private VLAN alone does not encrypt the admin token.
    `TF_VAR_technitium_server_url` and `TF_VAR_technitium_settings` can supply
    those inputs instead of the local file. No DNS settings or API addresses
    are inferred from the Incus instance.
-   Populate `technitium_zones` from the reviewed zone inventory, using the
-   commented object shape in `terraform.tfvars.example`. `TF_VAR_technitium_zones`
+   Declare the zones this DNS service owns in `technitium_zones`, using the
+   commented object shape in `terraform.tfvars.example`. When importing a zone,
+   first match its current properties. `TF_VAR_technitium_zones`
    is also supported. Its stable map keys are public resource labels, not DNS
    names; only these keys are declassified for iteration. Zone names and ACLs
    remain sensitive private inputs. Do not renumber labels after import.
@@ -188,20 +190,47 @@ It is not a backup, does not protect the Incus instance, and does not prevent
 someone from removing configuration or losing state. The provider's settings
 delete only forgets state; it does not restore a previous configuration.
 
-## Adopt Existing Zones
+## Manage DNS Zones
 
-`technitium_zone.existing["zone_0"]` and other stable labels own shared zone
+`technitium_zone.managed["zone_0"]` and other stable labels own shared zone
 identity and these explicitly supplied attributes: `name`, `type`, `disabled`,
 `soa_serial_date_scheme`, `query_access`, `query_access_network_acl`,
 `dynamic_update`, and `dynamic_update_network_acl`. There are no zone defaults
-in this root. An explicit empty map means no zones are selected, not an inventory
-of the existing service; removing a tracked key is a destructive lifecycle change.
+in this root. Declare desired properties for new zones and match current
+properties when importing existing ones. An explicit empty map means this root
+owns no zones; removing a tracked key is a destructive lifecycle change.
 
-A read-only lookup checks that each selected zone already exists, is Primary,
-is unsigned, and uses the audited `ZoneNameServers` notification and
-`AllowOnlyZoneNameServers` transfer modes before an update can proceed. Other
-zone types, signed zones, and different transfer/notify modes stop planning for
-compatibility review. This path is not a new-zone provisioning workflow.
+There is no pre-existence lookup, adoption flag, or separate existing-zone
+resource. A zone absent from state is planned for creation. Importing an already
+running zone establishes its state binding once; subsequent plans and applies
+use exactly the same lifecycle as a zone originally created by this root.
+
+The DNS service owns zone lifecycle, not an exhaustive record set. Creating a
+zone lets Technitium generate its apex SOA/NS data; service-specific records
+remain owned in their deploying service roots. Adding or changing a record in
+another root does not transfer its ownership to the zone resource.
+
+### New Zones
+
+1. Add a stable label and desired zone properties to the private
+   `technitium_zones` map. No manual creation in Technitium is required.
+2. Generate and review a full saved plan using the commands above. Expect a
+   create action for the new zone, not changes to existing infrastructure,
+   server settings, or other zones.
+3. With apply authorization, apply that saved plan. The service that deploys an
+   instance can then create its own records in the zone using separate state.
+
+### Existing Zones: One-Time Import
+
+If a zone already exists but is not in this root's state, import it rather than
+applying a conflicting create action. Use the same `technitium_zones` entry and
+`technitium_zone.managed` address that would be used to create a new zone.
+
+Before import, inspect its actual type, DNSSEC status, and transfer/notify
+policies. The verified migration scope is unsigned Primary zones with
+`ZoneNameServers` notification and `AllowOnlyZoneNameServers` transfer modes.
+Other types, signed zones, or different modes require compatibility review.
+These are migration preflight checks, not permanent existence requirements.
 
 Transfer/notify settings and TSIG references remain operator-managed and are
 omitted from resource arguments. The provider's list representation cannot
@@ -222,11 +251,11 @@ do not rename existing NS targets to satisfy record-provider validation.
    into the existing production root/state:
 
    ```bash
-   tofu import 'technitium_zone.existing["zone_0"]' '<zone-name>'
+   tofu import 'technitium_zone.managed["zone_0"]' '<zone-name>'
    ```
 
-   Repeat for the other inventoried labels. Do not apply create actions for
-   existing zones or import records as a side effect of zone adoption.
+   Repeat only for zones that already exist. New entries are created normally;
+   do not import records as a side effect of zone adoption.
 
 3. With planning authorization, generate and inspect a full saved plan using
    the commands above. Require no Incus/server-setting changes, zone replacement,

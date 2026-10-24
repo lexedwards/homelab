@@ -2,13 +2,7 @@ locals {
   technitium_zone_keys = nonsensitive(toset(keys(var.technitium_zones)))
 }
 
-data "technitium_zone" "existing" {
-  for_each = local.technitium_zone_keys
-
-  name = var.technitium_zones[each.key].name
-}
-
-resource "technitium_zone" "existing" {
+resource "technitium_zone" "managed" {
   for_each = local.technitium_zone_keys
 
   name                   = var.technitium_zones[each.key].name
@@ -23,23 +17,5 @@ resource "technitium_zone" "existing" {
 
   lifecycle {
     prevent_destroy = true
-
-    precondition {
-      condition     = data.technitium_zone.existing[each.key].type == "Primary"
-      error_message = "Only existing Primary zones have been verified for adoption. Stop for compatibility review of other types."
-    }
-
-    precondition {
-      condition     = data.technitium_zone.existing[each.key].dnssec_status == "Unsigned"
-      error_message = "Only unsigned zones have been verified for adoption. Signing, unsigning, and key changes are not authorized."
-    }
-
-    precondition {
-      condition = (
-        data.technitium_zone.existing[each.key].notify == "ZoneNameServers" &&
-        data.technitium_zone.existing[each.key].zone_transfer == "AllowOnlyZoneNameServers"
-      )
-      error_message = "Only the audited zone-name-server notify/transfer modes have been verified. Preserve other modes outside this adoption path rather than approximate them."
-    }
   }
 }

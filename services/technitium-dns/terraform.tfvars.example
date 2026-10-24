@@ -69,11 +69,12 @@
 # }
 
 # -----------------------------------------------------------------------------
-# Existing zones (all fields required; preserve existing values)
+# Zones owned by this DNS service (all fields required)
 # -----------------------------------------------------------------------------
 
+# Declare new zones here; import already-existing zones into the same resources.
 # Use stable opaque labels, never DNS names, as map keys. Keep labels unchanged
-# after import and add another object for each inventoried supported zone.
+# once managed. For an import, first match the zone's current properties.
 # technitium_zones = {
 #   zone_0 = {
 #     name                       =

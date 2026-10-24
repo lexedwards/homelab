@@ -84,7 +84,7 @@ variable "technitium_settings" {
 }
 
 variable "technitium_zones" {
-  description = "Existing unsigned Primary zones keyed by stable opaque labels, not DNS names. Supply every policy value from the reviewed inventory; no zone names or ACLs are inferred from infrastructure."
+  description = "DNS zones owned by this service, keyed by stable opaque labels rather than DNS names. Names and ACLs are explicit private inputs. Import existing zones into these same managed resources."
   type = map(object({
     name                       = string
     type                       = string
@@ -102,7 +102,7 @@ variable "technitium_zones" {
     condition = alltrue([
       for zone in values(var.technitium_zones) : try(alltrue([for value in zone : value != null]), false)
     ])
-    error_message = "Every adopted zone and all its attributes must be non-null. Use an explicit empty ACL only when the existing ACL is empty."
+    error_message = "Every managed zone and all its attributes must be non-null. Use an explicit empty ACL only when that is the desired policy."
   }
 
   validation {
@@ -115,7 +115,7 @@ variable "technitium_zones" {
         false
       )
     ])
-    error_message = "Use stable opaque snake_case labels, existing Primary zone names without surrounding whitespace, valid query/update modes, and ACLs without null or blank entries."
+    error_message = "Use stable opaque snake_case labels, Primary zone names without surrounding whitespace, valid query/update modes, and ACLs without null or blank entries."
   }
 
   validation {

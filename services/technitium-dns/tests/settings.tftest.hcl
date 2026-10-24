@@ -8,16 +8,7 @@ mock_provider "incus" {
   }
 }
 
-mock_provider "technitium" {
-  mock_data "technitium_zone" {
-    defaults = {
-      type          = "Primary"
-      dnssec_status = "Unsigned"
-      notify        = "ZoneNameServers"
-      zone_transfer = "AllowOnlyZoneNameServers"
-    }
-  }
-}
+mock_provider "technitium" {}
 
 variables {
   incus_remote          = "test-remote"
@@ -165,7 +156,7 @@ run "preserve_explicit_zone_properties_without_adopting_excluded_policies" {
   assert {
     condition = nonsensitive(alltrue([
       for label, zone in var.technitium_zones : jsonencode({
-        for name, value in zone : name => technitium_zone.existing[label][name]
+        for name, value in zone : name => technitium_zone.managed[label][name]
       }) == jsonencode(zone)
     ]))
     error_message = "Every zone must preserve its explicit identity, disabled state, serial mode, query/update policies, and ACLs."
@@ -173,7 +164,7 @@ run "preserve_explicit_zone_properties_without_adopting_excluded_policies" {
 
   assert {
     condition = alltrue([
-      for zone in technitium_zone.existing :
+      for zone in technitium_zone.managed :
       zone.dnssec == null && zone.notify == null && zone.allow_transfer == null &&
       zone.zone_transfer_tsig_key_names == null && zone.primary_zone_transfer_tsig_key_name == null
     ])
@@ -181,52 +172,52 @@ run "preserve_explicit_zone_properties_without_adopting_excluded_policies" {
   }
 }
 
-run "reject_signed_zone_adoption_before_any_write" {
+run "plan_new_zone_without_preexisting_zone_metadata" {
   command = plan
 
-  override_data {
-    target = data.technitium_zone.existing["zone_0"]
-    values = {
-      type          = "Primary"
-      dnssec_status = "SignedWithNSEC"
-      notify        = "ZoneNameServers"
-      zone_transfer = "AllowOnlyZoneNameServers"
+  variables {
+    technitium_zones = {
+      new_zone = {
+        name                       = "new-zone.example.invalid"
+        type                       = "Primary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
     }
   }
 
-  expect_failures = [technitium_zone.existing]
+  assert {
+    condition = (
+      technitium_zone.managed["new_zone"].name == "new-zone.example.invalid" &&
+      technitium_zone.managed["new_zone"].type == "Primary"
+    )
+    error_message = "Declaring a new zone must plan its managed resource without requiring that zone to exist first."
+  }
 }
 
-run "reject_untested_live_zone_types" {
+run "reject_unsupported_declared_zone_types" {
   command = plan
 
-  override_data {
-    target = data.technitium_zone.existing["zone_0"]
-    values = {
-      type          = "Secondary"
-      dnssec_status = "Unsigned"
-      notify        = "ZoneNameServers"
-      zone_transfer = "AllowOnlyZoneNameServers"
+  variables {
+    technitium_zones = {
+      zone_0 = {
+        name                       = "example.invalid"
+        type                       = "Secondary"
+        disabled                   = false
+        soa_serial_date_scheme     = false
+        query_access               = "Allow"
+        query_access_network_acl   = []
+        dynamic_update             = "Deny"
+        dynamic_update_network_acl = []
+      }
     }
   }
 
-  expect_failures = [technitium_zone.existing]
-}
-
-run "reject_lossy_combined_transfer_and_notify_modes" {
-  command = plan
-
-  override_data {
-    target = data.technitium_zone.existing["zone_0"]
-    values = {
-      type          = "Primary"
-      dnssec_status = "Unsigned"
-      notify        = "BothZoneAndSpecifiedNameServers"
-      zone_transfer = "AllowZoneNameServersAndUseSpecifiedNetworkACL"
-    }
-  }
-
-  expect_failures = [technitium_zone.existing]
+  expect_failures = [var.technitium_zones]
 }
 
 run "reject_null_zone_policy_inputs" {
