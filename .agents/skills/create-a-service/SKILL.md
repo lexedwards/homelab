@@ -37,9 +37,9 @@ appears before continuing; do not defer all acceptance checks until the end.
   ignored local configuration, state, saved plans, or rendered cloud-init to
   discover deployment values. A saved plan may be inspected only for an
   explicitly requested plan or apply review under the freshness gate below.
-- Apply the data classes in [Lifecycle And Operations](references/lifecycle-and-operations.md):
-  never disclose secrets, do not repeat exact deployment locators, and preserve
-  useful non-secret architecture already established in tracked documentation.
+- Before classifying configuration values, read and apply
+  [Configuration Values](../principle-configuration-values/SKILL.md) for commit
+  safety, local input channels, defaults, and example-file conventions.
 - Prefer a native package and one systemd service. Use Docker Compose only when
   a container runtime is justified; never use an imperative `docker run`
   lifecycle.
@@ -160,13 +160,9 @@ services/<service-name>/
 - Use kebab case for external service names and snake case for OpenTofu labels.
 - Add `.yamllint`, `cloud-init/`, and `config/` only when the selected branch
   needs them.
-- Keep required deployment values in typed, validated variables without
-  defaults. In `terraform.tfvars.example`, leave secrets and exact deployment
-  locators unassigned; established non-secret architecture conventions already
-  present in tracked files may be shown.
-- Mark discovered addresses and any unavoidable credential inputs or outputs as
-  sensitive where supported. Explain that sensitivity redacts normal output but
-  does not encrypt state.
+- When authoring variables and `terraform.tfvars.example`, read and apply
+  [Configuration Values](../principle-configuration-values/SKILL.md).
+- Mark discovered addresses as sensitive outputs where supported.
 
 **Security gate:** the authored configuration contains no secrets or unapproved
 deployment-specific values, and every elevated capability has a documented

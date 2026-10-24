@@ -3,18 +3,12 @@
 Read this reference when a service installs software, handles credentials,
 stores durable data, uses Docker Compose, or needs operational documentation.
 
-## Classify Infrastructure Data
+## Configuration And Credentials
 
-Apply the narrowest class that protects the value without hiding useful
-architecture.
-
-### Never Tracked Or Disclosed
-
-- Passwords, tokens, private keys, application credentials, and other secret
-  material.
-- OpenTofu state, saved plans, ignored local configuration, and rendered
-  first-boot data. A saved plan may be inspected only during an explicitly
-  requested plan or apply review; never quote its protected values.
+Before choosing tracked values, local inputs, or defaults, read and apply
+[Configuration Values](../../principle-configuration-values/SKILL.md).
+A saved plan may be inspected only during an explicitly requested plan or apply
+review; never quote its protected values.
 
 Keep application credentials out of OpenTofu state and first-boot data. Prefer
 post-deployment enrollment with a root-owned credential file. If first boot
@@ -22,33 +16,6 @@ cannot work without a secret, explain its state exposure and obtain the user's
 decision before implementing it. Mark every unavoidable credential variable and
 output as sensitive where OpenTofu supports it; sensitivity redacts normal
 output but does not encrypt state.
-
-### Readable But Not Repeated
-
-Exact deployment locators may be read when the authorized task requires them,
-but must not be repeated in chat, documentation, tests, examples, commits, or
-pull requests:
-
-- addresses, CIDRs, gateways, DNS values, and VLAN or guest IDs;
-- API, remote, and storage endpoints;
-- environment-specific datastore identifiers; and
-- usernames and public keys.
-
-Do not inspect ignored local configuration, state, plans, or rendered data to
-discover these values. Represent required locators as typed OpenTofu variables
-without defaults. Values belong only in ignored local variable files,
-`TF_VAR_...` environment variables, or an approved secret store.
-
-### Documentable Architecture
-
-Non-secret host roles and established project, pool, bridge, datastore, and
-service-name conventions may be documented when they already appear in tracked
-repository files. Do not promote an untracked or local value into an established
-convention.
-
-Use semantic placeholders such as `<remote-name>`, `<service-address>`, and
-`<datastore-id>` for deployment locators. Loopback addresses are acceptable for
-in-guest readiness checks.
 
 ## Provision Software
 
