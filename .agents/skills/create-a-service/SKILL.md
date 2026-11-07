@@ -44,7 +44,7 @@ appears before continuing; do not defer all acceptance checks until the end.
   a container runtime is justified; never use an imperative `docker run`
   lifecycle.
 - Add privilege, devices, mounts, kernel settings, and security exceptions only
-  for stated workload requirements.
+  for stated workload requirements or verified platform compatibility needs.
 - Use DHCP by default and keep stable addressing in upstream DHCP and DNS.
 - Do not invent exposure, persistence, authentication, migration, high
   availability, or backup requirements.
@@ -122,8 +122,9 @@ roles, and all host prerequisites affected by the change are confirmed.
 Follow the classified platform rather than choosing from all guest types at
 once:
 
-- **Micro Node Incus:** use an Incus container and load only the workload
-  sections needed from [Incus](references/incus.md).
+- **Micro Node Incus:** use an Incus container and follow
+  [Incus](references/incus.md), including the Debian 13 nesting requirement for
+  the current host.
 - **Proxmox:** establish `compute` or `store`, then choose a VM, unprivileged
   LXC, or reviewed appliance using [Proxmox](references/proxmox.md).
 - **Proxmox VM:** read [Proxmox VM](references/proxmox-vm.md).

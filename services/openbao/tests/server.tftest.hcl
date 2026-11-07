@@ -35,9 +35,18 @@ run "persistent_server_with_service_owned_dns" {
       incus_instance.openbao.config["boot.autostart"] == "true" &&
       incus_instance.openbao.config["limits.memory"] == "1024MiB" &&
       !contains(keys(incus_instance.openbao.config), "security.privileged") &&
-      !contains(keys(incus_instance.openbao.config), "security.nesting")
+      !contains(keys(incus_instance.openbao.config), "raw.apparmor") &&
+      !contains(keys(incus_instance.openbao.config), "raw.lxc")
     )
     error_message = "The server must autostart with bounded resources and no unexplained privilege exceptions."
+  }
+
+  assert {
+    condition = (
+      lookup(incus_instance.openbao.config, "security.nesting", "false") == "true" &&
+      incus_instance.openbao.config["limits.memory.swap"] == "false"
+    )
+    error_message = "Debian 13 on the current Micro Node host requires nesting for systemd startup while guest swapping remains disabled."
   }
 
   assert {

@@ -10,7 +10,8 @@ service for the Micro Node and Incus.
 2. Read `services/hello-world/` for the smallest native systemd baseline.
 3. Compare current Incus roots: `services/proxmox-qdevice/`,
    `services/tailscale-exit-node/`, `services/technitium-dns/`, and
-   `services/uptime-kuma/`.
+   `services/uptime-kuma/`; read `services/openbao/` for the verified Debian 13
+   nesting requirement and native service/cgroup checks.
 4. Use specialized examples only for their matching concern:
    `proxmox-qdevice` for authoritative SSH keys, `tailscale-exit-node` for TUN
    and forwarding, and `uptime-kuma` only for custom-volume persistence and
@@ -39,9 +40,18 @@ the current majority pattern. Never copy an environment value.
 - Use the current Debian 13 cloud-image convention unless package support or the
   workload requires another OS. Require a non-empty image input.
 - Set explicit workload-appropriate CPU and memory limits.
-- Do not enable `security.nesting` by default. Add it only when current evidence
-  demonstrates a host, guest, or workload requirement, and document that reason.
-  Systemd use or an inherited example alone is insufficient.
+- For Debian 13 containers on the current Micro Node Ubuntu/Incus host, set
+  `"security.nesting" = "true"` in the instance configuration. An OpenBao boot
+  test verified that enabling nesting and restarting cleared `sd-mkuserns` hangs in
+  `systemd-networkd`, `systemd-resolved`, and `systemd-journald`, allowing DHCP,
+  cloud-init, and native OpenBao startup; service-cgroup swap enforcement still
+  passed. Document this host-compatibility exception in the service README.
+- Keep the guest unprivileged. Nesting relaxes confinement but does not require
+  disabling AppArmor, changing host-wide sysctls, or copying Technitium's
+  application-specific `raw.apparmor` signal rule. For other OS/host combinations,
+  add nesting only with evidence of a requirement. Reassess this exception after
+  host/runtime changes; remove it only after a verified no-nesting boot with
+  networking, cloud-init, and required service hardening intact.
 - Attach the root disk from the `default` pool.
 - Attach `eth0` to `br0`; supply its tag through a required, validated
   `instance_vlan_id` variable without a default.
