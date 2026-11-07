@@ -29,8 +29,18 @@ over HTTPS. The API and UI listen on TCP 8200; the single-node cluster listener
 uses loopback TCP 8201 and is not published to the network.
 
 The initial resource limit is one CPU and 1 GiB RAM. Monitor memory, disk, and
-request load before increasing usage. The deployment does not enable privileged
-mode, nesting, or Docker-specific exceptions.
+request load before increasing usage. The guest remains unprivileged and has no
+raw AppArmor overrides or Docker-specific exceptions.
+
+`security.nesting=true` is required for Debian 13 systemd startup on the current
+Micro Node Ubuntu/Incus host. Without it, `sd-mkuserns` helpers blocked networking,
+DNS resolution, and journaling, preventing DHCP and cloud-init completion. A
+controlled test changing only nesting and restarting the guest restored those
+services; OpenBao then started and passed its effective/kernel swap-limit checks.
+Nesting relaxes container confinement beyond a targeted AppArmor rule, but does
+not make the guest privileged or disable AppArmor. Do not copy Technitium's
+application-specific signal rule. Reassess the exception after host/runtime
+changes and verify a successful boot without nesting before removing it.
 
 ## Configure And Validate
 

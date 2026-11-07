@@ -69,6 +69,7 @@ resource "incus_instance" "openbao" {
     "limits.cpu"           = tostring(var.instance_cpu_count)
     "limits.memory"        = "${var.instance_memory_mib}MiB"
     "limits.memory.swap"   = "false"
+    "security.nesting"     = "true"
   }
 
   device {
