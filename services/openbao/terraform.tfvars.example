@@ -1,0 +1,34 @@
+# Assign required environment-specific values after copying this file to
+# terraform.tfvars. Do not commit that file.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+# Required
+# incus_remote =
+
+# -----------------------------------------------------------------------------
+# DNS
+# -----------------------------------------------------------------------------
+
+# Authentication: inject TECHNITIUM_API_TOKEN outside OpenTofu input files.
+# Required
+# technitium_server_url =
+# dns_zone              =
+# dns_name              =
+
+# Optional
+# dns_ttl = 300
+
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
+
+# Required
+# incus_image      =
+# instance_vlan_id =
+
+# Optional
+# instance_cpu_count  = 1
+# instance_memory_mib = 1024
