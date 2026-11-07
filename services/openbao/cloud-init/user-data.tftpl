@@ -1,0 +1,32 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - openssl
+  - python3
+
+write_files:
+  - path: /usr/local/lib/openbao/install.sh
+    permissions: "0700"
+    owner: root:root
+    content: ${jsonencode(install)}
+  - path: /usr/local/lib/openbao/check-ready.py
+    permissions: "0755"
+    owner: root:root
+    content: ${jsonencode(readiness)}
+  - path: /etc/openbao/openbao.hcl
+    permissions: "0640"
+    owner: root:root
+    content: ${jsonencode(server_config)}
+  - path: /etc/systemd/system/openbao.service.d/hardening.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Service]
+      MemorySwapMax=0
+      LimitCORE=0
+      ProtectHome=true
+
+runcmd:
+  - [sh, /usr/local/lib/openbao/install.sh, "${openbao_version}", "${openbao_sha256}"]

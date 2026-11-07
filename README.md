@@ -12,6 +12,7 @@
     - [Local DNS](#local-dns)
     - [Lightweight Status Page](#lightweight-status-page)
     - [Tailscale Exit Node](#tailscale-exit-node)
+    - [Secrets Management](#secrets-management)
     - [Networked Storage](#networked-storage)
     - [Service Proxy](#service-proxy)
     - [Home Assistant](#home-assistant)
@@ -86,6 +87,12 @@ lightweight status page outside the Proxmox cluster.
 [Tailscale Exit Node](services/tailscale-exit-node/README.md) runs in an Incus
 instance on `micro-node`. It lets tailnet clients use the homelab's internet
 connection while away from home.
+
+### Secrets Management
+
+[OpenBao](services/openbao/README.md) defines a native, persistent secrets server
+in an Incus container on `micro-node`, with systemd swap protection and
+service-owned DNS. Initialization and unseal remain operator-managed.
 
 ### Networked Storage
 

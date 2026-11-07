@@ -109,6 +109,7 @@ The trusted client **should** now be able to deploy the Incus services assigned
 to the Micro Node:
 
 - [Proxmox QDevice](../../services/proxmox-qdevice/README.md)
+- [OpenBao](../../services/openbao/README.md)
 - [Tailscale Exit Node](../../services/tailscale-exit-node/README.md)
 - [Technitium DNS](../../services/technitium-dns/README.md)
 - [Uptime Kuma](../../services/uptime-kuma/README.md)
@@ -126,6 +127,7 @@ flowchart LR
     E[Tailscale Exit Node root] -->|Incus API| H
     D[Technitium DNS root] -->|Incus API| H
     U[Uptime Kuma root] -->|Incus API| H
+    B[OpenBao root] -->|Incus API| H
 ```
 
 ## Troubleshooting
