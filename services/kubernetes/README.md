@@ -6,9 +6,9 @@ yet define worker VMs, VLAN service pools, application policy, NFS storage or
 OpenBao workload-secret delivery. Implementation context and qualification gates
 remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 
-**Validation is local evidence, not deployment evidence.** This maintained root
-has not been applied. Earlier disposable proofs support the chosen component
-combination but do not prove this implementation's first-boot/restart behavior.
+**Validation is local evidence, not deployment evidence.** Earlier disposable
+proofs support the chosen component combination but do not prove this
+implementation's first-boot/restart behavior.
 
 ## Dependencies
 
@@ -20,7 +20,8 @@ combination but do not prove this implementation's first-boot/restart behavior.
   reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
 - Existing Technitium zone and a service-owned API A record that is not already
   owned elsewhere. The API name must remain stable through future HA expansion.
-- OpenTofu 1.9+, Python 3 and yamllint. Providers are pinned by the lock file.
+- OpenTofu 1.9+, Python 3, yamllint and Linux bubblewrap for isolated boot-sequence
+  tests. Providers are pinned by the lock file.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
 
@@ -49,20 +50,19 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs format/schema checks, plan/render and simulated-apply tests
 with **both providers mocked**, readiness-CLI tests with a fake API command,
-real temporary-file bootstrap/identity checks, YAML lint and shell syntax checks.
-Mocked apply does not create infrastructure. Validation does not read production inputs, contact Proxmox/DNS,
-execute the root-only installer or prove guest package/SELinux readiness. Init
-downloads providers but does not plan or deploy infrastructure.
+YAML lint and shell syntax checks. Bubblewrap tests execute the real installer
+and preflight in an isolated filesystem/network with fake package/system commands.
+They check install → simulated reboot → repeated preflight and failure paths, not
+actual RPM installation, kernel boot or SELinux policy. No infrastructure is
+created or contacted. Init downloads providers but does not plan or deploy it.
 
 ## Reviewed plan and deployment
 
 Only after separate authorization, verify template/key fingerprints, current
-guest-ID and MAC availability, snippets storage and DNS record ownership. The
-MAC defaults to a stable locally administered address using prefix `02:4b` and
-the explicit VM ID encoded in four bytes; it is not authentication. Unique VM IDs
-avoid collisions within this convention, but check other allocations too. Supply
-`control_plane.mac_address` only to override it, and `ipv4_address` only to validate
-an already configured reservation. Otherwise omit both; do not guess a free IP.
+guest-ID availability, snippets storage and DNS record ownership. Proxmox manages
+the NIC MAC when `control_plane.mac_address` is omitted; an optional override can
+pin an existing address. There is no generated-MAC convention or node-IP input.
+Use DHCP and reserve the observed lease upstream; do not guess a free IP.
 The initial DNS target is unknown until the guest agent reports its DHCP lease.
 
 ```bash
@@ -77,6 +77,10 @@ that review. Apply only the inspected, unchanged plan. Keep state, plans, render
 cloud-init and local inputs protected and securely backed up. Sensitive markings
 redact normal output; they do not encrypt stored data.
 
+Run persistent plans/applies only from the canonical checkout on `main`, using
+its existing default-workspace state. Feature worktrees are for development and
+mocked tests, not a second deployment state.
+
 The server and future worker resources belong to one root/state with separate
 resource groups and operational procedures. The explicit server resource uses
 the full-control VM clone API because it must own cloud-init, MAC, protection,
@@ -87,8 +91,8 @@ models or import a different owner without a reviewed migration.
 
 Cloud-init creates the approved non-root administrator, replaces that user's
 authorized-key file with the reviewed operator keys, disables root/password SSH
-and installs/enables the QEMU guest agent. It writes the API identity, explicit
-node address, internal CIDRs, server taint and managed-Cilium configuration before
+and installs/enables the QEMU guest agent. It writes the API identity,
+internal CIDRs, server taint and managed-Cilium configuration before
 starting the cluster. No Kubernetes token, kubeconfig or private certificate is
 supplied to OpenTofu/cloud-init; initial RKE2 startup generates them in the guest.
 
@@ -104,13 +108,16 @@ The root-only installer:
    Its pinned digest was obtained from the HTTPS publisher; this is not an
    independent release-signature verification. A key rotation fails closed and
    needs an explicit reviewed digest update.
-4. Loads required modules, enables forwarding, disables guest swap, preserves
-   SELinux labels and excludes Cilium interfaces from NetworkManager management.
-   It does not disable SELinux or the guest firewall.
+4. Writes persistent module-loading and forwarding settings, disables guest swap,
+   preserves SELinux labels and excludes Cilium interfaces from NetworkManager
+   management. It does not load newly installed modules into the template's old
+   running kernel, or disable SELinux or the guest firewall.
 5. Enables the RKE2 server and creates an installation marker only on success.
    The systemd unit requires that marker. Cloud-init then reboots the guest into
    the installed kernel. RKE2 first starts on the subsequent boot; its preflight
-   rejects non-enforcing mode, active swap or a changed bootstrap IP/MAC pair.
+   rejects non-enforcing mode or active swap, loads the required modules for the
+   running kernel, and applies the Kubernetes sysctl file. A missing module or
+   failed sysctl causes startup to fail rather than continuing without it.
 
 The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
 installer command clears those two repository exclusions while selecting exact
@@ -126,20 +133,23 @@ tickets and public logs. Create the matching UniFi fixed DHCP reservation before
 accepting workloads or restarting/maintaining the server. Keep the existing IP;
 do not deliberately move the node as part of reservation creation.
 
-The guest configures RKE2's node address and Cilium's API host from the single
-global-scope IPv4 on its default-route NIC. Bootstrap rejects missing/ambiguous
-routes, multiple primary addresses, internal-CIDR overlap and disagreement with
-any optional pre-existing reservation. It stores the observed IP/MAC pair in a
-root-only identity file. Startup later requires that same address on that same
-MAC, even if interface names change; it will not silently move the node or accept
-the old address on another interface. If the lease changes before reservation,
-restore the original pair in UniFi and recheck configuration; do not rerun bootstrap
-against existing etcd data to hide an identity change.
+RKE2 discovers the node IP through its native address selection. No helper
+rewrites configuration, records an IP/MAC identity file or checks that pair on
+restart. Stable addressing is an upstream DHCP responsibility: if the lease
+changes, restore the original reservation and investigate before maintenance.
+Future dual-NIC workers need reviewed primary-interface/address selection; this
+single-NIC server does not establish that behavior for them.
 
 OpenTofu selects the guest-agent address by the managed primary NIC's MAC, not
 the first non-loopback/pod address, and publishes API DNS after VM address discovery.
-Guest bootstrap uses the local address, so it does not need that DNS record to
-exist before the VM starts. The API's stable DNS name remains in initial TLS SANs.
+The API's stable DNS name remains in initial TLS SANs. Cilium uses that name on
+TCP 6443, not a rewritten node IP or the Kubernetes Service IP. The pinned
+RKE2-managed Cilium chart has no API-host default suitable for kube-proxy-free
+bootstrap. Its agent and operator use host networking and host DNS, so the
+external DNS record must resolve from the guest without CoreDNS/Cilium. The VM
+can report its DHCP address and RKE2 can start its API before Cilium is ready;
+DNS publication therefore does not depend on CNI readiness. Cilium may retry
+while DNS propagation completes. Verify this ordering during live qualification.
 With multiple usable addresses on the primary NIC, planning/apply fails rather
 than choosing one arbitrarily. DHCP discovery is not proof that a reservation is
 created, the IP cannot change, or cloud-init/cluster startup has completed.
@@ -175,8 +185,8 @@ on local tests or this checker.
 This root owns only its API A record, not the DNS zone. It points to the observed
 primary DHCP address, to be reserved after deployment, never a workload service
 IP. `overwrite = false` avoids silently replacing unrelated records. The private
-API FQDN appears in RKE2's initial TLS SAN list. The recorded primary IP/MAC identity is checked on
-each server start; this does not create or prove uniqueness of a DHCP reservation.
+API FQDN appears in RKE2's initial TLS SAN list. Neither discovery nor server
+startup creates or proves uniqueness of a DHCP reservation.
 
 RKE2 alone owns the managed Cilium chart. Its pre-bootstrap `HelmChartConfig`
 selects kube-proxy replacement, VXLAN, Kubernetes IPAM and host-namespace-only
@@ -242,6 +252,28 @@ Initial bootstrap failure may recreate only reviewed newly owned resources;
 after useful data exists, use an authorized isolated restore, not VM deletion,
 `cluster-reset` against production or an unreviewed package downgrade.
 
+### Recovering an earlier failed first boot
+
+Changing the cloud-init snippet does not repair an existing guest. Plan recovery
+separately from merging these changes, preserving the VM, its current MAC/lease
+and canonical state. The MAC is optional/computed in the pinned provider; still
+reject an unexpected MAC change or VM replacement in the next reviewed plan.
+An explicit override can retain the current MAC if needed.
+Remove any old `control_plane.ipv4_address` entry from local inputs; it is no
+longer consumed.
+
+For a failure before RKE2 installation, first confirm there is no useful etcd
+data and that RKE2 is stopped. An authorized in-place recovery must update the
+installer, preflight and rendered RKE2/Cilium configuration together, removing
+the old helper and its identity files only after their callers are removed.
+The installer remains first-boot-only: do not rerun cloud-init or use it to
+upgrade an initialized datastore. Inspect installation success, explicitly
+authorize the kernel reboot, then qualify API/DNS/Cilium, etcd membership,
+scheduling isolation and restart/rejoin. Neither a successful apply nor these
+local tests establish that the existing failed guest has recovered.
+
+### HA expansion
+
 Future HA preserves the API name behind a frontend independent of Cilium's
 workload announcements, supporting TCP 6443/9345 and the existing certificate
 identity. Back up data/associated credentials, review failure-domain placement,
@@ -250,6 +282,8 @@ registration path. A permanent two-member etcd cluster is not fault tolerant;
 three VMs across two hosts are not three independent host-failure domains. This
 slice provisions no extra server/frontend or worker, and later code must preserve
 the existing server resource identity rather than rebuild the cluster to expand.
+
+### Troubleshooting
 
 For failures inspect `cloud-init status --long`, protected cloud-init logs,
 `systemctl status rke2-server`, and `journalctl -u rke2-server` in the guest.
