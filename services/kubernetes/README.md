@@ -16,8 +16,8 @@ combination but do not prove this implementation's first-boot/restart behavior.
   this root does not own or update the image catalogue.
 - Available guest ID, disk capacity, a snippets-capable datastore and tagged
   primary bridge on `compute`.
-- A stable unicast MAC and matching upstream DHCP reservation; the required
-  `control_plane.ipv4_address` must be that reserved address, not an arbitrary IP.
+- DHCP on the primary VLAN. A reservation is not needed before initial deployment;
+  reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
 - Existing Technitium zone and a service-owned API A record that is not already
   owned elsewhere. The API name must remain stable through future HA expansion.
 - OpenTofu 1.9+, Python 3 and yamllint. Providers are pinned by the lock file.
@@ -47,18 +47,23 @@ Technitium provider enforces `skip_tls_verify = false`; private CA trust must be
 configured through its supported trust environment. Proxmox verification is also
 on unless a separately approved exception explicitly overrides it.
 
-`make validate` runs format/schema checks, plan-only tests with **both providers
-mocked**, readiness-CLI tests with a fake command at the API boundary, YAML lint
-and shell syntax checks. It does not read production inputs, contact Proxmox/DNS,
+`make validate` runs format/schema checks, plan/render and simulated-apply tests
+with **both providers mocked**, readiness-CLI tests with a fake API command,
+real temporary-file bootstrap/identity checks, YAML lint and shell syntax checks.
+Mocked apply does not create infrastructure. Validation does not read production inputs, contact Proxmox/DNS,
 execute the root-only installer or prove guest package/SELinux readiness. Init
 downloads providers but does not plan or deploy infrastructure.
 
 ## Reviewed plan and deployment
 
-Only after separate authorization, verify reservations, template and key
-fingerprints, current guest-ID availability, snippets storage and ownership of
-the DNS record. Changing an upstream DHCP pool does not invalidate old leases;
-resolve conflicts before using any selected address.
+Only after separate authorization, verify template/key fingerprints, current
+guest-ID and MAC availability, snippets storage and DNS record ownership. The
+MAC defaults to a stable locally administered address using prefix `02:4b` and
+the explicit VM ID encoded in four bytes; it is not authentication. Unique VM IDs
+avoid collisions within this convention, but check other allocations too. Supply
+`control_plane.mac_address` only to override it, and `ipv4_address` only to validate
+an already configured reservation. Otherwise omit both; do not guess a free IP.
+The initial DNS target is unknown until the guest agent reports its DHCP lease.
 
 ```bash
 make plan
@@ -105,13 +110,39 @@ The root-only installer:
 5. Enables the RKE2 server and creates an installation marker only on success.
    The systemd unit requires that marker. Cloud-init then reboots the guest into
    the installed kernel. RKE2 first starts on the subsequent boot; its preflight
-   rejects non-enforcing mode, active swap or a missing reserved node address.
+   rejects non-enforcing mode, active swap or a changed bootstrap IP/MAC pair.
 
 The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
 installer command clears those two repository exclusions while selecting exact
 versions. This is not an upgrade procedure: use the later reviewed server-first
 upgrade workflow, and never rerun first-boot provisioning against useful etcd data.
 OS kernel updates remain distinct and can require planned guest reboots.
+
+### Reserve the first lease after deployment
+
+Inspect `tofu output -json control_plane_dhcp_lease` locally after authorized apply.
+This explicitly reveals the private primary-NIC IP/MAC pair; keep it out of Git,
+tickets and public logs. Create the matching UniFi fixed DHCP reservation before
+accepting workloads or restarting/maintaining the server. Keep the existing IP;
+do not deliberately move the node as part of reservation creation.
+
+The guest configures RKE2's node address and Cilium's API host from the single
+global-scope IPv4 on its default-route NIC. Bootstrap rejects missing/ambiguous
+routes, multiple primary addresses, internal-CIDR overlap and disagreement with
+any optional pre-existing reservation. It stores the observed IP/MAC pair in a
+root-only identity file. Startup later requires that same address on that same
+MAC, even if interface names change; it will not silently move the node or accept
+the old address on another interface. If the lease changes before reservation,
+restore the original pair in UniFi and recheck configuration; do not rerun bootstrap
+against existing etcd data to hide an identity change.
+
+OpenTofu selects the guest-agent address by the managed primary NIC's MAC, not
+the first non-loopback/pod address, and publishes API DNS after VM address discovery.
+Guest bootstrap uses the local address, so it does not need that DNS record to
+exist before the VM starts. The API's stable DNS name remains in initial TLS SANs.
+With multiple usable addresses on the primary NIC, planning/apply fails rather
+than choosing one arbitrarily. DHCP discovery is not proof that a reservation is
+created, the IP cannot change, or cloud-init/cluster startup has completed.
 
 The guest-agent address output is sensitive and is **not** an API readiness claim.
 After separately authorized deployment/reboot, transfer the read-only checker to
@@ -141,11 +172,11 @@ on local tests or this checker.
 
 ## Ownership and network boundary
 
-This root owns only its API A record, not the DNS zone. It points to the upstream
-reserved primary address, never to a workload service IP. `overwrite = false`
-avoids silently replacing unrelated records. The private API FQDN appears in
-RKE2's initial TLS SAN list. Node address presence is checked on each server start;
-the check does not itself create or prove uniqueness of the DHCP reservation.
+This root owns only its API A record, not the DNS zone. It points to the observed
+primary DHCP address, to be reserved after deployment, never a workload service
+IP. `overwrite = false` avoids silently replacing unrelated records. The private
+API FQDN appears in RKE2's initial TLS SAN list. The recorded primary IP/MAC identity is checked on
+each server start; this does not create or prove uniqueness of a DHCP reservation.
 
 RKE2 alone owns the managed Cilium chart. Its pre-bootstrap `HelmChartConfig`
 selects kube-proxy replacement, VXLAN, Kubernetes IPAM and host-namespace-only

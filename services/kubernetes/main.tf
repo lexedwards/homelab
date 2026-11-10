@@ -22,10 +22,10 @@ provider "technitium" {
 }
 
 locals {
-  compute = var.proxmox_nodes["compute"]
-  rke2_config = yamlencode({
+  compute           = var.proxmox_nodes["compute"]
+  control_plane_mac = coalesce(var.control_plane.mac_address, join(":", concat(["02", "4b"], regexall("..", format("%08x", var.control_plane.vm_id)))))
+  rke2_config = jsonencode({
     "node-name"             = var.control_plane.name
-    "node-ip"               = var.control_plane.ipv4_address
     "tls-san"               = [var.api_dns.name]
     "selinux"               = true
     "write-kubeconfig-mode" = "0600"
@@ -36,14 +36,13 @@ locals {
     "service-cidr"          = var.cluster_networks.services
     "disable"               = ["rke2-ingress-nginx", "rke2-traefik"]
   })
-  cilium_config = yamlencode({
+  cilium_config = jsonencode({
     apiVersion = "helm.cattle.io/v1"
     kind       = "HelmChartConfig"
     metadata   = { name = "rke2-cilium", namespace = "kube-system" }
     spec = {
-      valuesContent = yamlencode({
+      valuesContent = jsonencode({
         kubeProxyReplacement = true
-        k8sServiceHost       = var.control_plane.ipv4_address
         k8sServicePort       = 6443
         socketLB             = { enabled = true, hostNamespaceOnly = true }
         routingMode          = "tunnel"
@@ -63,17 +62,43 @@ locals {
     cilium_config_base64 = base64encode(local.cilium_config)
     installer_base64     = base64encode(file("${path.module}/cloud-init/install-server.sh"))
     preflight_base64     = base64encode(file("${path.module}/config/node-preflight.sh"))
-    node_ipv4            = var.control_plane.ipv4_address
+    configure_base64     = base64encode(file("${path.module}/config/configure-server.py"))
+    bootstrap_identity_base64 = base64encode(jsonencode({
+      mac_address  = local.control_plane_mac
+      ipv4_address = var.control_plane.ipv4_address
+    }))
   })
+  primary_interface_index = index(
+    [for mac in proxmox_virtual_environment_vm.control_plane.mac_addresses : lower(mac)],
+    lower(proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address),
+  )
+  primary_ipv4 = one([
+    for address in proxmox_virtual_environment_vm.control_plane.ipv4_addresses[local.primary_interface_index] : address
+    if !startswith(address, "127.") && !startswith(address, "169.254.")
+  ])
 }
 
 resource "technitium_record" "api" {
   zone      = var.api_dns.zone
   name      = var.api_dns.name
   type      = "A"
-  value     = var.control_plane.ipv4_address
+  value     = local.primary_ipv4
   ttl       = var.api_dns.ttl
   overwrite = false
+  lifecycle {
+    precondition {
+      condition     = local.primary_ipv4 != null
+      error_message = "The primary NIC must report exactly one usable IPv4 lease."
+    }
+    precondition {
+      condition     = var.control_plane.ipv4_address == null ? true : local.primary_ipv4 == var.control_plane.ipv4_address
+      error_message = "The observed lease must match the optional pre-existing reservation."
+    }
+    precondition {
+      condition     = local.primary_ipv4 == null ? false : !cidrcontains(var.cluster_networks.pods, local.primary_ipv4) && !cidrcontains(var.cluster_networks.services, local.primary_ipv4)
+      error_message = "The observed primary address must not overlap internal cluster networks."
+    }
+  }
 }
 
 resource "proxmox_virtual_environment_file" "control_plane" {
@@ -148,7 +173,7 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     bridge      = local.compute.vm_bridge
     vlan_id     = var.primary_vlan_id
     model       = "virtio"
-    mac_address = var.control_plane.mac_address
+    mac_address = local.control_plane_mac
   }
   operating_system {
     type = "l26"
@@ -169,11 +194,23 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
       error_message = "proxmox_nodes must include compute."
     }
     precondition {
-      condition     = !cidrcontains(var.cluster_networks.pods, cidrhost(var.cluster_networks.services, 0)) && !cidrcontains(var.cluster_networks.services, cidrhost(var.cluster_networks.pods, 0)) && !cidrcontains(var.cluster_networks.pods, var.control_plane.ipv4_address) && !cidrcontains(var.cluster_networks.services, var.control_plane.ipv4_address)
-      error_message = "Internal pod/Service networks must not overlap each other or contain the primary node address."
+      condition     = !cidrcontains(var.cluster_networks.pods, cidrhost(var.cluster_networks.services, 0)) && !cidrcontains(var.cluster_networks.services, cidrhost(var.cluster_networks.pods, 0))
+      error_message = "Internal pod/Service networks must not overlap each other."
+    }
+    precondition {
+      condition     = var.control_plane.ipv4_address == null ? true : !cidrcontains(var.cluster_networks.pods, var.control_plane.ipv4_address) && !cidrcontains(var.cluster_networks.services, var.control_plane.ipv4_address)
+      error_message = "An optional pre-existing node reservation must not overlap internal cluster networks."
     }
   }
-  depends_on = [technitium_record.api]
+}
+
+output "control_plane_dhcp_lease" {
+  description = "Observed primary IP/MAC pair to reserve after deployment; not proof of API readiness or a reservation."
+  value = {
+    ipv4_address = local.primary_ipv4
+    mac_address  = proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address
+  }
+  sensitive = true
 }
 
 output "control_plane_ipv4_addresses" {
