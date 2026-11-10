@@ -2,15 +2,11 @@ mock_provider "proxmox" {
   mock_resource "proxmox_virtual_environment_file" {
     defaults = { id = "snippets:snippets/control-plane.yaml" }
   }
-  mock_resource "proxmox_virtual_environment_vm" {
-    defaults = {
-      mac_addresses  = ["00:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:01"]
-      ipv4_addresses = [["127.0.0.1"], ["198.18.0.8"], ["192.0.2.10"]]
-    }
-  }
 }
 mock_provider "technitium" {}
 
+# The VM mock leaves the NIC's computed MAC null. Plans must reject DNS publication
+# without primary identity; successful lease discovery requires live validation.
 variables {
   proxmox_endpoint     = "https://proxmox.example.invalid"
   proxmox_ssh_username = "testadmin"
@@ -19,9 +15,8 @@ variables {
   }
   template = { vm_id = 100, node_name = "compute" }
   control_plane = {
-    vm_id       = 101
-    name        = "test-server"
-    mac_address = "02:00:00:00:00:01"
+    vm_id = 101
+    name  = "test-server"
   }
   primary_vlan_id       = 100
   cloud_user            = "testadmin"
@@ -31,8 +26,8 @@ variables {
   cluster_networks      = { pods = "198.18.0.0/16", services = "198.19.0.0/16" }
 }
 
-run "protect_single_control_plane_and_preserve_optional_mac" {
-  command = apply
+run "protect_server_and_reject_unavailable_primary_identity" {
+  command = plan
   assert {
     condition = nonsensitive(
       proxmox_virtual_environment_vm.control_plane.node_name == "compute" &&
@@ -42,29 +37,26 @@ run "protect_single_control_plane_and_preserve_optional_mac" {
       proxmox_virtual_environment_vm.control_plane.cpu[0].cores == 2 &&
       proxmox_virtual_environment_vm.control_plane.memory[0].dedicated == 4096 &&
       proxmox_virtual_environment_vm.control_plane.disk[0].size == 32 &&
-      proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address == "02:00:00:00:00:01" &&
-      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp" &&
-      technitium_record.api.value == "192.0.2.10" && technitium_record.api.name == "api.example.invalid" && !technitium_record.api.overwrite
+      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp"
     )
-    error_message = "The server must be protected, explicitly identified, DHCP-addressed and use its own non-overwriting DNS record."
+    error_message = "The server must be protected, explicitly identified and DHCP-addressed."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "render_bootstrap_without_preselected_network_identity" {
   command = plan
-  plan_options {
-    target = [proxmox_virtual_environment_file.control_plane]
-  }
   variables {
     control_plane = { vm_id = 101, name = "test-server" }
   }
   assert {
     condition = nonsensitive(
-      try(var.control_plane.mac_address, null) == null &&
+      !contains(keys(var.control_plane), "mac_address") &&
       !contains(keys(yamldecode(local.rke2_config)), "node-ip")
     )
     error_message = "Bootstrap rendering must not require a preselected IP or MAC."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "bootstrap_without_secret_inputs_and_with_managed_cilium" {
@@ -87,6 +79,7 @@ run "bootstrap_without_secret_inputs_and_with_managed_cilium" {
     ))
     error_message = "Cloud-init must install the server without secret inputs and keep enforcing, explicit API identity and one managed Cilium owner."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "render_exact_installer_pins_and_reboot_only_after_install_success" {
@@ -109,12 +102,13 @@ run "render_exact_installer_pins_and_reboot_only_after_install_success" {
     )
     error_message = "Rendered first boot must use exact package pins, protected server config, reviewed keys and the success-conditioned kernel reboot."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "reject_template_identity_collision" {
   command = plan
   variables {
-    control_plane = { vm_id = 100, name = "test-server", mac_address = "02:00:00:00:00:01" }
+    control_plane = { vm_id = 100, name = "test-server" }
   }
   expect_failures = [proxmox_virtual_environment_vm.control_plane]
 }
@@ -133,14 +127,6 @@ run "reject_host_bits_in_cluster_networks" {
     cluster_networks = { pods = "198.18.0.1/16", services = "198.19.0.0/16" }
   }
   expect_failures = [var.cluster_networks]
-}
-
-run "reject_multicast_mac" {
-  command = plan
-  variables {
-    control_plane = { vm_id = 101, name = "test-server", mac_address = "01:00:00:00:00:01" }
-  }
-  expect_failures = [var.control_plane]
 }
 
 run "reject_shell_content_in_package_version" {

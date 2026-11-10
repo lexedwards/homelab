@@ -43,8 +43,6 @@
 # control_plane = {
 #   vm_id =
 #   name  =
-#   # Optional: pin an existing NIC address; otherwise use provider-managed MAC.
-#   mac_address = null
 # }
 # primary_vlan_id =
 # api_dns = {

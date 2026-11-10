@@ -48,7 +48,7 @@ Technitium provider enforces `skip_tls_verify = false`; private CA trust must be
 configured through its supported trust environment. Proxmox verification is also
 on unless a separately approved exception explicitly overrides it.
 
-`make validate` runs format/schema checks, plan/render and simulated-apply tests
+`make validate` runs format/schema checks and plan/render tests
 with **both providers mocked**, readiness-CLI tests with a fake API command,
 YAML lint and shell syntax checks. Bubblewrap tests execute the real installer
 and preflight in an isolated filesystem/network with fake package/system commands.
@@ -56,12 +56,18 @@ They check install → simulated reboot → repeated preflight and failure paths
 actual RPM installation, kernel boot or SELinux policy. No infrastructure is
 created or contacted. Init downloads providers but does not plan or deploy it.
 
+OpenTofu's VM mock does not populate the computed MAC inside the configured NIC.
+The plan checks therefore expect DNS publication to reject unavailable primary
+identity; they do not simulate successful lease discovery or DNS creation.
+The boot-sequence tests are temporary: after live first-boot/restart validation,
+remove `tests/test_boot_sequence.py` and its bubblewrap dependency.
+
 ## Reviewed plan and deployment
 
 Only after separate authorization, verify template/key fingerprints, current
-guest-ID availability, snippets storage and DNS record ownership. Proxmox manages
-the NIC MAC when `control_plane.mac_address` is omitted; an optional override can
-pin an existing address. There is no generated-MAC convention or node-IP input.
+guest-ID availability, snippets storage and DNS record ownership. Proxmox always
+manages the NIC MAC; this root provides no MAC override, generated-MAC convention
+or node-IP input.
 Use DHCP and reserve the observed lease upstream; do not guess a free IP.
 The initial DNS target is unknown until the guest agent reports its DHCP lease.
 
@@ -83,7 +89,7 @@ mocked tests, not a second deployment state.
 
 The server and future worker resources belong to one root/state with separate
 resource groups and operational procedures. The explicit server resource uses
-the full-control VM clone API because it must own cloud-init, MAC, protection,
+the full-control VM clone API because it must own cloud-init, protection,
 guest-agent, UEFI/Q35, Secure Boot and on-boot settings. Do not switch resource
 models or import a different owner without a reviewed migration.
 
@@ -256,11 +262,10 @@ after useful data exists, use an authorized isolated restore, not VM deletion,
 
 Changing the cloud-init snippet does not repair an existing guest. Plan recovery
 separately from merging these changes, preserving the VM, its current MAC/lease
-and canonical state. The MAC is optional/computed in the pinned provider; still
-reject an unexpected MAC change or VM replacement in the next reviewed plan.
-An explicit override can retain the current MAC if needed.
-Remove any old `control_plane.ipv4_address` entry from local inputs; it is no
-longer consumed.
+and canonical state. The NIC MAC is computed by the provider, not configured by
+this root; still reject an unexpected MAC change or VM replacement in the next
+reviewed plan. Remove any old `control_plane.mac_address` and
+`control_plane.ipv4_address` entries from local inputs; neither is consumed.
 
 For a failure before RKE2 installation, first confirm there is no useful etcd
 data and that RKE2 is stopped. An authorized in-place recovery must update the

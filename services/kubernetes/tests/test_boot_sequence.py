@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 
+# TODO: Remove this temporary suite and bubblewrap dependency after live first-boot/restart validation.
 SERVICE = Path(__file__).resolve().parents[1]
 
 

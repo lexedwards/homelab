@@ -63,11 +63,11 @@ locals {
     installer_base64     = base64encode(file("${path.module}/cloud-init/install-server.sh"))
     preflight_base64     = base64encode(file("${path.module}/config/node-preflight.sh"))
   })
-  primary_interface_index = index(
+  primary_interface_index = try(index(
     [for mac in proxmox_virtual_environment_vm.control_plane.mac_addresses : lower(mac)],
     lower(proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address),
-  )
-  primary_ipv4 = one([
+  ), null)
+  primary_ipv4 = local.primary_interface_index == null ? null : one([
     for address in proxmox_virtual_environment_vm.control_plane.ipv4_addresses[local.primary_interface_index] : address
     if !startswith(address, "127.") && !startswith(address, "169.254.")
   ])
@@ -86,7 +86,7 @@ resource "technitium_record" "api" {
       error_message = "The primary NIC must report exactly one usable IPv4 lease."
     }
     precondition {
-      condition     = local.primary_ipv4 == null ? false : !cidrcontains(var.cluster_networks.pods, local.primary_ipv4) && !cidrcontains(var.cluster_networks.services, local.primary_ipv4)
+      condition     = local.primary_ipv4 == null ? true : !cidrcontains(var.cluster_networks.pods, local.primary_ipv4) && !cidrcontains(var.cluster_networks.services, local.primary_ipv4)
       error_message = "The observed primary address must not overlap internal cluster networks."
     }
   }
@@ -161,10 +161,9 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     }
   }
   network_device {
-    bridge      = local.compute.vm_bridge
-    vlan_id     = var.primary_vlan_id
-    model       = "virtio"
-    mac_address = var.control_plane.mac_address
+    bridge  = local.compute.vm_bridge
+    vlan_id = var.primary_vlan_id
+    model   = "virtio"
   }
   operating_system {
     type = "l26"
