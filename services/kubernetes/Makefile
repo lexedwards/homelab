@@ -36,6 +36,7 @@ test:
 
 yaml-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
+	$(YAMLLINT) cloud-init/network-data.yaml
 
 shell-validate:
 	bash -n cloud-init/install-server.sh

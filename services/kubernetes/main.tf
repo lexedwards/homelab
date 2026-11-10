@@ -102,6 +102,16 @@ resource "proxmox_virtual_environment_file" "control_plane" {
   }
 }
 
+resource "proxmox_virtual_environment_file" "control_plane_network" {
+  node_name    = "compute"
+  datastore_id = local.compute.snippet_datastore_id
+  content_type = "snippets"
+  source_raw {
+    data      = file("${path.module}/cloud-init/network-data.yaml")
+    file_name = "kubernetes-control-plane-network-config.yaml"
+  }
+}
+
 resource "proxmox_virtual_environment_vm" "control_plane" {
   name        = var.control_plane.name
   description = "Initial RKE2 server and single-member etcd; managed by OpenTofu."
@@ -152,13 +162,9 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     pre_enrolled_keys = true
   }
   initialization {
-    datastore_id      = local.compute.vm_datastore_id
-    user_data_file_id = proxmox_virtual_environment_file.control_plane.id
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-    }
+    datastore_id         = local.compute.vm_datastore_id
+    user_data_file_id    = proxmox_virtual_environment_file.control_plane.id
+    network_data_file_id = proxmox_virtual_environment_file.control_plane_network.id
   }
   network_device {
     bridge  = local.compute.vm_bridge
