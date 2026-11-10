@@ -124,6 +124,10 @@ Grafana runs in a separate visualization VM.
 
 - APC UPS - 2200VA
 
+The [Kubernetes prerequisite findings](docs/kubernetes/prerequisites.md) capture
+the approved cluster design, disposable proof results and remaining review gates.
+They describe planned infrastructure, not a deployed Kubernetes service.
+
 ## Retired Services
 
 ### Local LLM Hosting
