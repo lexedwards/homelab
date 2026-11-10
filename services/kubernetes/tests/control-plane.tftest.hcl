@@ -2,15 +2,11 @@ mock_provider "proxmox" {
   mock_resource "proxmox_virtual_environment_file" {
     defaults = { id = "snippets:snippets/control-plane.yaml" }
   }
-  mock_resource "proxmox_virtual_environment_vm" {
-    defaults = {
-      mac_addresses  = ["00:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:01"]
-      ipv4_addresses = [["127.0.0.1"], ["198.18.0.8"], ["192.0.2.10"]]
-    }
-  }
 }
 mock_provider "technitium" {}
 
+# The VM mock leaves the NIC's computed MAC null. Plans must reject DNS publication
+# without primary identity; successful lease discovery requires live validation.
 variables {
   proxmox_endpoint     = "https://proxmox.example.invalid"
   proxmox_ssh_username = "testadmin"
@@ -19,10 +15,8 @@ variables {
   }
   template = { vm_id = 100, node_name = "compute" }
   control_plane = {
-    vm_id        = 101
-    name         = "test-server"
-    mac_address  = "02:00:00:00:00:01"
-    ipv4_address = "192.0.2.10"
+    vm_id = 101
+    name  = "test-server"
   }
   primary_vlan_id       = 100
   cloud_user            = "testadmin"
@@ -32,8 +26,8 @@ variables {
   cluster_networks      = { pods = "198.18.0.0/16", services = "198.19.0.0/16" }
 }
 
-run "protect_single_control_plane_and_explicit_address_identity" {
-  command = apply
+run "protect_server_and_reject_unavailable_primary_identity" {
+  command = plan
   assert {
     condition = nonsensitive(
       proxmox_virtual_environment_vm.control_plane.node_name == "compute" &&
@@ -43,36 +37,26 @@ run "protect_single_control_plane_and_explicit_address_identity" {
       proxmox_virtual_environment_vm.control_plane.cpu[0].cores == 2 &&
       proxmox_virtual_environment_vm.control_plane.memory[0].dedicated == 4096 &&
       proxmox_virtual_environment_vm.control_plane.disk[0].size == 32 &&
-      proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address == "02:00:00:00:00:01" &&
-      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp" &&
-      technitium_record.api.value == "192.0.2.10" && technitium_record.api.name == "api.example.invalid" && !technitium_record.api.overwrite
+      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp"
     )
-    error_message = "The server must be protected, explicitly identified, DHCP-addressed and use its own non-overwriting DNS record."
+    error_message = "The server must be protected, explicitly identified and DHCP-addressed."
   }
+  expect_failures = [technitium_record.api]
 }
 
-run "bootstrap_with_dhcp_before_a_reservation_exists" {
-  command = apply
-  override_resource {
-    target = proxmox_virtual_environment_vm.control_plane
-    values = {
-      mac_addresses  = ["00:00:00:00:00:00", "02:00:00:00:00:02", "02:4b:00:00:00:65"]
-      ipv4_addresses = [["127.0.0.1"], ["198.18.0.8"], ["192.0.2.10"]]
-    }
-  }
+run "render_bootstrap_without_preselected_network_identity" {
+  command = plan
   variables {
     control_plane = { vm_id = 101, name = "test-server" }
   }
   assert {
     condition = nonsensitive(
-      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp" &&
-      try(var.control_plane.ipv4_address, null) == null && try(var.control_plane.mac_address, null) == null &&
-      output.control_plane_dhcp_lease.mac_address == "02:4b:00:00:00:65" &&
-      technitium_record.api.value == "192.0.2.10" &&
+      !contains(keys(var.control_plane), "mac_address") &&
       !contains(keys(yamldecode(local.rke2_config)), "node-ip")
     )
-    error_message = "Initial deployment must not require an IP or MAC reservation; a lease can be reserved after bootstrap."
+    error_message = "Bootstrap rendering must not require a preselected IP or MAC."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "bootstrap_without_secret_inputs_and_with_managed_cilium" {
@@ -88,11 +72,14 @@ run "bootstrap_without_secret_inputs_and_with_managed_cilium" {
       yamldecode(local.rke2_config)["tls-san"] == ["api.example.invalid"] &&
       !contains(keys(yamldecode(local.rke2_config)), "token") &&
       !contains(keys(yamldecode(local.rke2_config)), "token-file") &&
-      yamldecode(yamldecode(local.cilium_config).spec.valuesContent).socketLB.hostNamespaceOnly,
+      yamldecode(yamldecode(local.cilium_config).spec.valuesContent).socketLB.hostNamespaceOnly &&
+      yamldecode(yamldecode(local.cilium_config).spec.valuesContent).k8sServiceHost == "api.example.invalid" &&
+      yamldecode(yamldecode(local.cilium_config).spec.valuesContent).k8sServicePort == 6443,
       false
     ))
     error_message = "Cloud-init must install the server without secret inputs and keep enforcing, explicit API identity and one managed Cilium owner."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "render_exact_installer_pins_and_reboot_only_after_install_success" {
@@ -103,21 +90,25 @@ run "render_exact_installer_pins_and_reboot_only_after_install_success" {
       yamldecode(local.cloud_init).power_state.mode == "reboot" &&
       yamldecode(local.cloud_init).power_state.condition == ["test", "-f", "/var/lib/kubernetes-server-installed"] &&
       strcontains(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/etc/systemd/system/rke2-server.service.d/10-prerequisites.conf"]).content, "ConditionPathExists=/var/lib/kubernetes-server-installed") &&
+      strcontains(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/etc/systemd/system/rke2-server.service.d/10-prerequisites.conf"]).content, "ExecStartPre=/usr/local/sbin/kubernetes-node-preflight") &&
+      base64decode(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/usr/local/sbin/install-kubernetes-server"]).content) == file("${path.module}/cloud-init/install-server.sh") &&
+      base64decode(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/usr/local/sbin/kubernetes-node-preflight"]).content) == file("${path.module}/config/node-preflight.sh") &&
       one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/etc/rancher/rke2/config.yaml"]).permissions == "0600" &&
-      strcontains(base64decode(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/usr/local/sbin/install-kubernetes-server"]).content), "python3 /usr/local/libexec/kubernetes-configure-server.py") &&
-      one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/usr/local/libexec/kubernetes-configure-server.py"]).permissions == "0700" &&
+      !strcontains(local.cloud_init, "kubernetes-configure-server") &&
+      !strcontains(local.cloud_init, "kubernetes-bootstrap-identity") &&
+      !strcontains(local.cloud_init, "kubernetes-node-identity") &&
       !contains(keys(yamldecode(base64decode(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/etc/rancher/rke2/config.yaml"]).content))), "node-ip") &&
-      jsondecode(base64decode(one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/etc/kubernetes-bootstrap-identity.json"]).content)).ipv4_address == "192.0.2.10" &&
       one([for f in yamldecode(local.cloud_init).write_files : f if f.path == "/home/testadmin/.ssh/authorized_keys"]).defer
     )
     error_message = "Rendered first boot must use exact package pins, protected server config, reviewed keys and the success-conditioned kernel reboot."
   }
+  expect_failures = [technitium_record.api]
 }
 
 run "reject_template_identity_collision" {
   command = plan
   variables {
-    control_plane = { vm_id = 100, name = "test-server", mac_address = "02:00:00:00:00:01", ipv4_address = "192.0.2.10" }
+    control_plane = { vm_id = 100, name = "test-server" }
   }
   expect_failures = [proxmox_virtual_environment_vm.control_plane]
 }
@@ -136,22 +127,6 @@ run "reject_host_bits_in_cluster_networks" {
     cluster_networks = { pods = "198.18.0.1/16", services = "198.19.0.0/16" }
   }
   expect_failures = [var.cluster_networks]
-}
-
-run "reject_preexisting_reservation_inside_pod_network" {
-  command = plan
-  variables {
-    control_plane = { vm_id = 101, name = "test-server", mac_address = "02:00:00:00:00:01", ipv4_address = "198.18.0.8" }
-  }
-  expect_failures = [proxmox_virtual_environment_vm.control_plane]
-}
-
-run "reject_multicast_mac" {
-  command = plan
-  variables {
-    control_plane = { vm_id = 101, name = "test-server", mac_address = "01:00:00:00:00:01", ipv4_address = "192.0.2.10" }
-  }
-  expect_failures = [var.control_plane]
 }
 
 run "reject_shell_content_in_package_version" {

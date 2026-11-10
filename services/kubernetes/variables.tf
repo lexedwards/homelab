@@ -62,23 +62,19 @@ variable "template" {
 }
 
 variable "control_plane" {
-  description = "Initial server identity. MAC defaults deterministically from VM ID; IPv4 is an optional pre-existing-reservation check. Otherwise bootstrap from DHCP and reserve the observed pair afterwards."
+  description = "Initial server VM ID/name. Proxmox manages its NIC MAC; reserve the observed DHCP lease upstream."
   type = object({
-    vm_id        = number
-    name         = string
-    mac_address  = optional(string)
-    ipv4_address = optional(string)
+    vm_id = number
+    name  = string
   })
   nullable  = false
   sensitive = true
   validation {
     condition = (
       var.control_plane.vm_id >= 100 && var.control_plane.vm_id <= 999999999 && floor(var.control_plane.vm_id) == var.control_plane.vm_id &&
-      can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", var.control_plane.name)) &&
-      (var.control_plane.mac_address == null ? true : can(regex("^[0-9A-Fa-f][02468aAcCeE](:[0-9A-Fa-f]{2}){5}$", var.control_plane.mac_address)) && lower(var.control_plane.mac_address) != "00:00:00:00:00:00") &&
-      (var.control_plane.ipv4_address == null ? true : try(cidrhost("${var.control_plane.ipv4_address}/32", 0) == var.control_plane.ipv4_address, false))
+      can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", var.control_plane.name))
     )
-    error_message = "control_plane requires a valid VM ID/hostname and, when supplied, a nonzero unicast MAC and valid IPv4 address."
+    error_message = "control_plane requires a valid VM ID and hostname."
   }
 }
 

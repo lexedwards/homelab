@@ -22,9 +22,8 @@ provider "technitium" {
 }
 
 locals {
-  compute           = var.proxmox_nodes["compute"]
-  control_plane_mac = coalesce(var.control_plane.mac_address, join(":", concat(["02", "4b"], regexall("..", format("%08x", var.control_plane.vm_id)))))
-  rke2_config = jsonencode({
+  compute = var.proxmox_nodes["compute"]
+  rke2_config = yamlencode({
     "node-name"             = var.control_plane.name
     "tls-san"               = [var.api_dns.name]
     "selinux"               = true
@@ -36,13 +35,14 @@ locals {
     "service-cidr"          = var.cluster_networks.services
     "disable"               = ["rke2-ingress-nginx", "rke2-traefik"]
   })
-  cilium_config = jsonencode({
+  cilium_config = yamlencode({
     apiVersion = "helm.cattle.io/v1"
     kind       = "HelmChartConfig"
     metadata   = { name = "rke2-cilium", namespace = "kube-system" }
     spec = {
-      valuesContent = jsonencode({
+      valuesContent = yamlencode({
         kubeProxyReplacement = true
+        k8sServiceHost       = var.api_dns.name
         k8sServicePort       = 6443
         socketLB             = { enabled = true, hostNamespaceOnly = true }
         routingMode          = "tunnel"
@@ -62,17 +62,12 @@ locals {
     cilium_config_base64 = base64encode(local.cilium_config)
     installer_base64     = base64encode(file("${path.module}/cloud-init/install-server.sh"))
     preflight_base64     = base64encode(file("${path.module}/config/node-preflight.sh"))
-    configure_base64     = base64encode(file("${path.module}/config/configure-server.py"))
-    bootstrap_identity_base64 = base64encode(jsonencode({
-      mac_address  = local.control_plane_mac
-      ipv4_address = var.control_plane.ipv4_address
-    }))
   })
-  primary_interface_index = index(
+  primary_interface_index = try(index(
     [for mac in proxmox_virtual_environment_vm.control_plane.mac_addresses : lower(mac)],
     lower(proxmox_virtual_environment_vm.control_plane.network_device[0].mac_address),
-  )
-  primary_ipv4 = one([
+  ), null)
+  primary_ipv4 = local.primary_interface_index == null ? null : one([
     for address in proxmox_virtual_environment_vm.control_plane.ipv4_addresses[local.primary_interface_index] : address
     if !startswith(address, "127.") && !startswith(address, "169.254.")
   ])
@@ -91,11 +86,7 @@ resource "technitium_record" "api" {
       error_message = "The primary NIC must report exactly one usable IPv4 lease."
     }
     precondition {
-      condition     = var.control_plane.ipv4_address == null ? true : local.primary_ipv4 == var.control_plane.ipv4_address
-      error_message = "The observed lease must match the optional pre-existing reservation."
-    }
-    precondition {
-      condition     = local.primary_ipv4 == null ? false : !cidrcontains(var.cluster_networks.pods, local.primary_ipv4) && !cidrcontains(var.cluster_networks.services, local.primary_ipv4)
+      condition     = local.primary_ipv4 == null ? true : !cidrcontains(var.cluster_networks.pods, local.primary_ipv4) && !cidrcontains(var.cluster_networks.services, local.primary_ipv4)
       error_message = "The observed primary address must not overlap internal cluster networks."
     }
   }
@@ -170,10 +161,9 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     }
   }
   network_device {
-    bridge      = local.compute.vm_bridge
-    vlan_id     = var.primary_vlan_id
-    model       = "virtio"
-    mac_address = local.control_plane_mac
+    bridge  = local.compute.vm_bridge
+    vlan_id = var.primary_vlan_id
+    model   = "virtio"
   }
   operating_system {
     type = "l26"
@@ -196,10 +186,6 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     precondition {
       condition     = !cidrcontains(var.cluster_networks.pods, cidrhost(var.cluster_networks.services, 0)) && !cidrcontains(var.cluster_networks.services, cidrhost(var.cluster_networks.pods, 0))
       error_message = "Internal pod/Service networks must not overlap each other."
-    }
-    precondition {
-      condition     = var.control_plane.ipv4_address == null ? true : !cidrcontains(var.cluster_networks.pods, var.control_plane.ipv4_address) && !cidrcontains(var.cluster_networks.services, var.control_plane.ipv4_address)
-      error_message = "An optional pre-existing node reservation must not overlap internal cluster networks."
     }
   }
 }

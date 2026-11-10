@@ -9,7 +9,6 @@ source /etc/os-release
 [[ $(uname -m) == x86_64 ]] || { echo 'An amd64 guest is required.' >&2; exit 1; }
 [[ ! -d /var/lib/rancher/rke2/server/db/etcd ]] || { echo 'This first-boot installer must not modify an existing datastore.' >&2; exit 1; }
 rm -f /var/lib/kubernetes-server-installed
-python3 /usr/local/libexec/kubernetes-configure-server.py
 version=$1
 selinux_version=$2
 [[ $version =~ ^1\.[0-9]+\.[0-9]+~rke2r[0-9]+-[0-9]+\.el10$ ]]
@@ -58,15 +57,11 @@ overlay
 br_netfilter
 nf_conntrack
 MODULES
-modprobe overlay
-modprobe br_netfilter
-modprobe nf_conntrack
 cat > /etc/sysctl.d/90-kubernetes.conf <<'SYSCTL'
 net.ipv4.ip_forward=1
 net.bridge.bridge-nf-call-iptables=1
 net.bridge.bridge-nf-call-ip6tables=1
 SYSCTL
-sysctl --system
 swapoff -a
 sed -i -E '/^[^#].*[[:space:]]swap[[:space:]]/s/^/# kubernetes: /' /etc/fstab
 install -d -m 0700 /etc/rancher/rke2
@@ -74,7 +69,6 @@ chmod 0700 /etc/rancher/rke2
 chmod 0600 /etc/rancher/rke2/config.yaml
 restorecon -RF /etc/rancher/rke2 /var/lib/rancher/rke2 /etc/yum.repos.d/rancher-rke2.repo \
   /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2 /usr/local/sbin/kubernetes-node-preflight \
-  /usr/local/libexec/kubernetes-configure-server.py /etc/kubernetes-node-identity.json \
   /etc/systemd/system/rke2-server.service.d
 nmcli general reload
 sshd -t

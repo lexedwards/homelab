@@ -31,11 +31,6 @@ write_files:
     permissions: "0700"
     encoding: b64
     content: ${preflight_base64}
-  - path: /usr/local/libexec/kubernetes-configure-server.py
-    owner: root:root
-    permissions: "0700"
-    encoding: b64
-    content: ${configure_base64}
   - path: /etc/rancher/rke2/config.yaml
     owner: root:root
     permissions: "0600"
@@ -46,11 +41,6 @@ write_files:
     permissions: "0600"
     encoding: b64
     content: ${cilium_config_base64}
-  - path: /etc/kubernetes-bootstrap-identity.json
-    owner: root:root
-    permissions: "0600"
-    encoding: b64
-    content: ${bootstrap_identity_base64}
   - path: /etc/systemd/system/rke2-server.service.d/10-prerequisites.conf
     owner: root:root
     permissions: "0644"

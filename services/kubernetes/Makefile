@@ -11,7 +11,7 @@ help:
 		'fmt              Format OpenTofu configuration' \
 		'fmt-check        Check formatting' \
 		'tofu-validate    Validate the initialized root offline' \
-		'test             Run mocked OpenTofu and local readiness tests' \
+		'test             Run mocked infrastructure, readiness and isolated boot tests' \
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'validate         Run all local checks without infrastructure access' \
