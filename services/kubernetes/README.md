@@ -285,7 +285,8 @@ Adding or changing custom network-data can propose VM replacement through the
 provider's cloud-init lifecycle. It does not update an existing guest's active
 NetworkManager profile. Review a fresh canonical-main saved plan and its data,
 downtime and identity implications before authorizing rollout; do not recreate
-an initialized datastore merely to apply a DNS-property change.
+an initialized datastore without explicit approval for downtime and deletion of
+the current guest data.
 
 For a failure before RKE2 installation, first confirm there is no useful etcd
 data and that RKE2 is stopped. An authorized in-place recovery must update the
