@@ -124,6 +124,8 @@ Grafana runs in a separate visualization VM.
 
 - APC UPS - 2200VA
 
+Architecture choices are recorded in the [architecture decision records](docs/adrs/).
+
 ## Retired Services
 
 ### Local LLM Hosting
