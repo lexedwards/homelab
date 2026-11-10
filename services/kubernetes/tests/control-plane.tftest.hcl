@@ -37,7 +37,7 @@ run "protect_server_and_reject_unavailable_primary_identity" {
       proxmox_virtual_environment_vm.control_plane.cpu[0].cores == 2 &&
       proxmox_virtual_environment_vm.control_plane.memory[0].dedicated == 4096 &&
       proxmox_virtual_environment_vm.control_plane.disk[0].size == 32 &&
-      proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address == "dhcp"
+      length(proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config) == 0
     )
     error_message = "The server must be protected, explicitly identified and DHCP-addressed."
   }
@@ -55,6 +55,30 @@ run "render_bootstrap_without_preselected_network_identity" {
       !contains(keys(yamldecode(local.rke2_config)), "node-ip")
     )
     error_message = "Bootstrap rendering must not require a preselected IP or MAC."
+  }
+  expect_failures = [technitium_record.api]
+}
+
+run "supply_dhcp_only_network_data_without_host_dns" {
+  command = plan
+  override_resource {
+    target = proxmox_virtual_environment_file.control_plane_network
+    values = { id = "snippets:snippets/network.yaml" }
+  }
+  assert {
+    condition = nonsensitive(
+      yamldecode(proxmox_virtual_environment_file.control_plane_network.source_raw[0].data) == {
+        version   = 2
+        ethernets = { ens18 = { dhcp4 = true } }
+      } &&
+      proxmox_virtual_environment_file.control_plane_network.content_type == "snippets" &&
+      proxmox_virtual_environment_file.control_plane_network.node_name == "compute" &&
+      proxmox_virtual_environment_file.control_plane_network.datastore_id == "snippets" &&
+      proxmox_virtual_environment_vm.control_plane.initialization[0].network_data_file_id == "snippets:snippets/network.yaml" &&
+      length(proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config) == 0 &&
+      length(proxmox_virtual_environment_vm.control_plane.initialization[0].dns) == 0
+    )
+    error_message = "The server must supply complete DHCP-only network-data without static DNS, address or MAC configuration."
   }
   expect_failures = [technitium_record.api]
 }

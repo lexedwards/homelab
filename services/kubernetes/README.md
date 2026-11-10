@@ -18,6 +18,7 @@ implementation's first-boot/restart behavior.
   primary bridge on `compute`.
 - DHCP on the primary VLAN. A reservation is not needed before initial deployment;
   reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
+- DHCP-provided DNS must resolve the private API name without cluster DNS.
 - Existing Technitium zone and a service-owned API A record that is not already
   owned elsewhere. The API name must remain stable through future HA expansion.
 - OpenTofu 1.9+, Python 3, yamllint and Linux bubblewrap for isolated boot-sequence
@@ -50,8 +51,9 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs format/schema checks and plan/render tests
 with **both providers mocked**, readiness-CLI tests with a fake API command,
-YAML lint and shell syntax checks. Bubblewrap tests execute the real installer
-and preflight in an isolated filesystem/network with fake package/system commands.
+user-data/network-data YAML lint and shell syntax checks. Bubblewrap tests execute
+the real installer and preflight in an isolated filesystem/network with fake
+package/system commands.
 They check install → simulated reboot → repeated preflight and failure paths, not
 actual RPM installation, kernel boot or SELinux policy. No infrastructure is
 created or contacted. Init downloads providers but does not plan or deploy it.
@@ -94,6 +96,18 @@ guest-agent, UEFI/Q35, Secure Boot and on-boot settings. Do not switch resource
 models or import a different owner without a reviewed migration.
 
 ## First boot and readiness
+
+`cloud-init/network-data.yaml` supplies complete version-2 network-data through
+`initialization.network_data_file_id`. It enables DHCP on `ens18` without static
+addresses, routes, nameservers or MAC matching. NetworkManager accepts DNS from
+DHCP; Proxmox's host-resolver defaults are not injected into this custom document.
+The generated `ip_config` path is deliberately omitted. This is separate from
+user-data, not a post-boot command or a helper that rewrites network settings.
+
+`ens18` is the primary VirtIO interface in the reviewed Rocky/Q35 single-NIC
+layout. Revalidate this mapping if the image or PCI/NIC layout changes. Future
+dual-NIC workers need their own network-data with one primary default route;
+this server configuration does not define their secondary-network behavior.
 
 Cloud-init creates the approved non-root administrator, replaces that user's
 authorized-key file with the reviewed operator keys, disables root/password SSH
@@ -266,6 +280,13 @@ and canonical state. The NIC MAC is computed by the provider, not configured by
 this root; still reject an unexpected MAC change or VM replacement in the next
 reviewed plan. Remove any old `control_plane.mac_address` and
 `control_plane.ipv4_address` entries from local inputs; neither is consumed.
+
+Adding or changing custom network-data can propose VM replacement through the
+provider's cloud-init lifecycle. It does not update an existing guest's active
+NetworkManager profile. Review a fresh canonical-main saved plan and its data,
+downtime and identity implications before authorizing rollout; do not recreate
+an initialized datastore without explicit approval for downtime and deletion of
+the current guest data.
 
 For a failure before RKE2 installation, first confirm there is no useful etcd
 data and that RKE2 is stopped. An authorized in-place recovery must update the
