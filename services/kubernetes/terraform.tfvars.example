@@ -41,10 +41,11 @@
 
 # Required
 # control_plane = {
-#   vm_id        =
-#   name         =
-#   mac_address  =
-#   ipv4_address =
+#   vm_id =
+#   name  =
+#   # Optional: omit for DHCP-first bootstrap and reserve the observed pair later.
+#   mac_address  = null
+#   ipv4_address = null
 # }
 # primary_vlan_id =
 # api_dns = {

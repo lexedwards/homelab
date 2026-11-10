@@ -62,12 +62,12 @@ variable "template" {
 }
 
 variable "control_plane" {
-  description = "Initial server identity; IPv4 must be reserved upstream for this stable unicast MAC."
+  description = "Initial server identity. MAC defaults deterministically from VM ID; IPv4 is an optional pre-existing-reservation check. Otherwise bootstrap from DHCP and reserve the observed pair afterwards."
   type = object({
     vm_id        = number
     name         = string
-    mac_address  = string
-    ipv4_address = string
+    mac_address  = optional(string)
+    ipv4_address = optional(string)
   })
   nullable  = false
   sensitive = true
@@ -75,11 +75,10 @@ variable "control_plane" {
     condition = (
       var.control_plane.vm_id >= 100 && var.control_plane.vm_id <= 999999999 && floor(var.control_plane.vm_id) == var.control_plane.vm_id &&
       can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", var.control_plane.name)) &&
-      can(regex("^[0-9A-Fa-f][02468aAcCeE](:[0-9A-Fa-f]{2}){5}$", var.control_plane.mac_address)) &&
-      lower(var.control_plane.mac_address) != "00:00:00:00:00:00" &&
-      try(cidrhost("${var.control_plane.ipv4_address}/32", 0) == var.control_plane.ipv4_address, false)
+      (var.control_plane.mac_address == null ? true : can(regex("^[0-9A-Fa-f][02468aAcCeE](:[0-9A-Fa-f]{2}){5}$", var.control_plane.mac_address)) && lower(var.control_plane.mac_address) != "00:00:00:00:00:00") &&
+      (var.control_plane.ipv4_address == null ? true : try(cidrhost("${var.control_plane.ipv4_address}/32", 0) == var.control_plane.ipv4_address, false))
     )
-    error_message = "control_plane requires a valid VM ID, hostname, nonzero unicast MAC and reserved IPv4 address."
+    error_message = "control_plane requires a valid VM ID/hostname and, when supplied, a nonzero unicast MAC and valid IPv4 address."
   }
 }
 
@@ -156,8 +155,8 @@ variable "cluster_networks" {
   nullable  = false
   sensitive = true
   validation {
-    condition     = can(cidrnetmask(var.cluster_networks.pods)) && can(cidrnetmask(var.cluster_networks.services))
-    error_message = "cluster_networks must contain IPv4 CIDRs."
+    condition     = alltrue([for cidr in [var.cluster_networks.pods, var.cluster_networks.services] : try(can(cidrnetmask(cidr)) && cidrhost(cidr, 0) == split("/", cidr)[0], false)])
+    error_message = "cluster_networks must contain canonical IPv4 network CIDRs without host bits."
   }
 }
 
