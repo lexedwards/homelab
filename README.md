@@ -14,6 +14,7 @@
     - [Tailscale Exit Node](#tailscale-exit-node)
     - [Secrets Management](#secrets-management)
     - [Networked Storage](#networked-storage)
+    - [Kubernetes](#kubernetes)
     - [Service Proxy](#service-proxy)
     - [Home Assistant](#home-assistant)
     - [Media Server](#media-server)
@@ -95,6 +96,12 @@ in an Incus container on `micro-node`, with systemd swap protection and
 service-owned DNS. Initialization and unseal remain operator-managed.
 
 ### Networked Storage
+
+### Kubernetes
+
+[Kubernetes](services/kubernetes/README.md) defines the initial RKE2 control-plane
+VM and managed Cilium bootstrap. Worker, storage and workload integration are
+separate slices; local validation does not establish deployment.
 
 ### Service Proxy
 

@@ -1,0 +1,90 @@
+#cloud-config
+hostname: ${jsonencode(hostname)}
+manage_etc_hosts: true
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: ${jsonencode(cloud_user)}
+    lock_passwd: true
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: ${jsonencode(public_keys)}
+
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - python3
+  - qemu-guest-agent
+
+write_files:
+  - path: /usr/local/sbin/install-kubernetes-server
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${installer_base64}
+  - path: /usr/local/sbin/kubernetes-node-preflight
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${preflight_base64}
+  - path: /etc/rancher/rke2/config.yaml
+    owner: root:root
+    permissions: "0600"
+    encoding: b64
+    content: ${rke2_config_base64}
+  - path: /var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml
+    owner: root:root
+    permissions: "0600"
+    encoding: b64
+    content: ${cilium_config_base64}
+  - path: /etc/kubernetes-node-address
+    owner: root:root
+    permissions: "0600"
+    content: ${jsonencode(node_ipv4)}
+  - path: /etc/systemd/system/rke2-server.service.d/10-prerequisites.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      ConditionPathExists=/var/lib/kubernetes-server-installed
+
+      [Service]
+      ExecStartPre=/usr/local/sbin/kubernetes-node-preflight
+  - path: /etc/NetworkManager/conf.d/90-kubernetes.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:cilium*;interface-name:lxc*;interface-name:veth*
+  - path: /etc/ssh/sshd_config.d/00-kubernetes.conf
+    owner: root:root
+    permissions: "0600"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+  - path: /home/${cloud_user}/.ssh/authorized_keys
+    owner: ${cloud_user}:${cloud_user}
+    permissions: "0600"
+    defer: true
+    encoding: b64
+    content: ${base64encode(join("\n", public_keys))}
+
+runcmd:
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - - restorecon
+    - -RF
+    - /home/${cloud_user}/.ssh
+    - /etc/ssh/sshd_config.d/00-kubernetes.conf
+  - - bash
+    - /usr/local/sbin/install-kubernetes-server
+    - ${jsonencode(rke2_version)}
+    - ${jsonencode(selinux_version)}
+
+power_state:
+  mode: reboot
+  delay: now
+  timeout: 60
+  condition: [test, -f, /var/lib/kubernetes-server-installed]
