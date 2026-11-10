@@ -1,0 +1,67 @@
+# Copy to terraform.tfvars, fill required values, and keep the populated file private.
+# Never commit credentials or deployment locators.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+# Inject PROXMOX_VE_API_TOKEN and TECHNITIUM_API_TOKEN privately; no token variables.
+# Load the approved node SSH key into the local agent before snippet uploads.
+# Required
+# proxmox_endpoint     =
+# proxmox_ssh_username =
+# technitium_server_url =
+
+# Optional
+# proxmox_insecure = false
+
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
+
+# Required
+# proxmox_nodes = {
+#   compute = {
+#     ssh_address          =
+#     snippet_datastore_id =
+#     vm_datastore_id      =
+#     vm_bridge            =
+#   }
+# }
+# template = {
+#   vm_id     =
+#   node_name =
+# }
+# cloud_user            =
+# cloud_ssh_public_keys = []
+
+# -----------------------------------------------------------------------------
+# Control plane
+# -----------------------------------------------------------------------------
+
+# Required
+# control_plane = {
+#   vm_id        =
+#   name         =
+#   mac_address  =
+#   ipv4_address =
+# }
+# primary_vlan_id =
+# api_dns = {
+#   zone =
+#   name =
+#   ttl  = 300
+# }
+# cluster_networks = {
+#   pods     =
+#   services =
+# }
+
+# Optional
+# control_plane_resources = {
+#   cpu_cores    = 2
+#   memory_mb    = 4096
+#   disk_size_gb = 32
+# }
+# rke2_version         = "1.36.6~rke2r1-0.el10"
+# rke2_selinux_version = "0.24-1.el10"
