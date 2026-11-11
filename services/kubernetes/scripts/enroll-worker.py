@@ -86,7 +86,7 @@ def require(condition, message):
     if not condition:
         raise RuntimeError(message)
 
-require(os.geteuid() == 0 and socket.gethostname() == p['name'], 'Unexpected worker identity')
+require(os.geteuid() == 0 and socket.gethostname().split('.', 1)[0] == p['name'], 'Unexpected worker identity')
 require(command(['getenforce']) == 'Enforcing' and not command(['swapon', '--noheadings', '--show']), 'SELinux/swap prerequisite failed')
 require(not Path('/var/lib/rancher/rke2/server/db/etcd').exists(), 'Never enroll an etcd server as a worker')
 require(not Path('/var/lib/rancher/rke2/agent/client-kubelet.crt').exists(), 'Worker is already enrolled')
