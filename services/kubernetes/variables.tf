@@ -123,7 +123,7 @@ variable "technitium_server_url" {
 }
 
 variable "api_dns" {
-  description = "Existing managed zone and stable private API FQDN; this root owns only its A record."
+  description = "Existing managed zone and stable private API FQDN. Worker A records share this zone and TTL."
   type = object({
     zone = string
     name = string
@@ -226,6 +226,26 @@ variable "workers" {
       try(length(worker.fqdn) <= 253 && split(".", worker.fqdn)[0] == worker.name, false)
     ])
     error_message = "Each worker requires a lowercase DNS FQDN of at most 253 characters, without a trailing dot, whose first label matches its short name."
+  }
+  validation {
+    condition = alltrue([for worker in values(var.workers) :
+      try(endswith(worker.fqdn, ".${var.api_dns.zone}") && worker.fqdn != var.api_dns.name, false)
+    ])
+    error_message = "Worker FQDNs must be within the existing API DNS zone and must not reuse the API record name."
+  }
+}
+
+variable "worker_reverse_dns_zone" {
+  description = "Approved existing octet-aligned IPv4 reverse zone for worker PTR ownership; null leaves reverse DNS outside this root. Never creates a zone."
+  type        = string
+  default     = null
+  sensitive   = true
+  validation {
+    condition = var.worker_reverse_dns_zone == null ? true : (
+      can(regex("^([0-9]{1,3}\\.){1,3}in-addr\\.arpa$", var.worker_reverse_dns_zone)) &&
+      try(alltrue([for octet in split(".", trimsuffix(var.worker_reverse_dns_zone, ".in-addr.arpa")) : tonumber(octet) <= 255]), false)
+    )
+    error_message = "worker_reverse_dns_zone must be null or an existing octet-aligned in-addr.arpa zone with one to three IPv4 octets."
   }
 }
 
