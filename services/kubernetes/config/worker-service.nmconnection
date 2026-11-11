@@ -1,0 +1,17 @@
+[connection]
+id=kubernetes-service
+type=ethernet
+interface-name=ens19
+autoconnect=true
+autoconnect-priority=200
+
+[ethernet]
+
+[ipv4]
+method=auto
+never-default=true
+ignore-auto-routes=true
+ignore-auto-dns=true
+
+[ipv6]
+method=disabled

@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: worker-check
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordinary
+  namespace: worker-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ordinary
+  template:
+    metadata:
+      labels:
+        app: ordinary
+    spec:
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: ordinary
+      containers:
+        - name: http
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -c, "mkdir -p /tmp/www; echo ordinary > /tmp/www/index.html; exec httpd -f -p 8080 -h /tmp/www"]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isolated
+  namespace: worker-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: isolated
+  template:
+    metadata:
+      labels:
+        app: isolated
+    spec:
+      runtimeClassName: kata-clh-runtime-rs
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: isolated
+      containers:
+        - name: http
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -c, "mkdir -p /tmp/www; echo isolated > /tmp/www/index.html; exec httpd -f -p 8080 -h /tmp/www"]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
