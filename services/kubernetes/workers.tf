@@ -12,6 +12,7 @@ locals {
   worker_cloud_init = {
     for host, worker in var.workers : host => templatefile("${path.module}/cloud-init/worker-user-data.tftpl", {
       hostname           = worker.name
+      fqdn               = worker.fqdn
       cloud_user         = var.cloud_user
       public_keys        = sort(tolist(var.cloud_ssh_public_keys))
       rke2_version       = var.rke2_version

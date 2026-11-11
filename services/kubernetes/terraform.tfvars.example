@@ -75,11 +75,13 @@
 #   compute = {
 #     vm_id          =
 #     name           =
+#     fqdn           =
 #     service_bridge =
 #   }
 #   store = {
 #     vm_id          =
 #     name           =
+#     fqdn           =
 #     service_bridge =
 #   }
 # }

@@ -194,10 +194,11 @@ variable "rke2_selinux_version" {
 }
 
 variable "workers" {
-  description = "Worker identities and secondary bridges keyed by physical host; empty disables worker provisioning. Proxmox owns both NIC MACs."
+  description = "Worker short names, OS FQDNs and secondary bridges keyed by physical host; empty disables provisioning. Proxmox owns both NIC MACs."
   type = map(object({
     vm_id          = number
     name           = string
+    fqdn           = string
     service_bridge = string
   }))
   default   = {}
@@ -218,6 +219,13 @@ variable "workers" {
       ])
     )
     error_message = "Enable exactly one uniquely identified worker on compute and store, with existing host inputs, valid secondary bridges and no server/template identity collision."
+  }
+  validation {
+    condition = alltrue([for worker in values(var.workers) :
+      can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$", worker.fqdn)) &&
+      try(length(worker.fqdn) <= 253 && split(".", worker.fqdn)[0] == worker.name, false)
+    ])
+    error_message = "Each worker requires a lowercase DNS FQDN of at most 253 characters, without a trailing dot, whose first label matches its short name."
   }
 }
 
