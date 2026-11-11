@@ -79,7 +79,7 @@ variable "control_plane" {
 }
 
 variable "primary_vlan_id" {
-  description = "Primary node/API access VLAN tag; no untagged control-plane NIC."
+  description = "Primary node/API access VLAN tag for server and workers; no untagged primary NIC."
   type        = number
   nullable    = false
   sensitive   = true
@@ -157,7 +157,7 @@ variable "cluster_networks" {
 }
 
 variable "control_plane_resources" {
-  description = "Initial server allocation, independent of future worker resources."
+  description = "Initial server allocation, independent of worker resources."
   type = object({
     cpu_cores    = optional(number, 2)
     memory_mb    = optional(number, 4096)
@@ -172,7 +172,7 @@ variable "control_plane_resources" {
 }
 
 variable "rke2_version" {
-  description = "Exact EL10 server/common RPM version-release; changes require compatibility review."
+  description = "Exact EL10 server/agent/common RPM version-release; changes require compatibility review."
   type        = string
   default     = "1.36.6~rke2r1-0.el10"
   nullable    = false
@@ -190,5 +190,66 @@ variable "rke2_selinux_version" {
   validation {
     condition     = can(regex("^[0-9]+\\.[0-9]+-[0-9]+\\.el10$", var.rke2_selinux_version))
     error_message = "rke2_selinux_version must pin an exact EL10 version-release."
+  }
+}
+
+variable "workers" {
+  description = "Worker identities and secondary bridges keyed by physical host; empty disables worker provisioning. Proxmox owns both NIC MACs."
+  type = map(object({
+    vm_id          = number
+    name           = string
+    service_bridge = string
+  }))
+  default   = {}
+  nullable  = false
+  sensitive = true
+  validation {
+    condition = length(var.workers) == 0 || (
+      toset(keys(var.workers)) == toset(["compute", "store"]) &&
+      length(distinct([for worker in values(var.workers) : worker.vm_id])) == 2 &&
+      length(distinct([for worker in values(var.workers) : worker.name])) == 2 &&
+      alltrue([for host, worker in var.workers :
+        contains(keys(var.proxmox_nodes), host) &&
+        worker.vm_id >= 100 && worker.vm_id <= 999999999 && floor(worker.vm_id) == worker.vm_id &&
+        worker.vm_id != var.template.vm_id && worker.vm_id != var.control_plane.vm_id &&
+        worker.name != var.control_plane.name &&
+        can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", worker.name)) &&
+        can(regex("^[A-Za-z0-9_.-]+$", worker.service_bridge))
+      ])
+    )
+    error_message = "Enable exactly one uniquely identified worker on compute and store, with existing host inputs, valid secondary bridges and no server/template identity collision."
+  }
+}
+
+variable "service_vlan_id" {
+  description = "Secondary worker service-network access tag; null only when workers are disabled."
+  type        = number
+  default     = null
+  sensitive   = true
+  validation {
+    condition = var.service_vlan_id == null ? length(var.workers) == 0 : (
+      var.service_vlan_id >= 1 && var.service_vlan_id <= 4094 &&
+      floor(var.service_vlan_id) == var.service_vlan_id && var.service_vlan_id != var.primary_vlan_id
+    )
+    error_message = "Enabled workers require a service VLAN tag distinct from the primary tag, from 1 through 4094."
+  }
+}
+
+variable "worker_resources" {
+  description = "Per-worker allocation, independent of the server."
+  type = object({
+    cpu_cores    = optional(number, 4)
+    memory_mb    = optional(number, 8192)
+    disk_size_gb = optional(number, 64)
+  })
+  default  = {}
+  nullable = false
+  validation {
+    condition = alltrue([
+      var.worker_resources.cpu_cores >= 4 && floor(var.worker_resources.cpu_cores) == var.worker_resources.cpu_cores,
+      var.worker_resources.memory_mb >= 8192 && floor(var.worker_resources.memory_mb) == var.worker_resources.memory_mb,
+      var.worker_resources.disk_size_gb >= 64 && floor(var.worker_resources.disk_size_gb) == var.worker_resources.disk_size_gb,
+    ])
+    error_message = "Workers require whole-number allocations of at least 4 cores, 8192 MiB and 64 GiB."
   }
 }

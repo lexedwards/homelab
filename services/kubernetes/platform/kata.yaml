@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kata-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kata
+  namespace: kube-system
+spec:
+  chart: https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-deploy-4.3.1.tgz
+  targetNamespace: kata-system
+  createNamespace: false
+  timeout: 15m
+  valuesContent: |
+    k8sDistribution: rke2
+    deploymentMode: job
+    image:
+      reference: quay.io/kata-containers/kata-deploy@sha256:7399058e3e6378a766770345abcf9b20b53611a419b1b56e71162c6ac1bf625a
+      tag: "4.3.1"
+    kubectlImage:
+      reference: quay.io/kata-containers/kubectl@sha256:9706a1e6b38cc89214f6e671d9a85cf50411548fa9e059e6259da8ee0a434941
+      tag: ""
+    job:
+      parallelism: 1
+      dispatcherImage:
+        reference: ghcr.io/kata-containers/k8s-job-dispatcher@sha256:b2540bc9c85d52c4ad96b82d4b2579d2169069f2f77725df50e0278373c1927e
+        tag: "0.3.0"
+      dispatcherNodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      dispatcherTolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+    nodeSelector:
+      homelab.io/role: worker
+      kubernetes.io/arch: amd64
+    tolerations:
+      - key: node.kubernetes.io/unschedulable
+        operator: Exists
+        effect: NoSchedule
+    selinux:
+      enabled: true
+    snapshotter:
+      setup: []
+    shims:
+      disableAll: true
+      clh-runtime-rs:
+        enabled: true
+        supportedArches: [amd64]
+        allowedHypervisorAnnotations: []
+        containerd:
+          snapshotter: ""
+        runtimeClass:
+          nodeSelector:
+            homelab.node-restriction.kubernetes.io/kata-verified: "true"
+            kubernetes.io/arch: amd64
+    defaultShim:
+      amd64: clh-runtime-rs
+    runtimeClasses:
+      enabled: true
+      createDefault: false

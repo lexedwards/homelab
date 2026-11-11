@@ -1,9 +1,11 @@
 # Kubernetes
 
-This OpenTofu root defines the initial Rocky Linux 10 amd64 RKE2 control-plane VM
-on `compute`, with one colocated etcd member and RKE2-managed Cilium. It does not
-yet define worker VMs, VLAN service pools, application policy, NFS storage or
-OpenBao workload-secret delivery. Implementation context and qualification gates
+This OpenTofu root defines the Rocky Linux 10 amd64 RKE2 control-plane VM on
+`compute`, with one colocated etcd member and RKE2-managed Cilium, and an optional
+worker on each physical host. [Worker enrollment and runtime operations][workers]
+are separate from infrastructure apply. VLAN service pools, application policy,
+NFS storage and OpenBao workload-secret delivery are not deployed by this root.
+Implementation context and qualification gates
 remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 
 **Validation is local evidence, not deployment evidence.** First-boot and restart
@@ -49,7 +51,8 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs format/schema checks and plan/render tests
 with **both providers mocked**, readiness-CLI tests with a fake API command,
-user-data/network-data YAML lint and shell syntax checks. These checks do not
+credential-boundary/enrollment checks with mocked SSH, user-data/network-data
+and platform YAML lint, and shell syntax checks. These checks do not
 exercise RPM installation, kernel boot or SELinux policy. No infrastructure is
 created or contacted. Init downloads providers but does not plan or deploy it.
 
@@ -98,9 +101,9 @@ The generated `ip_config` path is deliberately omitted. This is separate from
 user-data, not a post-boot command or a helper that rewrites network settings.
 
 `ens18` is the primary VirtIO interface in the reviewed Rocky/Q35 single-NIC
-layout. Revalidate this mapping if the image or PCI/NIC layout changes. Future
-dual-NIC workers need their own network-data with one primary default route;
-this server configuration does not define their secondary-network behavior.
+layout. Revalidate this mapping if the image or PCI/NIC layout changes. Workers
+use separate primary network-data and a native secondary NetworkManager profile;
+see the worker runbook for the renderer limitation and required reboot boundary.
 
 Cloud-init creates the approved non-root administrator, replaces that user's
 authorized-key file with the reviewed operator keys, disables root/password SSH
@@ -150,8 +153,8 @@ RKE2 discovers the node IP through its native address selection. No helper
 rewrites configuration, records an IP/MAC identity file or checks that pair on
 restart. Stable addressing is an upstream DHCP responsibility: if the lease
 changes, restore the original reservation and investigate before maintenance.
-Future dual-NIC workers need reviewed primary-interface/address selection; this
-single-NIC server does not establish that behavior for them.
+Worker enrollment additionally verifies primary-interface/address selection;
+single-NIC server acceptance does not establish dual-NIC behavior.
 
 OpenTofu selects the guest-agent address by the managed primary NIC's MAC, not
 the first non-loopback/pod address, and publishes API DNS after VM address discovery.
@@ -299,7 +302,7 @@ identity. Back up data/associated credentials, review failure-domain placement,
 and join two additional server/etcd members sequentially through RKE2's supported
 registration path. A permanent two-member etcd cluster is not fault tolerant;
 three VMs across two hosts are not three independent host-failure domains. This
-slice provisions no extra server/frontend or worker, and later code must preserve
+slice provisions no extra server/frontend, and later code must preserve
 the existing server resource identity rather than rebuild the cluster to expand.
 
 ### Troubleshooting
@@ -312,3 +315,4 @@ may contain protected information; do not publish them wholesale. Do not rerun
 cloud-init or modify image-catalogue state as a troubleshooting shortcut.
 
 [adrs]: ../../docs/adrs/
+[workers]: WORKERS.md

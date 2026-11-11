@@ -11,7 +11,7 @@ help:
 		'fmt              Format OpenTofu configuration' \
 		'fmt-check        Check formatting' \
 		'tofu-validate    Validate the initialized root offline' \
-		'test             Run mocked infrastructure and readiness tests' \
+		'test             Run mocked infrastructure, readiness and enrollment checks' \
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'validate         Run all local checks without infrastructure access' \
@@ -37,10 +37,15 @@ test:
 yaml-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
 	$(YAMLLINT) cloud-init/network-data.yaml
+	$(YAMLLINT) cloud-init/worker-user-data.tftpl
+	$(YAMLLINT) cloud-init/worker-network-data.yaml
+	$(YAMLLINT) platform/kata.yaml
+	$(YAMLLINT) examples/workloads.yaml
 
 shell-validate:
 	bash -n cloud-init/install-server.sh
 	bash -n config/node-preflight.sh
+	bash -n cloud-init/install-agent.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate
 

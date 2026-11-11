@@ -63,3 +63,30 @@
 # }
 # rke2_version         = "1.36.6~rke2r1-0.el10"
 # rke2_selinux_version = "0.24-1.el10"
+
+# -----------------------------------------------------------------------------
+# Workers
+# -----------------------------------------------------------------------------
+
+# Optional: disabled until both physical-host entries are supplied.
+# workers = {}
+# When enabling workers, fill both entries privately:
+# workers = {
+#   compute = {
+#     vm_id          =
+#     name           =
+#     service_bridge =
+#   }
+#   store = {
+#     vm_id          =
+#     name           =
+#     service_bridge =
+#   }
+# }
+# Also add store to proxmox_nodes using the same fields as compute.
+# service_vlan_id = null
+# worker_resources = {
+#   cpu_cores    = 4
+#   memory_mb    = 8192
+#   disk_size_gb = 64
+# }
