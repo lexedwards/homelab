@@ -9,15 +9,20 @@ provider "incus" {
 locals {
   openbao_version = "2.7.2"
   openbao_sha256  = "f9f40f906aaf673f536e59e45be3f485408b36cdb75697e89bb5201b8545dc46"
+  api_addr        = "https://${var.dns_name}:8200"
   server_config = templatefile("${path.module}/config/openbao.hcl.tftpl", {
-    api_addr = "http://${var.dns_name}:8200"
+    api_addr = local.api_addr
   })
   user_data = templatefile("${path.module}/cloud-init/user-data.tftpl", {
-    server_config   = local.server_config
-    readiness       = file("${path.module}/scripts/check-ready.py")
-    install         = file("${path.module}/scripts/install.sh")
-    openbao_version = local.openbao_version
-    openbao_sha256  = local.openbao_sha256
+    server_config              = local.server_config
+    readiness                  = file("${path.module}/scripts/check-ready.py")
+    install                    = file("${path.module}/scripts/install.sh")
+    deploy_certificate         = file("${path.module}/scripts/deploy-certificate.sh")
+    certificate_expiry_service = file("${path.module}/config/certificate-expiry.service")
+    certificate_expiry_timer   = file("${path.module}/config/certificate-expiry.timer")
+    dns_name                   = var.dns_name
+    openbao_version            = local.openbao_version
+    openbao_sha256             = local.openbao_sha256
   })
 }
 
@@ -111,8 +116,8 @@ resource "incus_instance" "openbao" {
 
   exec = {
     "00-check-server" = {
-      command = ["python3", "/usr/local/lib/openbao/check-ready.py"]
-      timeout = "2m"
+      command = ["python3", "/usr/local/lib/openbao/check-ready.py", "--allow-pending-tls"]
+      timeout = "3m"
       trigger = "once"
     }
   }

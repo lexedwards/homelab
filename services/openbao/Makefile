@@ -14,7 +14,7 @@ help:
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
 		'cloud-init-validate   Lint the cloud-init template and check installer syntax' \
 		'test                  Run mocked infrastructure and readiness tests offline' \
-		'server-test           Start a disposable loopback server using BAO_BIN; never initializes it' \
+		'server-test           Test HTTPS and reload using BAO_BIN and disposable initialized storage' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE (requires authorization)' \
 		'apply                 Apply the previously reviewed PLAN_FILE (requires authorization)'
@@ -34,6 +34,7 @@ tofu-validate:
 cloud-init-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
 	sh -n scripts/install.sh
+	sh -n scripts/deploy-certificate.sh
 
 test:
 	$(TOFU) test

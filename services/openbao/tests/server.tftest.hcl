@@ -75,14 +75,28 @@ run "persistent_server_with_service_owned_dns" {
   assert {
     condition = (
       strcontains(local.server_config, "storage \"raft\"") &&
-      strcontains(local.server_config, "http://bao.example.invalid:8200") &&
-      strcontains(local.server_config, "tls_disable = true") &&
+      strcontains(local.server_config, "https://bao.example.invalid:8200") &&
+      strcontains(local.server_config, "tls_disable = false") &&
+      strcontains(local.server_config, "/etc/openbao/tls/current/fullchain.pem") &&
+      strcontains(local.server_config, "/etc/openbao/tls/current/privkey.pem") &&
       strcontains(local.user_data, "MemorySwapMax=0") &&
       !strcontains(local.user_data, "operator init") &&
       !strcontains(local.user_data, "operator unseal") &&
       !strcontains(local.user_data, "server -dev")
     )
     error_message = "Provision persistent server mode and swap hardening without automating key-bearing initialization or unseal."
+  }
+
+  assert {
+    condition = (
+      contains(yamldecode(local.user_data).packages, "certbot") &&
+      contains(yamldecode(local.user_data).packages, "python3-certbot-dns-cloudflare") &&
+      strcontains(local.user_data, "ConditionPathExists=/etc/openbao/tls/current/fullchain.pem") &&
+      strcontains(local.user_data, "ConditionPathExists=/etc/openbao/tls/current/privkey.pem") &&
+      !strcontains(local.user_data, "dns_cloudflare_api_token") &&
+      incus_instance.openbao.exec["00-check-server"].command == tolist(["python3", "/usr/local/lib/openbao/check-ready.py", "--allow-pending-tls"])
+    )
+    error_message = "Install native ACME tooling without credentials and gate server startup until out-of-band TLS enrollment."
   }
 
   assert {
