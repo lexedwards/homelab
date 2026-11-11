@@ -2,19 +2,20 @@
 
 OpenBao runs as a native systemd service in one Debian 13 ARM64 Incus container
 on [Micro Node]. It uses integrated Raft storage on a separate custom volume,
-outside the Proxmox failure domain. This is a single server, not an HA cluster.
+outside the Proxmox failure domain. The API uses native HTTPS with Let's Encrypt
+certificates renewed through Cloudflare DNS-01. Plaintext API access is retired.
+This is a single server, not an HA cluster.
 
-> [!WARNING]
-> The existing initialized instance needs the separately authorized in-place
-> migration below. Updating cloud-init does not migrate it. New installations
-> remain stopped until out-of-band certificate enrollment; never initialize
-> existing storage again or replace the guest to enable TLS.
+> [!IMPORTANT]
+> The existing service is initialized. Never initialize its storage again.
+> New installations remain stopped until out-of-band certificate enrollment.
+> Changing cloud-init metadata does not reconfigure an existing guest.
 
 ## Dependencies
 
-- OpenTofu 1.9 or newer, `make`, `yamllint`, Python 3, OpenSSL, bubblewrap, and the matching OpenBao
-  CLI for the workstation architecture for local validation. Verify its release
-  signature/checksum before use; set `BAO_BIN` if it is not on `PATH`.
+- OpenTofu 1.9 or newer, `make`, `yamllint` and Python 3 for local validation.
+- For manual administration, the guest's installed OpenBao CLI or a workstation
+  CLI with a verified release signature/checksum and matching architecture.
 - A trusted Incus client, the Micro Node `default` directory storage pool, and
   unmanaged `br0` bridge.
 - A reviewed Debian 13 ARM64 cloud image. The upstream Incus image catalogue
@@ -57,21 +58,14 @@ Optional sizing and DNS TTL inputs have defaults in `variables.tf` and
 
 ```bash
 make init
-make validate BAO_BIN=<verified-bao-binary>
+make validate
 ```
 
-Validation runs format/OpenTofu checks, YAML template linting, installer syntax,
-mocked provider plans, rendered cloud-init checks, readiness unit tests, and two
-starts of a disposable server using the rendered configuration. The server test
-substitutes temporary storage, synthetic certificates and loopback high ports.
-It initializes only disposable storage, verifies synthetic authenticated access
-survives a certificate reload without restart or reseal, then restarts sealed.
-It removes its scratch files after stopping the process. Bubblewrap isolates
-certificate deployment tests from the workstation's accounts, files and systemd.
-The smoke test uses an isolated root with synthetic inputs and no deployment
-state or local tfvars; it reuses only the initialized provider binaries. Validation
-does not contact infrastructure, install the package, or prove systemd/cgroup
-behavior inside a new guest.
+Validation runs format/OpenTofu checks, YAML template linting, installer and
+deploy-hook syntax checks, mocked provider plans, rendered cloud-init assertions
+and readiness unit tests. It does not contact infrastructure, issue certificates,
+start OpenBao or prove guest systemd/cgroup behavior. Operational acceptance and
+rollout history remain in [ALE-41][ale-41], separate from local validation.
 
 OpenBao 2.7.2 is installed from the upstream ARM64 DEB. The version and SHA-256
 are kept together in `main.tf`. Before changing either, verify the release
@@ -94,6 +88,8 @@ make apply
 Apply only the reviewed saved plan, with no intervening configuration changes.
 Protect plans and state: they contain topology and rendered first-boot
 configuration even though initialization keys and application secrets are absent.
+Run persistent plans and applies only from canonical `main`, using the established
+production state. Feature worktrees must not become a second deployment owner.
 
 The root registers one A record using Incus's reported guest IPv4 address.
 It does not own the shared zone or overwrite sibling records. If the same record
@@ -138,8 +134,11 @@ certbot certonly --non-interactive --agree-tos --email '<operator-email>' \
 
 The deploy hook validates public trust, hostname, expiry and key pairing before
 atomically publishing a root-owned, OpenBao-readable certificate/key generation.
-Private keys stay on the guest, outside state and cloud-init. Previous generations
-remain for rollback; remove obsolete ones under an explicit retention policy.
+The TLS directories are `root:openbao`, mode `0750`; each published certificate
+and key is `root:openbao`, mode `0640`. The private domain file
+`/etc/openbao/acme-domain` is also `root:openbao`, mode `0640`. Private keys stay
+on the guest, outside state and cloud-init. Previous generations remain for
+rollback; remove obsolete ones under an explicit retention policy.
 It does not start an inactive server. On a new installation, authorize
 `systemctl start openbao`, then run the readiness check before initialization.
 
@@ -147,44 +146,6 @@ It does not start an inactive server. On a new installation, authorize
 check `/etc/letsencrypt/renewal/openbao.conf` locally. Successful renewal signals
 only `SIGHUP`, never restart: OpenBao 2.7.2 reloads the certificate without resealing.
 No unseal shares or OpenBao token are needed. Do not substitute a restart hook.
-
-### Migrate The Initialized HTTP Instance
-
-There are no existing HTTP clients, so cut over directly on port 8200 without
-a parallel plaintext listener. Run persistent plans only from canonical `main`
-in `/home/alex/sourcecode/homelab`, using the one established production state.
-First confirm state ownership and resource identities; do not initialize a second
-state or accept guest/data-volume replacement. Plans and live actions need
-separate authorization.
-
-1. Confirm independent unseal-share access, recovery credentials, current
-   initialized/unsealed health and the existing data-volume attachment. Securely
-   retain current configuration and a supported Raft snapshot where available;
-   this change does not establish a proven backup/restore system.
-2. Install only the Debian ACME packages on the existing guest; do not rerun
-   cloud-init or `install.sh`. Stage the reviewed deployment/readiness scripts,
-   expiry units and `/etc/openbao/acme-domain` using their template paths and
-   permissions. The domain file must be `root:openbao`, `0640`. Create
-   `/etc/openbao/tls` as `root:openbao`, `0750`, and `/etc/openbao-acme` as
-   `root:root`, `0700`. Add the reviewed certificate conditions to the existing
-   hardening drop-in without removing its other protections.
-3. Enroll the credential and certificate as above while HTTP remains available.
-   The hook may send HUP to the current HTTP process; this does not enable TLS.
-   Verify the staged files and native TLS configuration before the downtime window.
-4. In the agreed window, install the rendered `openbao.hcl` with the HTTPS API
-   address and TLS listener, preserving the existing Raft path and all hardening.
-   Run `systemctl daemon-reload`, enable `certbot.timer`, then authorize one
-   `systemctl restart openbao`. This restart seals the initialized server.
-5. Verify HTTPS from the guest and an intended client, manually unseal over
-   verified HTTPS, and confirm prior initialized data and authenticated access.
-   Confirm HTTP no longer serves API requests. Never use `BAO_SKIP_VERIFY` or
-   `curl -k`. Reconcile reviewed cloud-init metadata without assuming it ran.
-
-Before cutover, rollback means leaving the HTTP config untouched and disabling
-the new timers if needed. After cutover, prefer fixing TLS while retaining data.
-If the operator explicitly accepts temporary plaintext again, restore the saved
-HTTP configuration, restart and manually unseal; never reinitialize or roll back
-Raft data. Keep administrative traffic local during such an exception.
 
 ### Verify Renewal And Watch Expiry
 
@@ -276,6 +237,9 @@ incus exec <remote>:openbao -- systemctl show openbao -p MemorySwapMax -p Contro
 incus exec <remote>:openbao -- journalctl -u openbao --no-pager
 ```
 
+Use the private service DNS name with normal public-CA trust. Never set
+`BAO_SKIP_VERIFY` or use `curl -k` to bypass certificate verification.
+
 `check-ready.py` requires effective `MemorySwapMax=0` and the actual service
 cgroup's `memory.swap.max=0`. A missing/unavailable control fails the check;
 an ancestor's no-swap setting alone is not accepted as proof of the service
@@ -284,9 +248,10 @@ supplies its dedicated account and systemd sandbox; a drop-in preserves swap
 protection, disables core dumps, and denies access to home directories.
 
 After separately authorized deployment, verify DNS from an intended client,
-initialize/unseal privately, and test authenticated write/read of disposable data
-with a scoped identity. Verify unauthenticated secret reads are denied. Use a
-durable KV path for restart tests, not a token's ephemeral cubbyhole. Delete test
+unseal privately (initialize only new storage), and test authenticated write/read
+of disposable data with a scoped identity. Verify unauthenticated secret reads
+are denied. Use a durable KV path for restart tests, not a token's ephemeral
+cubbyhole. Delete test
 data afterwards. Do not publish tokens, share values, or secret contents.
 
 Before an authorized service or guest restart, confirm share availability and
@@ -338,3 +303,4 @@ can read an upgraded storage format; rollback may require an isolated restore
 using the matching old binary and snapshot.
 
 [Micro Node]: ../../hosts/micro-node/README.md
+[ale-41]: https://linear.app/lexedwards/issue/ALE-41/enable-native-https-for-openbao-using-cloudflare-dns-01
