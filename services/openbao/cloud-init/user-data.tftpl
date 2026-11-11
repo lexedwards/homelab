@@ -5,6 +5,8 @@ packages:
   - curl
   - openssl
   - python3
+  - certbot
+  - python3-certbot-dns-cloudflare
 
 write_files:
   - path: /usr/local/lib/openbao/install.sh
@@ -23,10 +25,30 @@ write_files:
     permissions: "0644"
     owner: root:root
     content: |
+      [Unit]
+      ConditionPathExists=/etc/openbao/tls/current/fullchain.pem
+      ConditionPathExists=/etc/openbao/tls/current/privkey.pem
+
       [Service]
       MemorySwapMax=0
       LimitCORE=0
       ProtectHome=true
+  - path: /usr/local/lib/openbao/deploy-certificate.sh
+    permissions: "0700"
+    owner: root:root
+    content: ${jsonencode(deploy_certificate)}
+  - path: /etc/openbao/acme-domain
+    permissions: "0640"
+    owner: root:root
+    content: ${jsonencode(dns_name)}
+  - path: /etc/systemd/system/openbao-certificate-expiry.service
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(certificate_expiry_service)}
+  - path: /etc/systemd/system/openbao-certificate-expiry.timer
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(certificate_expiry_timer)}
 
 runcmd:
   - [sh, /usr/local/lib/openbao/install.sh, "${openbao_version}", "${openbao_sha256}"]

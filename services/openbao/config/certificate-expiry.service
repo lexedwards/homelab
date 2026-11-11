@@ -1,0 +1,13 @@
+[Unit]
+Description=Verify OpenBao served certificate, renewal deployment and expiry
+
+[Service]
+Type=oneshot
+User=openbao
+Group=openbao
+ExecStart=/usr/bin/python3 /usr/local/lib/openbao/check-ready.py --certificate-only
+TimeoutStartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
