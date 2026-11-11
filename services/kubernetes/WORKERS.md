@@ -103,6 +103,11 @@ token. `--expected-version` defaults to `v1.36.6+rke2r1`; supply the correspondi
 reviewed version if RPM pins change. `--timeout` defaults to 600 seconds (30–900
 accepted), plus up to 60 seconds for revocation cleanup.
 
+`--node-name` is the short RKE2 name, not the OS FQDN. Worker preflight compares
+it with the OS hostname's first label and requires an exact RKE2 `node-name`
+match. Verify the full configured OS FQDN before enrollment as described above;
+this command does not validate its DNS suffix or upstream DNS records.
+
 The command refuses existing node identities, agent certificates and token files.
 It transfers credentials through subprocess stdin over pinned SSH, exclusively
 creates root-only mode-0600 `/etc/rancher/rke2/join-token`, restores its label and
