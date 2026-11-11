@@ -22,13 +22,22 @@ variables {
   api_dns               = { zone = "example.invalid", name = "api.example.invalid" }
   cluster_networks      = { pods = "198.18.0.0/16", services = "198.19.0.0/16" }
   workers = {
-    compute = { vm_id = 102, name = "test-worker-a", service_bridge = "br-service" }
-    store   = { vm_id = 103, name = "test-worker-b", service_bridge = "br-service" }
+    compute = { vm_id = 102, name = "test-worker-a", fqdn = "test-worker-a.nodes.example.invalid", service_bridge = "br-service" }
+    store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
   }
 }
 
 run "declare_workers_without_changing_server_or_supplying_credentials" {
   command = plan
+  assert {
+    condition = nonsensitive(alltrue([
+      for host, snippet in proxmox_virtual_environment_file.worker :
+      yamldecode(snippet.source_raw[0].data).hostname == var.workers[host].name &&
+      try(yamldecode(snippet.source_raw[0].data).fqdn, "") == "${var.workers[host].name}.nodes.example.invalid" &&
+      yamldecode(local.worker_rke2_config[host])["node-name"] == var.workers[host].name
+    ]))
+    error_message = "Worker cloud-init must supply an explicit FQDN while RKE2 retains the short node name."
+  }
   assert {
     condition = nonsensitive(alltrue([
       for host, vm in proxmox_virtual_environment_vm.worker :
@@ -84,8 +93,8 @@ run "reject_worker_identity_collision" {
   command = plan
   variables {
     workers = {
-      compute = { vm_id = 101, name = "test-server", service_bridge = "br-service" }
-      store   = { vm_id = 103, name = "test-worker-b", service_bridge = "br-service" }
+      compute = { vm_id = 101, name = "test-server", fqdn = "test-server.nodes.example.invalid", service_bridge = "br-service" }
+      store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
     }
   }
   expect_failures = [var.workers, technitium_record.api]
@@ -95,4 +104,26 @@ run "reject_same_service_and_primary_vlan" {
   command = plan
   variables { service_vlan_id = 100 }
   expect_failures = [var.service_vlan_id, technitium_record.api]
+}
+
+run "reject_unqualified_worker_hostname" {
+  command = plan
+  variables {
+    workers = {
+      compute = { vm_id = 102, name = "test-worker-a", fqdn = "test-worker-a", service_bridge = "br-service" }
+      store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
+    }
+  }
+  expect_failures = [var.workers, technitium_record.api]
+}
+
+run "reject_fqdn_with_different_short_name" {
+  command = plan
+  variables {
+    workers = {
+      compute = { vm_id = 102, name = "test-worker-a", fqdn = "other-worker.nodes.example.invalid", service_bridge = "br-service" }
+      store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
+    }
+  }
+  expect_failures = [var.workers, technitium_record.api]
 }

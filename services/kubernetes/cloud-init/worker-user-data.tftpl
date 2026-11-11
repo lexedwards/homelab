@@ -1,5 +1,6 @@
 #cloud-config
 hostname: ${jsonencode(hostname)}
+fqdn: ${jsonencode(fqdn)}
 manage_etc_hosts: true
 ssh_pwauth: false
 disable_root: true

@@ -10,9 +10,21 @@ Intel/AMD peers. Their OS disks are replaceable; application data belongs off-no
 
 `workers.tf` owns VMs and snippets in the existing cluster root/state. The empty
 `workers` default preserves the server-only deployment. Enable both physical-host
-entries using the input example: unique VM IDs/names, secondary bridges and a
-service VLAN distinct from the primary VLAN. Supply `store` host/upload/datastore
-inputs too. Existing server resources and configuration remain unchanged.
+entries using the input example: unique VM IDs/short names, explicit OS FQDNs,
+secondary bridges and a service VLAN distinct from the primary VLAN. Supply
+`store` host/upload/datastore inputs too. Existing server resources and
+configuration remain unchanged.
+
+Each worker's required `fqdn` must be a lowercase DNS name whose first label
+matches `name`, without a trailing dot. Cloud-init receives both `hostname` and
+`fqdn`; Rocky's native FQDN preference selects the explicit OS identity rather
+than an inherited name. RKE2 keeps `name` as its explicit short Kubernetes node
+name. Do not use the stable API alias as a worker's identity.
+
+Choose FQDNs privately and align upstream forward/reverse DNS with the observed
+primary DHCP leases and reservations. `manage_etc_hosts` updates the guest hosts
+file, not upstream DNS. This root creates only the API DNS record, not worker
+records. Service-VLAN leases do not replace primary node identities.
 
 Before an authorized plan, reconfirm IDs, template provenance, cross-node full
 clone support, bridge tags, nested KVM, datastore content/capacity and DHCP/DNS.
@@ -44,6 +56,15 @@ It records the installation boot ID and enables the agent. Cloud-init reboots in
 the installed kernel; NetworkManager loads the secondary profile on that reboot.
 Bootstrap networking before it is not accepted as dual-NIC readiness. The agent
 is gated on installation success and a separately enrolled token file.
+
+Before enrollment, verify that both the static and running OS hostname equal the
+configured FQDN after the kernel reboot, while RKE2 `node-name` retains the short
+name. Check upstream DNS separately; the guest hosts file alone is not proof.
+Updating a cloud-init snippet does not rename an existing guest or rerun first
+boot. For workers created without `fqdn`, populate the new required private
+input and obtain approval for a reviewed worker replacement to qualify clean
+boot. Do not rerun cloud-init or replace/rename the initialized control plane as
+part of this worker change.
 
 RKE2 natively selects the default-route interface. Enrollment requires the reboot,
 one IPv4 default route on `ens18`, no IPv6 default route and one DHCP IPv4 address
