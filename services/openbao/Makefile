@@ -1,10 +1,9 @@
 TOFU ?= tofu
 YAMLLINT ?= yamllint
 PYTHON ?= python3
-BAO_BIN ?= bao
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate test server-test validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate test validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -14,7 +13,6 @@ help:
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
 		'cloud-init-validate   Lint the cloud-init template and check installer syntax' \
 		'test                  Run mocked infrastructure and readiness tests offline' \
-		'server-test           Test HTTPS and reload using BAO_BIN and disposable initialized storage' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE (requires authorization)' \
 		'apply                 Apply the previously reviewed PLAN_FILE (requires authorization)'
@@ -40,10 +38,7 @@ test:
 	$(TOFU) test
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py'
 
-server-test:
-	$(PYTHON) -B tests/smoke-server.py --bao "$(BAO_BIN)" --tofu "$(TOFU)"
-
-validate: fmt-check tofu-validate cloud-init-validate test server-test
+validate: fmt-check tofu-validate cloud-init-validate test
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

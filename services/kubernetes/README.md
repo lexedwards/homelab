@@ -6,9 +6,8 @@ yet define worker VMs, VLAN service pools, application policy, NFS storage or
 OpenBao workload-secret delivery. Implementation context and qualification gates
 remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 
-**Validation is local evidence, not deployment evidence.** Earlier disposable
-proofs support the chosen component combination but do not prove this
-implementation's first-boot/restart behavior.
+**Validation is local evidence, not deployment evidence.** First-boot and restart
+acceptance is recorded separately in ALE-28.
 
 ## Dependencies
 
@@ -21,8 +20,7 @@ implementation's first-boot/restart behavior.
 - DHCP-provided DNS must resolve the private API name without cluster DNS.
 - Existing Technitium zone and a service-owned API A record that is not already
   owned elsewhere. The API name must remain stable through future HA expansion.
-- OpenTofu 1.9+, Python 3, yamllint and Linux bubblewrap for isolated boot-sequence
-  tests. Providers are pinned by the lock file.
+- OpenTofu 1.9+, Python 3 and yamllint. Providers are pinned by the lock file.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
 
@@ -51,18 +49,13 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs format/schema checks and plan/render tests
 with **both providers mocked**, readiness-CLI tests with a fake API command,
-user-data/network-data YAML lint and shell syntax checks. Bubblewrap tests execute
-the real installer and preflight in an isolated filesystem/network with fake
-package/system commands.
-They check install → simulated reboot → repeated preflight and failure paths, not
-actual RPM installation, kernel boot or SELinux policy. No infrastructure is
+user-data/network-data YAML lint and shell syntax checks. These checks do not
+exercise RPM installation, kernel boot or SELinux policy. No infrastructure is
 created or contacted. Init downloads providers but does not plan or deploy it.
 
 OpenTofu's VM mock does not populate the computed MAC inside the configured NIC.
 The plan checks therefore expect DNS publication to reject unavailable primary
 identity; they do not simulate successful lease discovery or DNS creation.
-The boot-sequence tests are temporary: after live first-boot/restart validation,
-remove `tests/test_boot_sequence.py` and its bubblewrap dependency.
 
 ## Reviewed plan and deployment
 
