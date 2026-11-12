@@ -40,7 +40,7 @@ locals {
     kind       = "HelmChartConfig"
     metadata   = { name = "rke2-cilium", namespace = "kube-system" }
     spec = {
-      valuesContent = yamlencode({
+      valuesContent = yamlencode(merge({
         kubeProxyReplacement = true
         k8sServiceHost       = var.api_dns.name
         k8sServicePort       = 6443
@@ -49,7 +49,7 @@ locals {
         tunnelProtocol       = "vxlan"
         ipam                 = { mode = "kubernetes" }
         operator             = { replicas = 1 }
-      })
+      }, local.service_exposure_values))
     }
   })
   cloud_init = templatefile("${path.module}/cloud-init/user-data.tftpl", {

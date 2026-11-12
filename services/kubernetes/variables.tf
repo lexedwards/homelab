@@ -281,3 +281,34 @@ variable "worker_resources" {
     error_message = "Workers require whole-number allocations of at least 4 cores, 8192 MiB and 64 GiB."
   }
 }
+
+variable "service_exposure" {
+  description = "Opt-in private LoadBalancer ranges and exact external device names. Null leaves bootstrap networking unchanged; applying outputs to Kubernetes requires separate approval."
+  type = object({
+    devices = set(string)
+    pools = map(object({
+      subnet    = string
+      start     = string
+      stop      = string
+      interface = string
+    }))
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition = var.service_exposure == null ? true : try(
+      length(var.service_exposure.devices) > 0 && length(var.service_exposure.pools) > 0 &&
+      alltrue([for device in var.service_exposure.devices : can(regex("^[a-zA-Z][a-zA-Z0-9_-]{0,14}$", device))]) &&
+      alltrue([for name, pool in var.service_exposure.pools :
+        can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", name)) &&
+        contains(var.service_exposure.devices, pool.interface) &&
+        !strcontains(pool.subnet, ":") &&
+        pool.subnet == "${cidrhost(pool.subnet, 0)}/${split("/", pool.subnet)[1]}" &&
+        cidrcontains(pool.subnet, pool.start) && cidrcontains(pool.subnet, pool.stop) &&
+        pool.start != cidrhost(pool.subnet, 0) && pool.stop != cidrhost(pool.subnet, -1)
+      ]), false
+    )
+    error_message = "Provide named IPv4 pools with canonical subnets, usable endpoints and exact interfaces included in devices; pool names must be 2–40 DNS-label characters."
+  }
+}
