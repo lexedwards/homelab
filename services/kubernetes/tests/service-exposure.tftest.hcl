@@ -34,6 +34,7 @@ run "enable_native_l2_without_changing_the_api_or_kata_socket_path" {
   assert {
     condition = try(
       yamldecode(yamldecode(local.cilium_config).spec.valuesContent).l2announcements.enabled &&
+      yamldecode(yamldecode(local.cilium_config).spec.valuesContent).rollOutCiliumPods &&
       yamldecode(yamldecode(local.cilium_config).spec.valuesContent).operator.rollOutPods &&
       yamldecode(yamldecode(local.cilium_config).spec.valuesContent).operator.replicas == 1 &&
       yamldecode(yamldecode(local.cilium_config).spec.valuesContent).k8sClientRateLimit.qps == 50 &&

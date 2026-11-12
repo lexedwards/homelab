@@ -6,6 +6,7 @@ locals {
   } }
   service_exposure_values = merge(
     var.service_exposure == null ? {} : { l2announcements = { enabled = true } },
+    var.service_exposure == null ? {} : { rollOutCiliumPods = true },
     var.service_exposure == null ? {} : { devices = sort(tolist(var.service_exposure.devices)) },
     var.service_exposure == null ? {} : { k8sClientRateLimit = { qps = 50, burst = 100 } },
     var.service_exposure == null ? {} : { operator = merge(local.cilium_bootstrap_values.operator, { rollOutPods = true }) },

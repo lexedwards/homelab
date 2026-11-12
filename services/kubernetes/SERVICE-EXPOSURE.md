@@ -44,9 +44,11 @@ RKE2 remains the only Cilium chart owner. Its bundled chart/version is determine
 by the existing pinned RKE2 installation; do not install a second Cilium release
 or substitute an unreviewed upstream chart. Preserve verified API identity,
 host-namespace-only socket LB, tunnel mode and the other existing chart values.
-Exposure sets `operator.rollOutPods = true` so native chart configuration changes
-also roll the operator. Its managed Service classes are startup settings; an
-updated ConfigMap and healthy old operator do not prove L2-class allocation works.
+Exposure sets `rollOutCiliumPods = true` and `operator.rollOutPods = true` so
+native chart configuration changes roll both agents and operator. L2 enablement
+and managed Service classes are startup settings; an updated ConfigMap and healthy
+old pods do not prove allocation or announcement works. Require replacement pod
+UIDs, readiness, actual L2 leases and client-side evidence before declaring success.
 Enabling L2 and changing `devices` affects the shared datapath, including service
 routing/masquerading, and can roll agents. It is not merely an IPAM-object update.
 
