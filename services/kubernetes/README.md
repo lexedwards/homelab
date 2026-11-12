@@ -16,6 +16,11 @@ automatically applied by infrastructure provisioning.
 outputs, the native RKE2 chart lifecycle and client-side qualification. Rendering
 the outputs does not deploy them or authorize a shared-datapath rollout.
 
+[Retained NFS storage](NFS.md) provides a pinned worker-only CSI chart and opt-in
+private StorageClass/qualification outputs. TrueNAS ownership, client restrictions,
+quota and backups remain an explicit operator boundary; local checks do not prove
+real-backend compatibility.
+
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
 

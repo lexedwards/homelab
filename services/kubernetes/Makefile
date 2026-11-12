@@ -1,9 +1,10 @@
 TOFU ?= tofu
 YAMLLINT ?= yamllint
 PYTHON ?= python3
+HELM ?= helm
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare plan apply
 
 help:
 	@printf '%s\n' \
@@ -15,6 +16,8 @@ help:
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'validate         Run all local checks without infrastructure access' \
+		'nfs-chart-validate Render/check a previously downloaded NFS_CHART archive using HELM' \
+		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
 		'plan             Write an authorized online plan to PLAN_FILE' \
 		'apply            Apply only a previously inspected, unchanged PLAN_FILE'
 
@@ -44,6 +47,8 @@ yaml-validate:
 	$(YAMLLINT) platform/network-policy/
 	$(YAMLLINT) examples/network-policy/
 	$(YAMLLINT) examples/service-exposure.yaml
+	$(YAMLLINT) platform/nfs.yaml.tftpl
+	$(YAMLLINT) examples/nfs-workloads.yaml.tftpl
 
 shell-validate:
 	bash -n cloud-init/install-server.sh
@@ -51,6 +56,15 @@ shell-validate:
 	bash -n cloud-init/install-agent.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate
+
+nfs-chart-validate:
+	test -f "$(NFS_CHART)"
+	$(PYTHON) -B scripts/validate-nfs-chart.py --chart "$(NFS_CHART)" --helm "$(HELM)"
+
+nfs-prepare:
+	test -f "$(NFS_CHART)"
+	test -n "$(NFS_MANIFEST)"
+	$(PYTHON) -B scripts/validate-nfs-chart.py --chart "$(NFS_CHART)" --helm "$(HELM)" --output "$(NFS_MANIFEST)"
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-check
+  labels:
+    homelab.io/qualification: nfs
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: witness
+  namespace: nfs-check
+  labels:
+    homelab.io/qualification: nfs
+spec:
+  accessModes: [ReadWriteMany]
+  volumeMode: Filesystem
+  storageClassName: ${jsonencode(storage_class_name)}
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordinary
+  namespace: nfs-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nfs-ordinary
+  template:
+    metadata:
+      labels:
+        app: nfs-ordinary
+        homelab.io/qualification: nfs
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: nfs-ordinary
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${qualification_uid}
+        runAsGroup: ${qualification_gid}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: witness
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -ec]
+          args:
+            - |
+              umask 007
+              printf '%s\n' "$POD_UID:$NODE_NAME:$POD_NAME" > "/data/witness-$POD_UID"
+              sync -f "/data/witness-$POD_UID"
+              touch /tmp/ready
+              exec sleep 86400
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            exec:
+              command: [test, -f, /tmp/ready]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: witness
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isolated
+  namespace: nfs-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nfs-isolated
+  template:
+    metadata:
+      labels:
+        app: nfs-isolated
+        homelab.io/qualification: nfs
+    spec:
+      runtimeClassName: kata-clh-runtime-rs
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: nfs-isolated
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${qualification_uid}
+        runAsGroup: ${qualification_gid}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: witness
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -ec]
+          args:
+            - |
+              umask 007
+              printf '%s\n' "$POD_UID:$NODE_NAME:$POD_NAME" > "/data/witness-$POD_UID"
+              sync -f "/data/witness-$POD_UID"
+              touch /tmp/ready
+              exec sleep 86400
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            exec:
+              command: [test, -f, /tmp/ready]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: witness
+        - name: tmp
+          emptyDir: {}
