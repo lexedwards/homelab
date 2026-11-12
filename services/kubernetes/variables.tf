@@ -312,3 +312,31 @@ variable "service_exposure" {
     error_message = "Provide named IPv4 pools with canonical subnets, usable endpoints and exact interfaces included in devices; pool names must be 2–40 DNS-label characters."
   }
 }
+
+variable "nfs_storage" {
+  description = "Opt-in private NFS endpoint, dedicated export, explicit StorageClass name and non-root synthetic qualification identity. Null renders no storage or test manifests. Does not configure TrueNAS or deploy Kubernetes objects."
+  type = object({
+    server             = string
+    share              = string
+    storage_class_name = string
+    qualification_identity = object({
+      uid = number
+      gid = number
+    })
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition = var.nfs_storage == null ? true : try(
+      can(regex("^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$", var.nfs_storage.server)) &&
+      startswith(var.nfs_storage.share, "/") && length(var.nfs_storage.share) > 1 &&
+      !can(regex("[#\r\n]", var.nfs_storage.share)) &&
+      alltrue([for segment in split("/", substr(var.nfs_storage.share, 1, length(var.nfs_storage.share) - 1)) : !contains(["", ".", ".."], segment)]) &&
+      can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", var.nfs_storage.storage_class_name)) && length(var.nfs_storage.storage_class_name) <= 63 &&
+      alltrue([for id in [var.nfs_storage.qualification_identity.uid, var.nfs_storage.qualification_identity.gid] : id >= 1 && id <= 2147483647 && floor(id) == id]),
+      false
+    )
+    error_message = "Supply a plain NFS hostname/IPv4 address, canonical dedicated absolute share path, DNS-label StorageClass name and positive integer non-root UID/GID."
+  }
+}

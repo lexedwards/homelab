@@ -120,3 +120,19 @@
 #     }
 #   }
 # }
+
+# -----------------------------------------------------------------------------
+# Optional retained NFS storage
+# -----------------------------------------------------------------------------
+
+# nfs_storage = null
+# Replace null with the reviewed private backend/identity; this only renders YAML.
+# nfs_storage = {
+#   server             =
+#   share              =
+#   storage_class_name =
+#   qualification_identity = {
+#     uid =
+#     gid =
+#   }
+# }

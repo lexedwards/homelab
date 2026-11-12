@@ -17,6 +17,12 @@ Use a dedicated TrueNAS dataset/NFS export and the NFS CSI driver, with `Retain`
 as the reclaim policy. Restrict export clients to the workers, retain root-squash,
 and use explicit workload UID/GID permissions rather than world-writable exports.
 
+The operator accepted an unrestricted export-client list for the initial dedicated
+share to allow flexible addresses. This is a deployment-specific exception, not a
+new default: network-reachable AUTH_SYS clients can assert numeric identities.
+Keep root-squash and explicit permissions, and preserve the accepted client-access
+risk in rollout review. Upstream network changes are not implied.
+
 ## Consequences
 
 - CSI normally creates per-PVC subdirectories, not per-PVC ZFS datasets. The
