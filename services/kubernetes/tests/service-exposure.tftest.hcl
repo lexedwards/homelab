@@ -59,6 +59,40 @@ run "leave_existing_bootstrap_unchanged_without_opt_in" {
   expect_failures = [technitium_record.api]
 }
 
+run "enabling_runtime_exposure_does_not_rewrite_first_boot_cilium" {
+  command = plan
+  variables {
+    service_exposure = {
+      devices = ["test0", "test1"]
+      pools = {
+        primary = { subnet = "192.0.2.0/24", start = "192.0.2.32", stop = "192.0.2.63", interface = "test0" }
+      }
+    }
+  }
+  assert {
+    condition = base64decode(one([
+      for file in yamldecode(local.cloud_init).write_files : file
+      if file.path == "/var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml"
+      ]).content) == yamlencode({
+      apiVersion = "helm.cattle.io/v1"
+      kind       = "HelmChartConfig"
+      metadata   = { name = "rke2-cilium", namespace = "kube-system" }
+      spec = { valuesContent = yamlencode({
+        kubeProxyReplacement = true
+        k8sServiceHost       = "api.example.invalid"
+        k8sServicePort       = 6443
+        socketLB             = { enabled = true, hostNamespaceOnly = true }
+        routingMode          = "tunnel"
+        tunnelProtocol       = "vxlan"
+        ipam                 = { mode = "kubernetes" }
+        operator             = { replicas = 1 }
+      }) }
+    })
+    error_message = "Runtime L2 inputs must not alter the immutable first-boot snippet or trigger control-plane replacement."
+  }
+  expect_failures = [technitium_record.api]
+}
+
 run "select_each_pool_and_its_exact_worker_interface" {
   command = plan
   variables {
@@ -124,7 +158,7 @@ run "reject_pool_outside_its_subnet" {
       }
     }
   }
-  expect_failures = [var.service_exposure]
+  expect_failures = [technitium_record.api, var.service_exposure]
 }
 
 run "reject_interface_regex_or_missing_device" {
@@ -137,7 +171,7 @@ run "reject_interface_regex_or_missing_device" {
       }
     }
   }
-  expect_failures = [var.service_exposure]
+  expect_failures = [technitium_record.api, var.service_exposure]
 }
 
 run "reject_internal_network_overlap" {
@@ -163,5 +197,5 @@ run "reject_network_and_broadcast_addresses" {
       }
     }
   }
-  expect_failures = [var.service_exposure]
+  expect_failures = [technitium_record.api, var.service_exposure]
 }
