@@ -21,10 +21,24 @@ matches `name`, without a trailing dot. Cloud-init receives both `hostname` and
 than an inherited name. RKE2 keeps `name` as its explicit short Kubernetes node
 name. Do not use the stable API alias as a worker's identity.
 
-Choose FQDNs privately and align upstream forward/reverse DNS with the observed
-primary DHCP leases and reservations. `manage_etc_hosts` updates the guest hosts
-file, not upstream DNS. This root creates only the API DNS record, not worker
-records. Service-VLAN leases do not replace primary node identities.
+Choose FQDNs privately within `api_dns.zone`. The root manages an A record for
+each worker using its observed primary DHCP lease and the shared `api_dns.ttl`.
+Guest-agent interfaces are matched to the first Proxmox NIC by MAC, not interface
+array order. Missing or ambiguous primary leases and internal pod/Service
+addresses prevent publication. Service-VLAN leases never supply worker DNS.
+
+Set `worker_reverse_dns_zone` privately only after confirming this root may own
+worker PTR records in that existing octet-aligned IPv4 reverse zone. Otherwise
+leave it `null`; A records are still managed. The root never creates DNS zones.
+PTR names reverse the observed primary addresses and point to the managed worker
+FQDNs. An address change replaces the old owned PTR; disabling PTR management
+plans deletion of this root's PTRs, not the zone or unrelated records.
+
+Before applying, check existing A/CNAME/PTR records and DHCP DNS ownership. Import
+records deliberately assigned to this root instead of managing the same record
+from two states or competing with DHCP updates. `overwrite = false` preserves
+other records in the RRset; it is not proof of exclusive ownership or absence of
+conflicting addresses. `manage_etc_hosts` changes only the guest hosts file.
 
 Before an authorized plan, reconfirm IDs, template provenance, cross-node full
 clone support, bridge tags, nested KVM, datastore content/capacity and DHCP/DNS.
@@ -35,6 +49,14 @@ separate authorization. Infrastructure apply neither enrolls workers nor deploys
 platform manifests. Inspect sensitive `worker_dhcp_leases` privately: addresses
 are matched to Proxmox-owned NIC MACs. Reserve both leases upstream before
 enrollment, normal workloads or maintenance. Neither MACs nor addresses are inputs.
+
+For existing workers, adding DNS ownership needs a reviewed DNS-only plan, not a
+VM replacement. It must leave all VM/snippet resources and the API record
+unchanged. After an approved apply, query the upstream DHCP DNS servers directly
+for worker A records and any managed PTRs before enrollment. Do not use the DNS
+administration HTTPS endpoint as a DNS listener or the guest hosts file as proof.
+Changing a reservation or replacing a worker requires rechecking the observed
+primary lease and the DNS plan; reservations remain upstream/operator-owned.
 
 ## Native Network And First Boot
 

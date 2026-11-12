@@ -5,6 +5,11 @@ mock_provider "proxmox" {
 }
 mock_provider "technitium" {}
 
+override_module {
+  target  = module.worker_dns
+  outputs = {}
+}
+
 variables {
   proxmox_endpoint     = "https://proxmox.example.invalid"
   proxmox_ssh_username = "testadmin"
@@ -126,4 +131,27 @@ run "reject_fqdn_with_different_short_name" {
     }
   }
   expect_failures = [var.workers, technitium_record.api]
+}
+
+run "reject_a_worker_fqdn_reusing_the_api_record" {
+  command = plan
+  variables { api_dns = { zone = "example.invalid", name = "test-worker-a.nodes.example.invalid" } }
+  expect_failures = [var.workers, technitium_record.api]
+}
+
+run "reject_worker_fqdns_outside_the_managed_zone" {
+  command = plan
+  variables {
+    workers = {
+      compute = { vm_id = 102, name = "test-worker-a", fqdn = "test-worker-a.other.invalid", service_bridge = "br-service" }
+      store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
+    }
+  }
+  expect_failures = [var.workers, technitium_record.api]
+}
+
+run "reject_invalid_reverse_zone_octets" {
+  command = plan
+  variables { worker_reverse_dns_zone = "999.0.192.in-addr.arpa" }
+  expect_failures = [var.worker_reverse_dns_zone, technitium_record.api]
 }

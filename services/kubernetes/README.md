@@ -20,8 +20,9 @@ acceptance is recorded separately in ALE-28.
 - DHCP on the primary VLAN. A reservation is not needed before initial deployment;
   reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
 - DHCP-provided DNS must resolve the private API name without cluster DNS.
-- Existing Technitium zone and a service-owned API A record that is not already
-  owned elsewhere. The API name must remain stable through future HA expansion.
+- Existing Technitium zone and service-owned API/worker A records that are not
+  already owned elsewhere. Optional worker PTR ownership needs an approved
+  existing reverse zone. The API name stays stable through future HA expansion.
 - OpenTofu 1.9+, Python 3 and yamllint. Providers are pinned by the lock file.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
@@ -57,8 +58,10 @@ exercise RPM installation, kernel boot or SELinux policy. No infrastructure is
 created or contacted. Init downloads providers but does not plan or deploy it.
 
 OpenTofu's VM mock does not populate the computed MAC inside the configured NIC.
-The plan checks therefore expect DNS publication to reject unavailable primary
-identity; they do not simulate successful lease discovery or DNS creation.
+The VM-focused worker checks override the DNS module; separate module checks feed
+synthetic guest-agent observations through real MAC/address selection and mocked
+DNS resources. They verify both A/PTR plans and rejection paths, not actual lease
+discovery or authenticated DNS publication.
 
 ## Reviewed plan and deployment
 
@@ -198,11 +201,14 @@ on local tests or this checker.
 
 ## Ownership and network boundary
 
-This root owns only its API A record, not the DNS zone. It points to the observed
-primary DHCP address, to be reserved after deployment, never a workload service
-IP. `overwrite = false` avoids silently replacing unrelated records. The private
-API FQDN appears in RKE2's initial TLS SAN list. Neither discovery nor server
-startup creates or proves uniqueness of a DHCP reservation.
+This root owns its API A record, worker A records and explicitly enabled worker
+PTR records, not DNS zones. Each A record points to the node's observed primary
+DHCP address, never a workload service IP. Worker records use `api_dns.zone` and
+`api_dns.ttl`; see the [worker runbook][workers] for optional reverse-zone ownership
+and existing-record imports. `overwrite = false` preserves other RRset members;
+it does not detect conflicting records or competing state/DHCP owners. The
+private API FQDN remains in RKE2's initial TLS SAN list. DHCP reservations stay
+upstream; discovery and DNS publication do not create or prove their uniqueness.
 
 RKE2 alone owns the managed Cilium chart. Its pre-bootstrap `HelmChartConfig`
 selects kube-proxy replacement, VXLAN, Kubernetes IPAM and host-namespace-only

@@ -86,6 +86,9 @@
 #   }
 # }
 # Also add store to proxmox_nodes using the same fields as compute.
+# Worker A records use api_dns.zone and api_dns.ttl.
+# Set an approved existing reverse zone only when this root may own worker PTRs.
+# worker_reverse_dns_zone = null
 # service_vlan_id = null
 # worker_resources = {
 #   cpu_cores    = 4
