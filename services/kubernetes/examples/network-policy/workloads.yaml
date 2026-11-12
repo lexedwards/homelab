@@ -1,0 +1,330 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: policy-check
+  labels:
+    homelab.io/policy-check: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: policy-outside
+  labels:
+    homelab.io/policy-check: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-ordinary
+  namespace: policy-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: client-ordinary
+  template:
+    metadata:
+      labels:
+        app: client-ordinary
+        homelab.io/policy-check: "true"
+        policy-check-access: approved
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: client-ordinary
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sleep, "86400"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-isolated
+  namespace: policy-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: client-isolated
+  template:
+    metadata:
+      labels:
+        app: client-isolated
+        homelab.io/policy-check: "true"
+        policy-check-access: approved
+    spec:
+      runtimeClassName: kata-clh-runtime-rs
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: client-isolated
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sleep, "86400"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-ordinary
+  namespace: policy-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: server-ordinary
+  template:
+    metadata:
+      labels:
+        app: server-ordinary
+        homelab.io/policy-check: "true"
+        policy-check-role: server
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: server-ordinary
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -ec, "mkdir -p /tmp/www; echo policy-check > /tmp/www/index.html; httpd -p 9090 -h /tmp/www; exec httpd -f -p 8080 -h /tmp/www"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-isolated
+  namespace: policy-check
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: server-isolated
+  template:
+    metadata:
+      labels:
+        app: server-isolated
+        homelab.io/policy-check: "true"
+        policy-check-role: server
+    spec:
+      runtimeClassName: kata-clh-runtime-rs
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: server-isolated
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -ec, "mkdir -p /tmp/www; echo policy-check > /tmp/www/index.html; httpd -p 9090 -h /tmp/www; exec httpd -f -p 8080 -h /tmp/www"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unapproved-client
+  namespace: policy-check
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unapproved-client
+  template:
+    metadata:
+      labels:
+        app: unapproved-client
+        homelab.io/policy-check: "true"
+        policy-check-access: unapproved
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sleep, "86400"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: outside-witness
+  namespace: policy-outside
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: outside-witness
+  template:
+    metadata:
+      labels:
+        app: outside-witness
+        homelab.io/policy-check: "true"
+        policy-check-access: approved
+        policy-check-role: server
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        homelab.io/role: worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: docker.io/library/busybox:1.37.0
+          command: [sh, -ec, "mkdir -p /tmp/www; echo policy-outside > /tmp/www/index.html; httpd -p 9090 -h /tmp/www; exec httpd -f -p 8080 -h /tmp/www"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}

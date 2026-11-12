@@ -41,6 +41,8 @@ yaml-validate:
 	$(YAMLLINT) cloud-init/worker-network-data.yaml
 	$(YAMLLINT) platform/kata.yaml
 	$(YAMLLINT) examples/workloads.yaml
+	$(YAMLLINT) platform/network-policy/
+	$(YAMLLINT) examples/network-policy/
 
 shell-validate:
 	bash -n cloud-init/install-server.sh

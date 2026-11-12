@@ -8,6 +8,10 @@ NFS storage and OpenBao workload-secret delivery are not deployed by this root.
 Implementation context and qualification gates
 remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 
+[Workload network policy](NETWORK-POLICY.md) provides an explicitly scoped
+namespace baseline, synthetic examples and bounded direct-peer checks. It is not
+automatically applied by infrastructure provisioning.
+
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
 
