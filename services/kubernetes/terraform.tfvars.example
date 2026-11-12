@@ -95,3 +95,28 @@
 #   memory_mb    = 8192
 #   disk_size_gb = 64
 # }
+
+# -----------------------------------------------------------------------------
+# Optional workload service exposure
+# -----------------------------------------------------------------------------
+
+# Null preserves current Cilium bootstrap settings; this is not a live rollout.
+# Use reviewed pool and exact Linux device inputs, not node DHCP addresses.
+# One pool can be added first; adding another later need not replace the first.
+# service_exposure = {
+#   devices = []
+#   pools = {
+#     primary = {
+#       subnet    =
+#       start     =
+#       stop      =
+#       interface =
+#     }
+#     secondary = {
+#       subnet    =
+#       start     =
+#       stop      =
+#       interface =
+#     }
+#   }
+# }

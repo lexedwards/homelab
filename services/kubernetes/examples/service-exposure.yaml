@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: primary-ordinary
+  namespace: policy-check
+  labels:
+    homelab.io/service-pool: primary
+spec:
+  type: LoadBalancer
+  loadBalancerClass: io.cilium/l2-announcer
+  externalTrafficPolicy: Cluster
+  allocateLoadBalancerNodePorts: false
+  selector:
+    app: server-ordinary
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: primary-isolated
+  namespace: policy-check
+  labels:
+    homelab.io/service-pool: primary
+spec:
+  type: LoadBalancer
+  loadBalancerClass: io.cilium/l2-announcer
+  externalTrafficPolicy: Cluster
+  allocateLoadBalancerNodePorts: false
+  selector:
+    app: server-isolated
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: secondary-ordinary
+  namespace: policy-check
+  labels:
+    homelab.io/service-pool: secondary
+spec:
+  type: LoadBalancer
+  loadBalancerClass: io.cilium/l2-announcer
+  externalTrafficPolicy: Cluster
+  allocateLoadBalancerNodePorts: false
+  selector:
+    app: server-ordinary
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: secondary-isolated
+  namespace: policy-check
+  labels:
+    homelab.io/service-pool: secondary
+spec:
+  type: LoadBalancer
+  loadBalancerClass: io.cilium/l2-announcer
+  externalTrafficPolicy: Cluster
+  allocateLoadBalancerNodePorts: false
+  selector:
+    app: server-isolated
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

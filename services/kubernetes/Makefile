@@ -43,6 +43,7 @@ yaml-validate:
 	$(YAMLLINT) examples/workloads.yaml
 	$(YAMLLINT) platform/network-policy/
 	$(YAMLLINT) examples/network-policy/
+	$(YAMLLINT) examples/service-exposure.yaml
 
 shell-validate:
 	bash -n cloud-init/install-server.sh

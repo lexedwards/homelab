@@ -12,6 +12,10 @@ remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 namespace baseline, synthetic examples and bounded direct-peer checks. It is not
 automatically applied by infrastructure provisioning.
 
+[Service exposure](SERVICE-EXPOSURE.md) describes opt-in private Cilium IPAM/L2
+outputs, the native RKE2 chart lifecycle and client-side qualification. Rendering
+the outputs does not deploy them or authorize a shared-datapath rollout.
+
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
 
