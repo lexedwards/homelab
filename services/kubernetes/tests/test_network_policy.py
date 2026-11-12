@@ -65,7 +65,8 @@ elif 'monitor' in args:
     while not pathlib.Path(__file__).with_name('request-fired').exists():
         if time.monotonic()>deadline:raise SystemExit(1)
         time.sleep(0.01)
-    if mode not in ['missing-flow','stale-flow']:print(json.dumps(event),flush=True)
+    if mode in ['cache-log','cache-log-only']:print('time=2026-11-12T18:05:13Z level=info msg="Initializing dissection cache..."',flush=True)
+    if mode not in ['missing-flow','stale-flow','cache-log-only']:print(json.dumps(event),flush=True)
     raise SystemExit(124)
 else:raise SystemExit(2)
 ''')
@@ -85,12 +86,14 @@ else:raise SystemExit(2)
         self.assertIn('"cross_worker": true', evidence)
 
     def test_denial_requires_a_fresh_matching_policy_drop(self):
-        result, evidence = self.probe('denied')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Policy denied', evidence)
+        for mode in ['denied', 'cache-log']:
+            with self.subTest(mode=mode):
+                result, evidence = self.probe(mode)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('Policy denied', evidence)
 
     def test_rejects_missing_stale_or_unrelated_drop_evidence(self):
-        for mode in ['missing-flow', 'stale-flow', 'wrong-port', 'wrong-source', 'wrong-reason', 'allowed']:
+        for mode in ['missing-flow', 'cache-log-only', 'stale-flow', 'wrong-port', 'wrong-source', 'wrong-reason', 'allowed']:
             with self.subTest(mode=mode):
                 result, _ = self.probe(mode)
                 self.assertNotEqual(result.returncode, 0)

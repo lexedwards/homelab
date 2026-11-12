@@ -124,7 +124,7 @@ def main(argv=None):
                     if remaining <= 0 or monitor['process'].wait(timeout=remaining) != 124:
                         raise RuntimeError('Native monitor failed instead of completing its bounded capture')
                     raw = monitor['paths'][0].read_bytes()[monitor['offset']:].decode()
-                    events = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                    events = [json.loads(line) for line in raw.splitlines() if line.lstrip().startswith('{')]
                     matching = [v for v in events if policy_drop(v, source['ip'], destination['ip'], args.port)]
                     evidence['observations'].append({'node': monitor['node'], 'matching_policy_drops': matching})
                     matched = matched or bool(matching)
