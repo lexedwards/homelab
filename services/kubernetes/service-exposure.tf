@@ -8,6 +8,7 @@ locals {
     var.service_exposure == null ? {} : { l2announcements = { enabled = true } },
     var.service_exposure == null ? {} : { devices = sort(tolist(var.service_exposure.devices)) },
     var.service_exposure == null ? {} : { k8sClientRateLimit = { qps = 50, burst = 100 } },
+    var.service_exposure == null ? {} : { operator = merge(local.cilium_bootstrap_values.operator, { rollOutPods = true }) },
   )
   service_pool_files = { for name, pool in local.service_pools : "pool-${name}.yaml" => yamlencode({
     apiVersion = "cilium.io/v2"
