@@ -15,6 +15,8 @@ spec:
   targetNamespace: kata-system
   createNamespace: false
   timeout: 15m
+  failurePolicy: abort
+  backOffLimit: 0
   valuesContent: |
     k8sDistribution: rke2
     deploymentMode: job

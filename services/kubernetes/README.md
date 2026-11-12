@@ -23,7 +23,8 @@ acceptance is recorded separately in ALE-28.
 - Existing Technitium zone and service-owned API/worker A records that are not
   already owned elsewhere. Optional worker PTR ownership needs an approved
   existing reverse zone. The API name stays stable through future HA expansion.
-- OpenTofu 1.9+, Python 3 and yamllint. Providers are pinned by the lock file.
+- OpenTofu 1.9+, Python 3 with PyYAML, and yamllint. Providers are pinned by the
+  lock file. The Python checks parse authored Kubernetes manifests with PyYAML.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
 
