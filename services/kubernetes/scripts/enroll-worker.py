@@ -120,7 +120,7 @@ if p['action'] == 'install':
         f.flush()
         os.fsync(f.fileno())
     command(['restorecon', str(token)])
-    command(['systemctl', 'start', 'rke2-agent'])
+    command(['systemctl', 'start', '--no-block', 'rke2-agent'])
 print(json.dumps({'primary_ip': addresses['ens18'][0]}))
 '''
 
