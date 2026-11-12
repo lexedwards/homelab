@@ -83,8 +83,10 @@ for name, text in json.loads((directory / 'files.json').read_text()).items():
 PY
 ```
 
-The output map is empty without opt-in. Applying OpenTofu updates the first-boot
-snippet, not the already initialized server's on-disk manifest. Do not rerun
+The output map is empty without opt-in. Exposure inputs change only the sensitive
+runtime outputs: the first-boot snippet always uses the unchanged bootstrap
+configuration. Enabling exposure must not replace a snippet or VM. Applying
+OpenTofu does not update the initialized server's on-disk manifest. Do not rerun
 cloud-init, recreate the server or restart RKE2 to deliver this configuration.
 Under separate live rollout approval, atomically replace only
 `/var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml` with the reviewed

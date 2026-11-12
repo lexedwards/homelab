@@ -35,23 +35,28 @@ locals {
     "service-cidr"          = var.cluster_networks.services
     "disable"               = ["rke2-ingress-nginx", "rke2-traefik"]
   })
-  cilium_config = yamlencode({
+  cilium_bootstrap_values = {
+    kubeProxyReplacement = true
+    k8sServiceHost       = var.api_dns.name
+    k8sServicePort       = 6443
+    socketLB             = { enabled = true, hostNamespaceOnly = true }
+    routingMode          = "tunnel"
+    tunnelProtocol       = "vxlan"
+    ipam                 = { mode = "kubernetes" }
+    operator             = { replicas = 1 }
+  }
+  cilium_chart_config = {
     apiVersion = "helm.cattle.io/v1"
     kind       = "HelmChartConfig"
     metadata   = { name = "rke2-cilium", namespace = "kube-system" }
     spec = {
-      valuesContent = yamlencode(merge({
-        kubeProxyReplacement = true
-        k8sServiceHost       = var.api_dns.name
-        k8sServicePort       = 6443
-        socketLB             = { enabled = true, hostNamespaceOnly = true }
-        routingMode          = "tunnel"
-        tunnelProtocol       = "vxlan"
-        ipam                 = { mode = "kubernetes" }
-        operator             = { replicas = 1 }
-      }, local.service_exposure_values))
+      valuesContent = yamlencode(local.cilium_bootstrap_values)
     }
-  })
+  }
+  cilium_bootstrap_config = yamlencode(local.cilium_chart_config)
+  cilium_config = yamlencode(merge(local.cilium_chart_config, {
+    spec = { valuesContent = yamlencode(merge(local.cilium_bootstrap_values, local.service_exposure_values)) }
+  }))
   cloud_init = templatefile("${path.module}/cloud-init/user-data.tftpl", {
     hostname             = var.control_plane.name
     cloud_user           = var.cloud_user
@@ -59,7 +64,7 @@ locals {
     rke2_version         = var.rke2_version
     selinux_version      = var.rke2_selinux_version
     rke2_config_base64   = base64encode(local.rke2_config)
-    cilium_config_base64 = base64encode(local.cilium_config)
+    cilium_config_base64 = base64encode(local.cilium_bootstrap_config)
     installer_base64     = base64encode(file("${path.module}/cloud-init/install-server.sh"))
     preflight_base64     = base64encode(file("${path.module}/config/node-preflight.sh"))
   })
