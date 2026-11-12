@@ -108,7 +108,8 @@ through the same native owner and wait for health; do not delete release Secrets
 ## Authorized Runtime Checks
 
 Prepare approved **non-cluster clients on each tested Layer-2 segment**, with
-`ip`, `arping` and `curl`. A worker-local or routed-only HTTP request does not
+`ip`, `curl` and either usable `arping` or dynamic neighbor observation. A
+worker-local or routed-only HTTP request does not
 prove that an L2 announcement works. Confirm each client route is directly
 connected through the selected NIC, not a gateway or another VLAN interface.
 Keep addresses, MACs, client inventory and raw command output private.
@@ -134,6 +135,11 @@ The expected synthetic body is `policy-check`. Record the ARP responder MAC and
 correlate it to the active worker/interface and the Service's `cilium-l2announce-*`
 Lease in `kube-system`. An IP in Service status alone proves allocation, not
 advertisement. Check both runtimes and both pools from their intended L2 clients.
+`arping` needs approved raw-socket privileges. Without them, start
+`ip -ts monitor neigh dev "$interface"` before the HTTP requests and retain the
+dynamic neighbor transitions, route and resulting worker-interface MAC. Reject a
+gateway route or static neighbor entry. Distinguish kernel neighbor evidence from
+a direct `arping` capture; an installed binary alone does not prove usable tooling.
 Cross-VLAN access follows upstream routing/firewall policy; the pool selector is
 not a firewall and does not guarantee client-VLAN isolation.
 
@@ -164,6 +170,22 @@ VLAN-facing Service backends; Service exposure must not bypass pod policy. Keep
 fresh tuple-matched native policy-drop evidence, DNS restoration and the expected
 external client rule separate. Do not use unrestricted ingress or delete
 default-deny just to make the external HTTP test pass.
+
+`externalTrafficPolicy: Cluster` can SNAT a remote-backend request to the ingress
+worker's `cilium_host` address while retaining the external/world identity.
+Consequently, a client `/32` IP-block allowance alone is not reliable on every
+backend path. For the owned synthetic routing checks, use an explicit Cilium
+ingress rule from `world`, limited to TCP 8080 and the synthetic server selector;
+retain default-deny and repeat the internal positive/negative matrix afterwards.
+This is an external service-port allowance, **not** a source-IP client ACL or a
+production policy template. Application-specific client restrictions need a
+reviewed enforcement point that sees the original source identity.
+
+Service pool selection also does not select internet egress. VLAN-specific pod
+internet routing needs a separately reviewed egress-gateway/routing design. Keep
+the primary node/API default route intact, handle DHCP-learned gateway changes,
+DNS and IPv6 explicitly, and verify fail-closed behavior during startup,
+reconciliation and gateway failure before claiming a pod cannot use another VLAN.
 
 ## Failures, Cleanup And Recovery
 
