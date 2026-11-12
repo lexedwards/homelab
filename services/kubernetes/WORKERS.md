@@ -173,6 +173,23 @@ install before accepting applications. Do not cordon all workers before the Helm
 install job has somewhere to run. Later upgrades require a reviewed per-worker
 drain and installer-target procedure, not unattended runtime upgrades.
 
+### Preserve The Full Desired Worker Set
+
+The install selector is the complete desired installation set, not an incremental
+target list. On upgrade, the stock dispatcher cleans up previously installed nodes
+that no longer match it **before** installing the desired nodes. Narrowing
+`job.nodes`, `nodeSelector` or affinity to a replacement can therefore uninstall
+Kata from its healthy peer and restart that peer's agent.
+
+For a replacement, retain the full worker selection in `platform/kata.yaml` and
+review the installed-node markers against that desired set before upgrading.
+Keep `job.parallelism: 1`; authorization and workload/drain checks must cover every
+selected worker that the installer may restart. Never remove node markers to hide
+a peer from reconciliation. A genuinely single-worker installer procedure needs
+separate review; changing the release's desired set is not that procedure.
+
+### Apply The Reviewed Rollout
+
 After authorization with the verified administrative kubeconfig:
 
 ```bash
@@ -181,6 +198,43 @@ kubectl -n kube-system wait job/helm-install-kata --for=condition=complete --tim
 kubectl -n kata-system get jobs,pods
 kubectl get runtimeclass kata-clh-runtime-rs -o yaml
 ```
+
+On upgrade, record the previous Helm install Job UID and observe the new Job
+before accepting completion; an earlier completed Job is not upgrade evidence.
+Inspect dispatcher and per-node Jobs as well as Helm status. Unexpected cleanup
+or a node outside the reviewed set is a stop condition.
+
+### Stop And Recover A Failed Rollout
+
+The HelmChart uses `failurePolicy: abort` and `backOffLimit: 0` so a failed Helm
+Job does not automatically retry or uninstall/reinstall the release. These fields
+do not disable the stock dispatcher's per-node retry policy or undo completed
+host actions. Inspect the actual Jobs and host state before any further attempt.
+
+If an unexpected rollout is active, pause native Helm reconciliation with the
+`helmcharts.helm.cattle.io/unmanaged: "true"` annotation on the existing HelmChart.
+Then cancel the owned Helm/dispatcher/per-node Jobs using normal foreground
+deletion, not force deletion. Pausing the controller alone does not stop active
+Jobs. Verify their pods have exited. Do not delete the HelmChart: deletion can
+invoke uninstall hooks. Remove verified eligibility from any affected worker and
+leave failed workers cordoned; preserve API/recovery access and the peer.
+
+Review Helm history and actual host runtime configuration separately. If a
+cancelled upgrade left the latest release pending, an explicitly approved native
+`helm rollback` to a reviewed revision with `--no-hooks` can recover the release
+without rerunning host hooks. It still reconciles that revision's non-hook chart
+resources and does not restore binaries or handlers already removed from a host.
+Do not delete release Secrets or use an uninstall/reinstall as a generic repair.
+
+Restore the reviewed full-worker values while reconciliation is paused. Confirm
+the abort/no-retry settings, retained node identities, workload/data ownership and
+the complete intended node set before removing the unmanaged annotation. Treat
+the resulting reconciliation as a new authorized rollout, then reverify actual
+VMM/KVM execution, networking, volumes and lifecycle behavior before restoring
+protected eligibility. Confirm the latest Helm revision is deployed, native
+reconciliation is enabled and all owned recovery/test resources are removed.
+
+### Verify Runtime Capability
 
 The stock installer owns persistent RKE2 containerd integration; never edit
 generated `config.toml`. Inspect persistent template/drop-ins and effective CRI:
@@ -224,7 +278,9 @@ or introduce a custom Kata build to hide failure.
    deleted; they are not PV storage.
 5. Review the replacement's SSH key/new Proxmox MACs, reserve observed leases and
    enroll with a fresh credential. Re-run job-mode Kata installation through a
-   reviewed Helm update; a completed one-shot dispatcher does not cover new nodes.
+   reviewed Helm update retaining the full desired worker set; a completed
+   one-shot dispatcher does not cover new nodes. Do not narrow selection to the
+   replacement: that can uninstall Kata from its peer.
 6. Requalify runtime/volumes before restoring verified eligibility. Check original
    control-plane UID and sole etcd member/cluster IDs, ordinary scheduling, both
    VLAN gateways, API TLS and Cilium. Inspect remaining platform Helm convergence.
