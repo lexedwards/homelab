@@ -17,7 +17,7 @@ SPEC.loader.exec_module(enrollment)
 
 
 class EnrollmentBoundaryTests(unittest.TestCase):
-    def test_worker_preflight_accepts_its_short_or_fully_qualified_hostname_only(self):
+    def test_worker_accepts_its_hostname_and_starts_without_waiting_for_activation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             files = {
@@ -51,22 +51,39 @@ class EnrollmentBoundaryTests(unittest.TestCase):
                 commands[('nmcli', '-g', 'ipv4.method', 'connection', 'show', 'uuid', interface)] = 'auto'
             commands[('nmcli', '-g', 'ipv4.never-default,ipv4.ignore-auto-dns,ipv4.ignore-auto-routes,ipv6.method',
                       'connection', 'show', 'uuid', 'ens19')] = 'yes\nyes\nyes\ndisabled'
+            token_file = root / 'etc/rancher/rke2/join-token'
+            commands[('restorecon', str(token_file))] = ''
+            commands[('systemctl', 'start', '--no-block', 'rke2-agent')] = ''
+
+            def command(argv, **kwargs):
+                if argv[:2] == ['systemctl', 'start'] and '--no-block' not in argv:
+                    raise enrollment.subprocess.TimeoutExpired(argv, kwargs['timeout'])
+                return commands[tuple(argv)]
+
+            def run_worker(payload, hostname):
+                output = io.StringIO()
+                with patch('socket.gethostname', return_value=hostname), patch('os.geteuid', return_value=0), \
+                        patch('pathlib.Path', side_effect=lambda name: root / str(name).lstrip('/')), \
+                        patch('subprocess.check_output', side_effect=command), \
+                        patch('sys.stdin', io.StringIO(json.dumps(payload))), contextlib.redirect_stdout(output):
+                    exec(enrollment.WORKER, {})
+                return json.loads(output.getvalue())
+
             payload = {'name': 'test-worker', 'host': 'compute', 'version': 'v1.36.6+rke2r1',
                        'supervisor': 'https://api.example.invalid:9345', 'action': 'check'}
             for hostname in ['test-worker', 'test-worker.nodes.example.invalid', 'other-worker.nodes.example.invalid']:
-                output = io.StringIO()
-                with self.subTest(hostname=hostname), patch('socket.gethostname', return_value=hostname), \
-                        patch('os.geteuid', return_value=0), \
-                        patch('pathlib.Path', side_effect=lambda name: root / str(name).lstrip('/')), \
-                        patch('subprocess.check_output', side_effect=lambda argv, **kwargs: commands[tuple(argv)]), \
-                        patch('sys.stdin', io.StringIO(json.dumps(payload))), contextlib.redirect_stdout(output):
+                with self.subTest(hostname=hostname):
                     if hostname.startswith('other-worker'):
                         with self.assertRaisesRegex(RuntimeError, 'Unexpected worker identity'):
-                            exec(enrollment.WORKER, {})
+                            run_worker(payload, hostname)
                     else:
-                        exec(enrollment.WORKER, {})
-                        self.assertEqual(json.loads(output.getvalue()), {'primary_ip': '192.0.2.20'})
-            self.assertFalse((root / 'etc/rancher/rke2/join-token').exists())
+                        self.assertEqual(run_worker(payload, hostname), {'primary_ip': '192.0.2.20'})
+            self.assertFalse(token_file.exists())
+            token = 'K10' + 'a' * 64 + '::abcdef.0123456789abcdef'
+            payload.update(action='install', token=token)
+            self.assertEqual(run_worker(payload, 'test-worker.nodes.example.invalid'), {'primary_ip': '192.0.2.20'})
+            self.assertEqual(token_file.read_text(), token + '\n')
+            self.assertEqual(token_file.stat().st_mode & 0o777, 0o600)
 
     def test_accepts_only_secure_bootstrap_tokens_not_server_credentials(self):
         token = 'K10' + 'a' * 64 + '::abcdef.0123456789abcdef'
@@ -99,18 +116,21 @@ class EnrollmentBoundaryTests(unittest.TestCase):
                     if payload['action'] == 'install':
                         self.assertEqual(payload['token'], token)
                         return SimpleNamespace(returncode=int(fail_install), stdout='{}')
-                    output = {'ready': True} if payload['action'] == 'observe' else {'primary_ip': '192.0.2.20'}
+                    output = {'ready': actions.count('observe') >= 2} if payload['action'] == 'observe' else {'primary_ip': '192.0.2.20'}
                     return SimpleNamespace(returncode=0, stdout=json.dumps(output))
 
                 args = ['--server-ssh', 'admin@server.example.invalid', '--worker-ssh', 'admin@worker.example.invalid',
                         '--identity-file', str(key), '--server-known-hosts', str(key), '--worker-known-hosts', str(key),
                         '--node-name', 'test-worker', '--host', 'compute', '--api-server', 'https://api.example.invalid:6443']
                 output = io.StringIO()
-                with patch.object(enrollment.subprocess, 'run', side_effect=run), contextlib.redirect_stdout(output):
+                with patch.object(enrollment.subprocess, 'run', side_effect=run), \
+                        patch.object(enrollment.time, 'sleep'), contextlib.redirect_stdout(output):
                     if fail_install:
                         with self.assertRaises(RuntimeError):
                             enrollment.main(args)
                     else:
                         enrollment.main(args)
                 self.assertEqual(actions[-1], 'delete')
+                self.assertEqual(actions.count('delete'), 1)
+                self.assertEqual(actions.count('observe'), 0 if fail_install else 2)
                 self.assertNotIn(token, output.getvalue())

@@ -133,7 +133,10 @@ this command does not validate its DNS suffix or upstream DNS records.
 The command refuses existing node identities, agent certificates and token files.
 It transfers credentials through subprocess stdin over pinned SSH, exclusively
 creates root-only mode-0600 `/etc/rancher/rke2/join-token`, restores its label and
-starts the agent. Values never enter argv, OpenTofu, cloud-init or normal output.
+queues agent startup with native `systemctl start --no-block`. The command waits
+for Kubernetes/Cilium readiness, not synchronous systemd activation; image pulls
+can exceed the individual remote-command deadline. Values never enter argv,
+OpenTofu, cloud-init or normal output.
 Readiness checks worker role/zone/version, primary address and Cilium while
 preserving existing node UIDs and the control-plane taint. Actual etcd membership
 is a separate acceptance check, not proven by a Ready API.
