@@ -60,10 +60,11 @@ Set optional `nfs_storage` in ignored tfvars using `terraform.tfvars.example`:
 `null` renders nothing. Enabled inputs produce sensitive `nfs_manifests` outputs
 for the StorageClass and synthetic qualification resources, without changing
 first-boot snippets, VMs, networking or existing useful storage. The native CSI
-chart is maintained separately in `platform/nfs.yaml`.
+chart blueprint is maintained separately in `platform/nfs.yaml.tftpl`.
 
 Run `make validate` offline. For the real upstream Helm rendering, download the
-archive URL from `platform/nfs.yaml` into a protected working directory, then run:
+archive URL from the blueprint's `homelab.io/chart-source` annotation into a
+protected working directory, then run:
 
 ```bash
 make nfs-chart-validate NFS_CHART='<downloaded-chart.tgz>' HELM='<helm-executable>'
@@ -77,6 +78,19 @@ of implicit storage/snapshot resources. It contacts neither a cluster nor a
 network service. Exit 0 means the chart contract passed; nonzero means failure,
 not runtime compatibility. Version changes require a newly reviewed checksum,
 images and render contract.
+
+Prepare the actual native installer from those same verified bytes:
+
+```bash
+make nfs-prepare NFS_CHART='<downloaded-chart.tgz>' HELM='<helm-executable>' \
+  NFS_MANIFEST='<new-protected-native-manifest.yaml>'
+```
+
+`NFS_MANIFEST` is required and must not already exist. The preparer uses the cached
+checksum-verified archive for both Helm rendering and native `chartContent`, then
+creates a mode-0600 manifest. The Helm controller installs those embedded bytes;
+it does not fetch a potentially changed release URL. Never apply the unexpanded
+blueprint or replace the embedded content with a chart URL.
 
 ## Review And Deploy Under Separate Approval
 
@@ -94,8 +108,8 @@ under a protected directory and split its map into new files as described in
 the [service-exposure runbook][exposure]. JSON output is unredacted.
 
 Under explicit driver-rollout approval, verify no conflicting driver/chart,
-StorageClass or `nfs-system` resources exist, then install the reviewed native
-`platform/nfs.yaml` through the existing RKE2 Helm controller. Persist the reviewed
+StorageClass or `nfs-system` resources exist, then install the prepared native
+`NFS_MANIFEST` through the existing RKE2 Helm controller. Persist the reviewed
 platform file and private StorageClass in separately owned runtime manifest files
 on the server, not in cloud-init. Never place the synthetic qualification manifest
 in the server's auto-reconciliation directory. Retain operator copies for recovery

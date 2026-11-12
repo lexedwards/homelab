@@ -10,8 +10,11 @@ kind: HelmChart
 metadata:
   name: nfs-csi
   namespace: kube-system
+  annotations:
+    homelab.io/chart-source: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.13.6/charts/v4.13.6/csi-driver-nfs-4.13.6.tgz
+    homelab.io/chart-sha256: 4b471fb134bfea4fcaa3dc3342a67acd646431b746c673c978327353db5d22da
 spec:
-  chart: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.13.6/charts/v4.13.6/csi-driver-nfs-4.13.6.tgz
+  chartContent: ${chart_content}
   targetNamespace: nfs-system
   createNamespace: false
   timeout: 10m
