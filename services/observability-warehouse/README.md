@@ -33,8 +33,8 @@ data.
 - Proxmox must be able to full-clone the source template to each target
   datastore. Cluster membership does not make node-local storage shared.
 - DHCP, routing, and any configured VLANs must cover all three VMs.
-- A RustFS HTTPS S3 endpoint with a self-signed certificate and three existing
-  buckets for Mimir, Loki, and Tempo.
+- A RustFS HTTPS S3 endpoint with a trusted certificate matching its configured
+  hostname, and three existing buckets for Mimir, Loki, and Tempo.
 - An NFS export reachable from the warehouse VM.
 - OpenTofu 1.9 or newer, `make`, `yamllint`, and an Alloy binary matching the
   configured package version.
@@ -61,6 +61,37 @@ warehouse data sources, and generates an initial administrator password inside
 the guest. The password does not enter OpenTofu state.
 
 ## Quick Start
+
+### RustFS certificate trust
+
+HTTPS and certificate verification are enabled by default for Mimir, Loki and
+Tempo. Supply the producer's certificate hostname and port as `s3_endpoint`;
+an IP address works only when the certificate covers that IP. Keep both
+`s3_insecure` and `s3_insecure_skip_verify` false. The container images' system
+trust stores must validate the certificate chain. Private-CA distribution needs
+its own reviewed configuration; do not compensate with a verification bypass.
+
+The RustFS/TrueNAS operator owns certificate issuance, renewal, reload and
+private-key protection. This consumer root neither administers that app nor
+copies its private key. Recheck TLS identity and trust from the actual consumer
+images after renewal or an endpoint/image change. If the trust root changes,
+review and distribute the public trust material before removing the old root.
+
+Existing VMs do not rerun first boot when this default changes. Inspect an
+authorized saved plan and the existing runtime configuration before rollout;
+do not replace a VM or rerun cloud-init to change TLS flags. An in-place change
+must preserve credential files, buckets, NFS data and local working data, validate
+all three clients, then restart only the reviewed services. Confirm readiness
+and actual telemetry writes/reads before claiming migration complete. If trust
+fails, stop and repair the endpoint/trust configuration rather than silently
+enabling plaintext or skip-verification.
+
+A successful TLS handshake is not S3 authorization or read/write evidence.
+Unauthenticated HTTP status codes alone do not qualify bucket access. Kubernetes
+backups require a separate bucket-scoped identity and their own published
+endpoint/trust input; never reuse this service's credentials or private state.
+
+### Provisioning
 
 1. Create the ignored local configuration.
 

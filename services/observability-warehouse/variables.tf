@@ -283,9 +283,9 @@ variable "s3_insecure" {
 }
 
 variable "s3_insecure_skip_verify" {
-  description = "Skip verification of the RustFS HTTPS certificate."
+  description = "Skip verification of the RustFS HTTPS certificate. Keep false for verified RustFS access."
   type        = bool
-  default     = true
+  default     = false
   nullable    = false
 }
 
