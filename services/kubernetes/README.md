@@ -23,8 +23,9 @@ real-backend compatibility.
 
 [Mounted-secret authentication](SECRETS.md) prepares private OpenBao Kubernetes-auth
 and exact service enrollment without stored reviewer credentials, secret values
-or network access. It does not install the CSI/provider stack or authorize live
-OpenBao changes.
+or network access. It also documents pinned worker-only CSI/provider preparation,
+the narrow host-labeling boundary and ordinary/Kata reload qualification. These
+offline tools do not deploy the stack or authorize live OpenBao changes.
 
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
