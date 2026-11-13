@@ -15,6 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SecretCSIContractTests(unittest.TestCase):
+    def test_qualification_default_deny_uses_api_canonical_empty_rules(self):
+        policy = next(document for document in yaml.safe_load_all((ROOT / 'examples/secrets-workloads.yaml').read_text())
+                      if document['kind'] == 'NetworkPolicy')
+        self.assertEqual(policy['spec'], {'podSelector': {}, 'policyTypes': ['Ingress', 'Egress']})
+
     def test_native_chart_fields_match_helm_controller_serialization(self):
         charts = [document for document in yaml.safe_load_all((ROOT / 'platform/secrets-csi.yaml.tftpl').read_text())
                   if document['kind'] == 'HelmChart']
