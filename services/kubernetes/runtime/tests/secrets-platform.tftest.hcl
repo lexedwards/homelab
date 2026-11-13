@@ -18,10 +18,6 @@ override_data {
   values = { outputs = { runtime_connection = { api_host = "https://api.example.invalid:6443", ssh_user = "testadmin", workers = ["test-worker-a", "test-worker-b"] } } }
 }
 override_data {
-  target = data.terraform_remote_state.openbao[0]
-  values = { outputs = { api_endpoint = "https://bao.example.invalid:8200" } }
-}
-override_data {
   target = data.kubernetes_resource.secrets_worker["test-worker-a"]
   values = { object = { metadata = { uid = "worker-a-uid" }, status = { addresses = [{ type = "InternalIP", address = "192.0.2.11" }] } } }
 }
@@ -39,7 +35,8 @@ override_data {
 }
 
 variables {
-  openbao_admin_token = "synthetic-ephemeral-administration"
+  openbao_endpoint_file = abspath("tests/fixtures/openbao-endpoint.json")
+  openbao_admin_token   = "synthetic-ephemeral-administration"
   secrets_platform = {
     kubeconfig_path = "/synthetic/kubeconfig"
     auth_mount      = "kubernetes-test"
@@ -124,11 +121,20 @@ run "manage_parked_qualification_as_resources_not_secret_values" {
 
 run "reject_missing_service_owned_endpoint_before_any_apply" {
   command = plan
-  override_data {
-    target = data.terraform_remote_state.openbao[0]
-    values = { outputs = {} }
-  }
-  expect_failures = [vault_auth_backend.kubernetes[0]]
+  variables { openbao_endpoint_file = "/synthetic/missing-published-endpoint" }
+  expect_failures = [var.openbao_endpoint_file]
+}
+
+run "reject_a_credential_bearing_endpoint_export" {
+  command = plan
+  variables { openbao_endpoint_file = abspath("tests/fixtures/invalid-openbao-endpoint.json") }
+  expect_failures = [var.openbao_endpoint_file]
+}
+
+run "reject_a_null_endpoint_export" {
+  command = plan
+  variables { openbao_endpoint_file = abspath("tests/fixtures/null-openbao-endpoint.json") }
+  expect_failures = [var.openbao_endpoint_file]
 }
 
 run "reject_a_worker_cohort_different_from_the_infrastructure_definition" {

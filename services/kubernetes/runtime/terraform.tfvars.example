@@ -6,7 +6,9 @@
 # Inject TF_VAR_openbao_admin_token ephemerally; never put the token in tfvars.
 # Load the approved guest SSH identity into the operator's agent.
 # API/SSH-user/worker-cohort metadata comes from the infrastructure state.
-# OpenBao endpoint comes from its hosting state; do not duplicate either endpoint.
+# OpenBao publishes its api_endpoint JSON output; never read the hosting state.
+# Required when secrets_platform is enabled:
+# openbao_endpoint_file =
 
 # -----------------------------------------------------------------------------
 # Core (optional until the cluster is enrolled)

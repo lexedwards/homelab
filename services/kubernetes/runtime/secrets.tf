@@ -2,7 +2,7 @@ locals {
   secrets_enabled               = nonsensitive(var.secrets_platform != null)
   secrets_qualification_enabled = local.secrets_enabled && nonsensitive(var.secrets_qualification != null)
   secrets_worker_names          = local.secrets_enabled ? nonsensitive(toset(keys(var.secrets_platform.workers))) : toset([])
-  openbao_endpoint              = try(data.terraform_remote_state.openbao[0].outputs.api_endpoint, "https://disabled-openbao.invalid")
+  openbao_endpoint              = local.secrets_enabled ? coalesce(try(tostring(jsondecode(file(var.openbao_endpoint_file))), null), "https://disabled-openbao.invalid") : "https://disabled-openbao.invalid"
   cluster_connection            = try(data.terraform_remote_state.cluster[0].outputs.runtime_connection, { api_host = "https://disabled-cluster.invalid", ssh_user = "unconfigured", workers = [] })
   secrets_chart_template = local.secrets_enabled ? templatefile("${path.module}/../platform/secrets-csi.yaml.tftpl", {
     driver_chart   = "downloaded-at-plan"
@@ -39,10 +39,17 @@ provider "vault" {
   token            = var.openbao_admin_token
 }
 
-data "terraform_remote_state" "openbao" {
-  count   = local.secrets_enabled ? 1 : 0
-  backend = "local"
-  config  = { path = "${path.module}/../../openbao/terraform.tfstate" }
+module "secrets_qualification_delegation" {
+  count        = local.secrets_qualification_enabled ? 1 : 0
+  source       = "../../../modules/openbao-deployment-access"
+  name         = "kubernetes-secrets-qualification"
+  secret_paths = [var.secrets_qualification.secret_path]
+}
+
+output "secrets_qualification_enrollment" {
+  description = "Non-secret role/policy names for protected token issuance; no credential is minted or stored by OpenTofu."
+  sensitive   = true
+  value       = local.secrets_qualification_enabled ? merge(module.secrets_qualification_delegation[0].enrollment, { address = local.openbao_endpoint }) : null
 }
 
 data "terraform_remote_state" "cluster" {
@@ -151,10 +158,6 @@ resource "vault_auth_backend" "kubernetes" {
   description = "Kubernetes workload identity; client JWT TokenReview with exact service-owned roles."
   lifecycle {
     prevent_destroy = true
-    precondition {
-      condition     = can(data.terraform_remote_state.openbao[0].outputs.api_endpoint)
-      error_message = "Apply the reviewed OpenBao service endpoint output in its existing canonical state before enabling the secret platform."
-    }
   }
 }
 
@@ -197,7 +200,7 @@ resource "kubernetes_service_account_v1" "secrets_qualification" {
 
 module "secrets_qualification" {
   count             = local.secrets_qualification_enabled ? 1 : 0
-  source            = "../modules/openbao-access"
+  source            = "../../../modules/kubernetes-openbao-access"
   name              = "kubernetes-secrets-qualification"
   auth_mount        = vault_auth_backend.kubernetes[0].path
   openbao_endpoint  = local.openbao_endpoint

@@ -16,10 +16,23 @@ from this directory.
 Run `make init` then `make validate` locally. These initialize providers and run
 mocked/API-fixture checks, not deployments. Parent `make init`/`make validate`
 include this root. Live plans require the previously applied non-secret metadata
-outputs from the two infrastructure roots, protected Kubernetes credentials,
+output from the parent infrastructure root, a privately published OpenBao endpoint
+export (`openbao_endpoint_file`), protected Kubernetes credentials,
 explicit ephemeral OpenBao administration and reviewed worker trust. Review a
 saved runtime plan before applying it. A native chart object is not Ready proof;
 wait for real CRDs/releases before enabling service definitions.
+
+This is a privileged platform/authorization root, not an ordinary app deployment
+identity. Its qualification definition also enrolls a separate exact-record
+writer token role and bounded issuer policy. `secrets_qualification_enrollment`
+exports only non-secret issuance metadata. Mint tokens and populate values through
+the protected OpenBao helper, never through OpenTofu. That writer cannot manage
+or refresh this root's auth resources; authorization remains administrative.
+
+Reusable implementations live in repository-level `modules/`; this root imports
+no module, script or state from another service. OpenBao publishes its endpoint
+as a JSON output export, not access to its hosting state. Republish after endpoint
+changes. The parent Kubernetes state remains a same-service metadata interface.
 
 Enabled runtime plans fetch pinned charts over HTTPS and fail on checksum or
 network errors. No charts are vendored and there is no offline fallback. Saved

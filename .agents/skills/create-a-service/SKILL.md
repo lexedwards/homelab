@@ -1,6 +1,6 @@
 ---
 name: create-a-service
-description: Creates or changes an OpenTofu-managed homelab service under services/. Use for service placement, a Micro Node Incus instance, or a Proxmox VM, LXC, or appliance on compute or store. For an existing service, inspect its provider and placement before selecting a platform branch; never infer the platform from cloud-init, user-data, a package manager, systemd, Docker, or the services/ path alone.
+description: Creates or changes an OpenTofu-managed homelab service under services/. Enforces service-local deployment ownership and repository-level shared modules. Use for service placement, a Micro Node Incus instance, or a Proxmox VM, LXC, or appliance on compute or store. For an existing service, inspect its provider and placement before selecting a platform branch; never infer the platform from cloud-init, user-data, a package manager, systemd, Docker, or the services/ path alone.
 ---
 
 # Create A Service
@@ -51,6 +51,29 @@ appears before continuing; do not defer all acceptance checks until the end.
 - Never plan or apply infrastructure unless the user explicitly asks for that
   operation. Apply only a saved plan generated from the current configuration,
   inspected with `tofu show` in the current workflow, and unchanged since review.
+
+## Enforce Service Ownership
+
+**deployments, modules, resources etc. DO NOT mix across the services/ boundary**
+
+- Each `services/<name>/` owns only that service's deployments, resources, state
+  and lifecycle. Do not create, adopt or manage another service's resources there.
+- Private modules, templates, scripts and tests stay inside their owning service.
+  Never import another service's implementation or read its tfvars/state files.
+  Reading tracked sibling code as a reference is not permission to depend on it.
+- Put reusable implementation in repository-level `modules/` (with its shared
+  tools/tests), not in a service directory. Shared modules must not import service
+  implementation or deployment state. Their instantiated resources belong to
+  the caller; shared code is not a shared production deployment.
+- Integrate services only through explicit published interfaces: APIs or narrowly
+  exported non-secret outputs supplied to the consumer. Reuse the producer's
+  output, not a duplicate endpoint or access to its whole state. Credentials remain
+  separately protected. Multiple roots inside one service may share that service's
+  documented metadata/state contract without crossing a service boundary.
+
+Before implementation, trace module sources, file/state reads and script/test
+imports. Fail the boundary gate on a cross-service implementation dependency;
+extract shared code or define an explicit interface before continuing.
 
 ## Trace
 
@@ -184,6 +207,10 @@ complete local validation workflow:
 3. Run `make validate`, including OpenTofu format and validation plus every
    authored YAML, cloud-init, and service-configuration check.
 4. Run `git diff --check` from the repository root.
+   Run `python3 scripts/check-service-boundaries.py` and
+   `python3 -B -m unittest discover -s tests -p 'test_service_boundaries.py'` there
+   too. The checker covers literal local OpenTofu references only; manually
+   review dynamic references and script/test imports against the ownership gate.
 5. Use `git status --short --untracked-files=all` to identify every intended
    changed or new file. Inspect all of those files, including untracked files,
    for whitespace errors, secrets, and unapproved deployment-specific values.

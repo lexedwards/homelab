@@ -222,14 +222,38 @@ OpenTofu owner; do not create a second writer in a central root.
 This initial hosting slice does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
 The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
-consumes this root's sensitive `api_endpoint` output through the existing protected
-service state. The endpoint derives from service DNS and HTTPS port; consumers
-must not duplicate it in ad hoc deployment files. This output contains no tokens
-or secret values and does not authorize live API changes.
+consumes this root's published `api_endpoint` output, never this service's state.
+The endpoint derives from service DNS and HTTPS port. After an authorized output
+apply, publish the JSON string from this canonical root with tracing disabled:
+
+```bash
+umask 077
+tofu output -json api_endpoint > /protected/openbao-endpoint.json
+```
+
+Consumers receive that explicit non-secret export as an input. Republish it after
+endpoint changes; do not duplicate the hostname or grant access to the hosting
+state. This output contains no tokens or secret values and authorizes no API changes.
 Keep populating actual secret values separate from declaring configuration:
 ordinary secret resources/data sources can persist values in state and saved
 plans. Sensitive marking only redacts display. Runtime identities must not be
 able to edit their own access policies.
+
+Authorization is **administrative**, even when its definitions live with the
+service. Per [ADR 008][administrative-auth], apply those definitions with the
+trusted configuration identity and keep native provider refresh enabled. Do not
+give a service's ordinary deployment token permission to edit roles or policies.
+The reusable [deployment-access module][deployment-access] lives at repository
+level, not inside this hosting service. Each consumer owns its instance and
+authorization stage. This hosting root gains no runtime API dependency.
+
+## Service Deployment Credentials
+
+The shared [deployment-access module][deployment-access] owns the protected
+issuance/population helper, tests and command reference. Consuming services call
+that shared implementation, not scripts or modules under `services/openbao`.
+Keep issued tokens and values outside OpenTofu, argv and logs. Runtime readers
+cannot manage authorization; rotators require a separate reviewed writer identity.
 
 ## Verify And Operate
 
@@ -308,4 +332,6 @@ can read an upgraded storage format; rollback may require an isolated restore
 using the matching old binary and snapshot.
 
 [Micro Node]: ../../hosts/micro-node/README.md
+[administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
+[deployment-access]: ../../modules/openbao-deployment-access/README.md
 [ale-41]: https://linear.app/lexedwards/issue/ALE-41/enable-native-https-for-openbao-using-cloudflare-dns-01

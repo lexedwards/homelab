@@ -9,6 +9,7 @@ init:
 
 fmt-check:
 	$(TOFU) fmt -check -recursive
+	$(TOFU) fmt -check -recursive ../../../modules
 
 tofu-validate:
 	$(TOFU) validate
@@ -16,6 +17,9 @@ tofu-validate:
 test:
 	$(TOFU) test
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py'
+	$(PYTHON) -B ../../../scripts/check-service-boundaries.py
+	$(PYTHON) -B -m unittest discover -s ../../../tests -p 'test_service_boundaries.py'
+	$(MAKE) -C ../../../modules/openbao-deployment-access test
 
 validate: fmt-check tofu-validate test
 
