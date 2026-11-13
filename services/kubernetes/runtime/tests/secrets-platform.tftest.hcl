@@ -1,9 +1,3 @@
-mock_provider "proxmox" {
-  mock_resource "proxmox_virtual_environment_file" {
-    defaults = { id = "snippets:snippets/fixture.yaml" }
-  }
-}
-mock_provider "technitium" {}
 mock_provider "kubernetes" {
   mock_data "kubernetes_config_map_v1" {
     defaults = { data = { "ca.crt" = "synthetic-public-ca" } }
@@ -14,9 +8,9 @@ mock_provider "kubernetes" {
 }
 mock_provider "vault" {}
 
-override_module {
-  target  = module.worker_dns
-  outputs = {}
+override_data {
+  target = data.terraform_remote_state.cluster[0]
+  values = { outputs = { runtime_connection = { api_host = "https://api.example.invalid:6443", ssh_user = "testadmin", workers = ["test-worker-a", "test-worker-b"] } } }
 }
 override_data {
   target = data.terraform_remote_state.openbao[0]
@@ -40,26 +34,7 @@ override_data {
 }
 
 variables {
-  openbao_admin_token  = "synthetic-ephemeral-administration"
-  proxmox_endpoint     = "https://proxmox.example.invalid"
-  proxmox_ssh_username = "testadmin"
-  proxmox_nodes = {
-    compute = { ssh_address = "compute.example.invalid", snippet_datastore_id = "snippets", vm_datastore_id = "vms", vm_bridge = "br-primary" }
-    store   = { ssh_address = "store.example.invalid", snippet_datastore_id = "snippets", vm_datastore_id = "vms", vm_bridge = "br-primary" }
-  }
-  template              = { vm_id = 100, node_name = "compute" }
-  control_plane         = { vm_id = 101, name = "test-server" }
-  primary_vlan_id       = 100
-  service_vlan_id       = 200
-  cloud_user            = "testadmin"
-  cloud_ssh_public_keys = ["ssh-ed25519 c3ludGhldGljLWtleQ== test-fixture"]
-  technitium_server_url = "https://dns.example.invalid"
-  api_dns               = { zone = "example.invalid", name = "api.example.invalid" }
-  cluster_networks      = { pods = "198.18.0.0/16", services = "198.19.0.0/16" }
-  workers = {
-    compute = { vm_id = 102, name = "test-worker-a", fqdn = "test-worker-a.nodes.example.invalid", service_bridge = "br-service" }
-    store   = { vm_id = 103, name = "test-worker-b", fqdn = "test-worker-b.nodes.example.invalid", service_bridge = "br-service" }
-  }
+  openbao_admin_token = "synthetic-ephemeral-administration"
   secrets_platform = {
     kubeconfig_path = "/synthetic/kubeconfig"
     auth_mount      = "kubernetes-test"
@@ -78,7 +53,6 @@ run "disabled_platform_needs_no_cluster_or_openbao_objects" {
     condition     = length(kubernetes_manifest.secrets_chart) == 0 && length(vault_auth_backend.kubernetes) == 0 && length(terraform_data.secrets_provider_directory) == 0
     error_message = "Opt-in platform resources must not affect the existing provisioning-only deployment."
   }
-  expect_failures = [technitium_record.api]
 }
 
 run "manage_native_charts_auth_and_host_prerequisites_without_secret_values" {
@@ -100,7 +74,6 @@ run "manage_native_charts_auth_and_host_prerequisites_without_secret_values" {
     )
     error_message = "OpenTofu must own the actual native chart, cluster auth and verified worker prerequisite resources, not merely export manifests or create secret values."
   }
-  expect_failures = [technitium_record.api]
 }
 
 run "reject_a_replaced_node_before_granting_capability_or_ssh_changes" {
@@ -109,7 +82,7 @@ run "reject_a_replaced_node_before_granting_capability_or_ssh_changes" {
     target = data.kubernetes_resource.secrets_worker["test-worker-a"]
     values = { object = { metadata = { uid = "unexpected-node-uid" }, status = { addresses = [{ type = "InternalIP", address = "192.0.2.11" }] } } }
   }
-  expect_failures = [terraform_data.secrets_provider_directory["test-worker-a"], technitium_record.api]
+  expect_failures = [terraform_data.secrets_provider_directory["test-worker-a"]]
 }
 
 run "reject_partial_worker_selection" {
@@ -122,7 +95,7 @@ run "reject_partial_worker_selection" {
       workers         = { test-worker-a = { node_uid = "worker-a-uid", host_key = "ssh-ed25519 c3ludGhldGljLWhvc3Q=" } }
     }
   }
-  expect_failures = [var.secrets_platform, technitium_record.api]
+  expect_failures = [var.secrets_platform]
 }
 
 run "manage_parked_qualification_as_resources_not_secret_values" {
@@ -139,7 +112,6 @@ run "manage_parked_qualification_as_resources_not_secret_values" {
     )
     error_message = "Qualification must be resource-owned, explicit-runtime and initially parked until out-of-band synthetic value enrollment."
   }
-  expect_failures = [technitium_record.api]
 }
 
 run "reject_missing_service_owned_endpoint_before_any_apply" {
@@ -148,5 +120,14 @@ run "reject_missing_service_owned_endpoint_before_any_apply" {
     target = data.terraform_remote_state.openbao[0]
     values = { outputs = {} }
   }
-  expect_failures = [vault_auth_backend.kubernetes[0], technitium_record.api]
+  expect_failures = [vault_auth_backend.kubernetes[0]]
+}
+
+run "reject_a_worker_cohort_different_from_the_infrastructure_definition" {
+  command = plan
+  override_data {
+    target = data.terraform_remote_state.cluster[0]
+    values = { outputs = { runtime_connection = { api_host = "https://api.example.invalid:6443", ssh_user = "testadmin", workers = ["test-worker-a", "unapproved-worker"] } } }
+  }
+  expect_failures = [terraform_data.secrets_provider_directory["test-worker-a"], terraform_data.secrets_provider_directory["test-worker-b"]]
 }

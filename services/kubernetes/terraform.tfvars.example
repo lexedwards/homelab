@@ -7,8 +7,6 @@
 
 # Inject PROXMOX_VE_API_TOKEN and TECHNITIUM_API_TOKEN privately; no token variables.
 # Load the approved node SSH key into the local agent before snippet uploads.
-# For opted-in secret-platform management, inject TF_VAR_openbao_admin_token
-# as an ephemeral environment value; never put the actual token in this file.
 # Required
 # proxmox_endpoint     =
 # proxmox_ssh_username =
@@ -16,27 +14,6 @@
 
 # Optional
 # proxmox_insecure = false
-
-# -----------------------------------------------------------------------------
-# Optional mounted-secret platform (after API/worker enrollment)
-# -----------------------------------------------------------------------------
-
-# OpenBao's endpoint is consumed from its existing sibling service state.
-# Keep secrets_qualification null until the platform CRDs are installed.
-# secrets_platform = null
-# secrets_platform = {
-#   kubeconfig_path =
-#   auth_mount      =
-#   api_audience    =
-#   workers = {
-#     # Both actual worker names: { node_uid = <verified>, host_key = <pinned public key> }
-#   }
-# }
-# secrets_qualification = null
-# secrets_qualification = {
-#   secret_path =
-#   replicas    = 0
-# }
 
 # -----------------------------------------------------------------------------
 # Core

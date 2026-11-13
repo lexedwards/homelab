@@ -14,6 +14,19 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class RuntimeInputExampleTests(unittest.TestCase):
+    def test_only_noncredential_definitions_have_tfvars_placeholders(self):
+        example = (ROOT / 'terraform.tfvars.example').read_text()
+        definitions = '\n'.join(path.read_text() for path in ROOT.glob('*.tf'))
+        blocks = re.findall(r'^variable "([^"]+)" \{(.*?)^\}', definitions, re.M | re.S)
+        ephemeral = {name for name, body in blocks if re.search(r'^\s*ephemeral\s*=\s*true\s*$', body, re.M)}
+        documented = set(re.findall(r'^# ([a-z][a-z0-9_]*)\s*=', example, re.M))
+        self.assertEqual({name for name, _ in blocks} - ephemeral, documented)
+        self.assertEqual(ephemeral, {'openbao_admin_token'})
+        self.assertIn('TF_VAR_openbao_admin_token', example)
+        self.assertTrue(all(not line.strip() or line.lstrip().startswith('#') for line in example.splitlines()))
+
+
 class ProviderFixture(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass

@@ -3,22 +3,23 @@ locals {
   secrets_qualification_enabled = local.secrets_enabled && nonsensitive(var.secrets_qualification != null)
   secrets_worker_names          = local.secrets_enabled ? nonsensitive(toset(keys(var.secrets_platform.workers))) : toset([])
   openbao_endpoint              = try(data.terraform_remote_state.openbao[0].outputs.api_endpoint, "https://disabled-openbao.invalid")
-  secrets_chart_template = local.secrets_enabled ? templatefile("${path.module}/platform/secrets-csi.yaml.tftpl", {
-    driver_chart   = filebase64("${path.module}/vendor/secrets-store-csi-driver-1.6.2.tgz")
-    provider_chart = filebase64("${path.module}/vendor/openbao-0.30.7.tgz")
+  cluster_connection            = try(data.terraform_remote_state.cluster[0].outputs.runtime_connection, { api_host = "https://disabled-cluster.invalid", ssh_user = "unconfigured", workers = [] })
+  secrets_chart_template = local.secrets_enabled ? templatefile("${path.module}/../platform/secrets-csi.yaml.tftpl", {
+    driver_chart   = filebase64("${path.module}/../vendor/secrets-store-csi-driver-1.6.2.tgz")
+    provider_chart = filebase64("${path.module}/../vendor/openbao-0.30.7.tgz")
     api_audience   = jsonencode(var.secrets_platform.api_audience)
     bao_address    = jsonencode(local.openbao_endpoint)
   }) : ""
   secrets_charts = { for document in [for text in split("\n---\n", local.secrets_chart_template) : try(yamldecode(text), null)] : document.metadata.name => document if try(document.kind, "") == "HelmChart" }
   secrets_qualification_documents = {
-    for document in [for text in split("\n---\n", file("${path.module}/examples/secrets-workloads.yaml")) : yamldecode(text)] :
+    for document in [for text in split("\n---\n", file("${path.module}/../examples/secrets-workloads.yaml")) : yamldecode(text)] :
     "${document.kind}/${document.metadata.name}" => document
   }
 }
 
 provider "kubernetes" {
   config_path = try(var.secrets_platform.kubeconfig_path, null)
-  host        = local.secrets_enabled ? "https://${var.api_dns.name}:6443" : null
+  host        = local.secrets_enabled ? local.cluster_connection.api_host : null
   insecure    = false
 }
 
@@ -32,7 +33,13 @@ provider "vault" {
 data "terraform_remote_state" "openbao" {
   count   = local.secrets_enabled ? 1 : 0
   backend = "local"
-  config  = { path = "${path.module}/../openbao/terraform.tfstate" }
+  config  = { path = "${path.module}/../../openbao/terraform.tfstate" }
+}
+
+data "terraform_remote_state" "cluster" {
+  count   = local.secrets_enabled ? 1 : 0
+  backend = "local"
+  config  = { path = "${path.module}/../terraform.tfstate" }
 }
 
 data "kubernetes_config_map_v1" "secrets_api_ca" {
@@ -54,23 +61,27 @@ resource "terraform_data" "secrets_provider_directory" {
   for_each = local.secrets_worker_names
   triggers_replace = [
     data.kubernetes_resource.secrets_worker[each.key].object.metadata.uid,
-    filesha256("${path.module}/scripts/label-secrets-provider.py"),
+    filesha256("${path.module}/../scripts/label-secrets-provider.py"),
   ]
   connection {
     type     = "ssh"
     host     = one([for address in data.kubernetes_resource.secrets_worker[each.key].object.status.addresses : address.address if address.type == "InternalIP" && can(cidrnetmask("${address.address}/32"))])
-    user     = var.cloud_user
+    user     = local.cluster_connection.ssh_user
     agent    = true
     host_key = var.secrets_platform.workers[each.key].host_key
     timeout  = "30s"
   }
   provisioner "remote-exec" {
-    inline = ["sudo -n python3 -B -c '${replace(file("${path.module}/scripts/label-secrets-provider.py"), "'", "'\"'\"'")}' --apply"]
+    inline = ["sudo -n python3 -B -c '${replace(file("${path.module}/../scripts/label-secrets-provider.py"), "'", "'\"'\"'")}' --apply"]
   }
   lifecycle {
     precondition {
       condition     = data.kubernetes_resource.secrets_worker[each.key].object.metadata.uid == var.secrets_platform.workers[each.key].node_uid
       error_message = "Worker identity changed. Reverify enrollment and pinned SSH trust before preparing its provider directory."
+    }
+    precondition {
+      condition     = can(data.terraform_remote_state.cluster[0].outputs.runtime_connection) && toset(keys(var.secrets_platform.workers)) == toset(local.cluster_connection.workers)
+      error_message = "Export reviewed cluster metadata from its canonical state and select its full worker set."
     }
   }
 }
@@ -121,8 +132,8 @@ resource "kubernetes_manifest" "secrets_chart" {
     prevent_destroy = true
     precondition {
       condition = (
-        filesha256("${path.module}/vendor/secrets-store-csi-driver-1.6.2.tgz") == "2658657164b156c7759772a84ba83013ae2495a0b2d2e92ea6b2ad0738f623c4" &&
-        filesha256("${path.module}/vendor/openbao-0.30.7.tgz") == "fa4e6f3c1bbe936dc7ba079f1303ea56810af2f8600f046d8d5809860a4f980f"
+        filesha256("${path.module}/../vendor/secrets-store-csi-driver-1.6.2.tgz") == "2658657164b156c7759772a84ba83013ae2495a0b2d2e92ea6b2ad0738f623c4" &&
+        filesha256("${path.module}/../vendor/openbao-0.30.7.tgz") == "fa4e6f3c1bbe936dc7ba079f1303ea56810af2f8600f046d8d5809860a4f980f"
       )
       error_message = "Vendored CSI/provider chart bytes differ from the reviewed pins."
     }
@@ -146,7 +157,7 @@ resource "vault_auth_backend" "kubernetes" {
 resource "vault_kubernetes_auth_backend_config" "cluster" {
   count                  = local.secrets_enabled ? 1 : 0
   backend                = vault_auth_backend.kubernetes[0].path
-  kubernetes_host        = "https://${var.api_dns.name}:6443"
+  kubernetes_host        = local.cluster_connection.api_host
   kubernetes_ca_cert     = data.kubernetes_config_map_v1.secrets_api_ca[0].data["ca.crt"]
   token_reviewer_jwt     = ""
   disable_local_ca_jwt   = true
@@ -182,7 +193,7 @@ resource "kubernetes_service_account_v1" "secrets_qualification" {
 
 module "secrets_qualification" {
   count             = local.secrets_qualification_enabled ? 1 : 0
-  source            = "./modules/openbao-access"
+  source            = "../modules/openbao-access"
   name              = "kubernetes-secrets-qualification"
   auth_mount        = vault_auth_backend.kubernetes[0].path
   openbao_endpoint  = local.openbao_endpoint
@@ -201,7 +212,7 @@ resource "kubernetes_config_map_v1" "secrets_reload_app" {
     name      = "reload-app"
     namespace = kubernetes_namespace_v1.secrets_qualification[0].metadata[0].name
   }
-  data = { "reload.py" = file("${path.module}/examples/secret-reload.py") }
+  data = { "reload.py" = file("${path.module}/../examples/secret-reload.py") }
 }
 
 resource "kubernetes_manifest" "secrets_qualification_policy" {

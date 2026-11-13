@@ -1,8 +1,10 @@
 # OpenBao Mounted-Secret Authentication
 
-`secrets.tf` manages the cluster's CSI/provider platform, worker prerequisites,
+`runtime/secrets.tf` manages the cluster's CSI/provider platform, worker prerequisites,
 native OpenBao Kubernetes auth and optional owned qualification service in the
-existing Kubernetes OpenTofu root/state. VM bootstrap is unchanged. Native RKE2
+adjacent API runtime root/state. The existing VM state and bootstrap are unchanged.
+This [state boundary][runtime-state] keeps VM recovery planning independent of
+an unavailable Kubernetes API or sealed OpenBao. Native RKE2
 Helm still owns the releases; OpenTofu owns their HelmChart API objects, not a
 competing Helm release or an auto-reconciled server manifest file.
 
@@ -17,17 +19,23 @@ Production qualification remains in ALE-49.
 
 Everything defaults off. First establish the cluster and enrolled workers using
 the existing infrastructure lifecycle. After separate review/authorization,
-enable `secrets_platform` in the canonical root's private inputs. There is no new
-deployment state and no apply from a feature worktree.
+enable `secrets_platform` in the canonical `services/kubernetes/runtime` root's
+private inputs. Its new protected state owns only API runtime configuration;
+the two existing infrastructure states are preserved, not copied or split.
+No persisted apply runs from a feature worktree.
 
 - OpenBao's service root exports `api_endpoint`, derived from its service-owned
   DNS name and native HTTPS port. Make that output available through an inspected
   output-only apply in canonical `services/openbao` first. Do not duplicate its
   hostname/port in an ad hoc enrollment file or expose authentication material.
-- The Kubernetes root reads the existing sibling OpenBao state for this output.
+- The runtime root reads that existing OpenBao state and the parent Kubernetes
+  state's `runtime_connection` output. Make the latter available through a
+  reviewed output-only parent apply first. It supplies the stable API origin,
+  SSH user and complete worker cohort, not credentials.
   Remote-state access grants access to the entire protected hosting state, not
-  only the output. Keep its access/backups protected and keep actual secret
-  values out of it. Both services' established state files remain authoritative.
+  only the output. Keep access/backups protected and keep actual secret values
+  out of them. Both infrastructure states remain authoritative. The parent root
+  has no Kubernetes or OpenBao API provider dependency.
 - Supply an explicit protected `kubeconfig_path`. The provider is pinned to the
   cluster's existing API DNS name and verified TLS, and obtains the public API CA
   from the cluster's `kube-root-ca.crt` ConfigMap. The API audience remains a
@@ -63,7 +71,8 @@ ownership to hide a second writer.
 ### Apply phases and qualification
 
 1. **Platform:** keep `secrets_qualification = null`. Review/apply the saved
-   platform plan from canonical `main` with its existing state. Wait for both
+   platform plan from canonical `main` in `services/kubernetes/runtime`, using
+   that root's runtime state, never the parent VM plan/state. Wait for both
    worker DaemonSets, node registrations, native releases and both driver CRDs.
    Creating HelmChart objects alone does not prove the releases are Ready.
 2. **Service definition:** set `secrets_qualification` to an approved exact
@@ -131,14 +140,14 @@ Follow [ADR 002][ownership]. Each deployed object has one OpenTofu owner:
 
 | Owner | Managed declaration | Responsibility |
 | --- | --- | --- |
-| Kubernetes platform | `secrets.tf` shared resources | Native charts, verified worker prerequisites, auth mount/config and exact TokenReview ClusterRole |
+| Kubernetes platform | `runtime/secrets.tf` shared resources | Native charts, verified worker prerequisites, auth mount/config and exact TokenReview ClusterRole |
 | Owning service | Its `modules/openbao-access` instance | Exact record-read policy, account-bound auth role, reviewer binding and SecretProviderClass |
 | Owning service | Its namespace/account and workload resources | Workload identity and read-only class consumption |
 | Operator | Protected value-enrollment workflow | Secret population and independent OpenBao recovery custody |
 
 The service caller declares its namespace and account in its own OpenTofu root;
 the access module does not create them. For the built-in qualification service,
-the Kubernetes root declares `secrets-check` and `reader` and orders their creation
+the runtime root declares `secrets-check` and `reader` and orders their creation
 before the access module. No manual namespace/account creation is required.
 Review existing object names before applying and stop on an ownership conflict.
 Do not let each service reconcile the shared platform resources.
@@ -445,3 +454,4 @@ Scale down and remove only owned test resources/roles/values after approved
 disposition. Preserve the existing NFS witness claim and shared platform objects.
 
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
+[runtime-state]: ../../docs/adrs/006-kubernetes-runtime-state-boundary.md

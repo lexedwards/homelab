@@ -1,5 +1,5 @@
 variable "secrets_platform" {
-  description = "Opt-in runtime platform ownership after cluster enrollment. Kubeconfig and SSH agent credentials stay out of state; public host keys and approved node UIDs bind worker preparation."
+  description = "Opt-in API runtime ownership in its canonical state after cluster enrollment. Credentials stay out of state; public host keys and approved node UIDs bind worker preparation."
   type = object({
     kubeconfig_path = string
     auth_mount      = string
@@ -18,7 +18,6 @@ variable "secrets_platform" {
       can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.secrets_platform.auth_mount)) &&
       can(regex("^[^[:space:]]{1,256}$", var.secrets_platform.api_audience)) &&
       length(var.secrets_platform.workers) == 2 &&
-      toset(keys(var.secrets_platform.workers)) == toset([for worker in var.workers : worker.name]) &&
       alltrue([for worker in var.secrets_platform.workers :
         length(worker.node_uid) > 0 &&
         can(regex("^(ssh-ed25519|ecdsa-sha2-nistp256|ssh-rsa) [A-Za-z0-9+/=]+$", worker.host_key))

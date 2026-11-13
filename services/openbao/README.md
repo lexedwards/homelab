@@ -221,7 +221,7 @@ OpenTofu owner; do not create a second writer in a central root.
 
 This initial hosting slice does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
-The Kubernetes service root owns its optional native Kubernetes-auth platform and
+The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
 consumes this root's sensitive `api_endpoint` output through the existing protected
 service state. The endpoint derives from service DNS and HTTPS port; consumers
 must not duplicate it in ad hoc deployment files. This output contains no tokens
