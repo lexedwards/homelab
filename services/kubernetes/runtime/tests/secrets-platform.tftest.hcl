@@ -7,6 +7,11 @@ mock_provider "kubernetes" {
   }
 }
 mock_provider "vault" {}
+mock_provider "external" {
+  mock_data "external" {
+    defaults = { result = { content = "c3ludGhldGljLWNoYXJ0" } }
+  }
+}
 
 override_data {
   target = data.terraform_remote_state.cluster[0]
@@ -60,6 +65,9 @@ run "manage_native_charts_auth_and_host_prerequisites_without_secret_values" {
   assert {
     condition = (
       length(kubernetes_manifest.secrets_chart) == 2 &&
+      kubernetes_manifest.secrets_chart["secrets-store-csi"].manifest.spec.chartContent == "c3ludGhldGljLWNoYXJ0" &&
+      data.external.secrets_chart["secrets-store-csi"].query.url == "https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts/secrets-store-csi-driver-1.6.2.tgz" &&
+      data.external.secrets_chart["openbao-provider"].query.sha256 == "fa4e6f3c1bbe936dc7ba079f1303ea56810af2f8600f046d8d5809860a4f980f" &&
       kubernetes_manifest.secrets_chart["secrets-store-csi"].manifest.spec.targetNamespace == "secrets-system" &&
       yamldecode(kubernetes_manifest.secrets_chart["secrets-store-csi"].manifest.spec.valuesContent).tokenRequests[0].audience == "synthetic-api-audience" &&
       yamldecode(kubernetes_manifest.secrets_chart["openbao-provider"].manifest.spec.valuesContent).global.externalBaoAddr == "https://bao.example.invalid:8200" &&

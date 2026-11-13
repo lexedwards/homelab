@@ -5,8 +5,8 @@ locals {
   openbao_endpoint              = try(data.terraform_remote_state.openbao[0].outputs.api_endpoint, "https://disabled-openbao.invalid")
   cluster_connection            = try(data.terraform_remote_state.cluster[0].outputs.runtime_connection, { api_host = "https://disabled-cluster.invalid", ssh_user = "unconfigured", workers = [] })
   secrets_chart_template = local.secrets_enabled ? templatefile("${path.module}/../platform/secrets-csi.yaml.tftpl", {
-    driver_chart   = filebase64("${path.module}/../vendor/secrets-store-csi-driver-1.6.2.tgz")
-    provider_chart = filebase64("${path.module}/../vendor/openbao-0.30.7.tgz")
+    driver_chart   = "downloaded-at-plan"
+    provider_chart = "downloaded-at-plan"
     api_audience   = jsonencode(var.secrets_platform.api_audience)
     bao_address    = jsonencode(local.openbao_endpoint)
   }) : ""
@@ -14,6 +14,15 @@ locals {
   secrets_qualification_documents = {
     for document in [for text in split("\n---\n", file("${path.module}/../examples/secrets-workloads.yaml")) : yamldecode(text)] :
     "${document.kind}/${document.metadata.name}" => document
+  }
+}
+
+data "external" "secrets_chart" {
+  for_each = local.secrets_enabled ? toset(["secrets-store-csi", "openbao-provider"]) : toset([])
+  program  = ["python3", "-B", "${path.module}/../scripts/download-secret-chart.py"]
+  query = {
+    url    = local.secrets_charts[each.key].metadata.annotations["homelab.io/chart-source"]
+    sha256 = local.secrets_charts[each.key].metadata.annotations["homelab.io/chart-sha256"]
   }
 }
 
@@ -122,7 +131,9 @@ resource "kubernetes_namespace_v1" "secrets_system" {
 
 resource "kubernetes_manifest" "secrets_chart" {
   for_each = local.secrets_enabled ? toset(["secrets-store-csi", "openbao-provider"]) : toset([])
-  manifest = local.secrets_charts[each.key]
+  manifest = merge(local.secrets_charts[each.key], {
+    spec = merge(local.secrets_charts[each.key].spec, { chartContent = data.external.secrets_chart[each.key].result.content })
+  })
   field_manager {
     name            = "homelab-opentofu"
     force_conflicts = false
@@ -130,13 +141,6 @@ resource "kubernetes_manifest" "secrets_chart" {
   depends_on = [kubernetes_namespace_v1.secrets_system, kubernetes_labels.secrets_worker]
   lifecycle {
     prevent_destroy = true
-    precondition {
-      condition = (
-        filesha256("${path.module}/../vendor/secrets-store-csi-driver-1.6.2.tgz") == "2658657164b156c7759772a84ba83013ae2495a0b2d2e92ea6b2ad0738f623c4" &&
-        filesha256("${path.module}/../vendor/openbao-0.30.7.tgz") == "fa4e6f3c1bbe936dc7ba079f1303ea56810af2f8600f046d8d5809860a4f980f"
-      )
-      error_message = "Vendored CSI/provider chart bytes differ from the reviewed pins."
-    }
   }
 }
 

@@ -21,5 +21,10 @@ explicit ephemeral OpenBao administration and reviewed worker trust. Review a
 saved runtime plan before applying it. A native chart object is not Ready proof;
 wait for real CRDs/releases before enabling service definitions.
 
+Enabled runtime plans fetch pinned charts over HTTPS and fail on checksum or
+network errors. No charts are vendored and there is no offline fallback. Saved
+plans contain the verified chart bytes; cluster image pulls still require
+reachable registries. Reliable internet access is an operating prerequisite.
+
 [decision]: ../../../docs/adrs/006-kubernetes-runtime-state-boundary.md
 [secrets]: ../SECRETS.md

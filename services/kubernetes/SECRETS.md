@@ -103,7 +103,7 @@ values or every service's access policy in the cluster root. Its
 pinned provider's deprecation warning; dropping it would allow adoption of an
 unrelated policy. Review this behavior when upgrading the provider.
 
-Non-secret endpoint/path/role metadata and vendored chart bytes necessarily enter
+Non-secret endpoint/path/role metadata and downloaded chart bytes necessarily enter
 protected state/plans; `sensitive` redacts normal display, not persistence. Actual
 tokens, API keys, database passwords and mounted values do not belong there.
 
@@ -279,15 +279,23 @@ images. The qualification application image is pinned too. Versions retain the
 earlier synthetic compatibility baseline; this is not production acceptance or
 a claim that every selected version is the latest release.
 
-The exact public archives and their licenses are in `vendor/`. The OpenTofu
-resource checks their SHA-256 values and embeds their bytes; no separate
-download or artifact path is required to deploy. The offline preparer can use
-these same archives for additional inspection. It checks their SHA-256 values
-before Helm sees them, renders copies of those verified bytes locally for RKE2
-1.36.6, and checks the resulting resource, image and security contract. It embeds
-the same verified bytes in `chartContent`; installation does not fetch an archive
-from a release URL. Publisher-index checksums and registry manifest digests bind
-the reviewed inputs, but are not independent publisher-signature attestations.
+Chart archives are not stored in Git. With the platform enabled, normal runtime
+planning downloads both pinned HTTPS release URLs from the blueprint annotations
+through `download-secret-chart.py`. A changed checksum, unavailable source or
+download failure stops planning. No cached or vendored fallback is used.
+OpenTofu embeds the verified bytes in native `chartContent`; a saved-plan apply
+uses those reviewed bytes rather than downloading a potentially different chart.
+Fresh planning requires a reliable internet connection. Apply and subsequent
+pod scheduling also depend on reachable image registries for uncached images.
+This is not an offline deployment or recovery mechanism: chart checksums and
+image digests bind inputs, but provide neither availability nor independent
+publisher-signature attestations.
+
+For optional offline rendering, download the same pinned archives outside Git
+and pass their paths explicitly to the preparer. It checks SHA-256 before Helm
+sees them, renders verified bytes for RKE2 1.36.6 and checks the resource, image
+and security contract. These inspection exports remain non-deployable second
+writers; the owning OpenTofu root performs the live download and reconciliation.
 
 With Helm available and `service-enrollment.yaml` prepared above:
 
