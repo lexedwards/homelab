@@ -25,6 +25,7 @@ help:
 
 init:
 	$(TOFU) init
+	$(MAKE) -C runtime init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -34,10 +35,12 @@ fmt-check:
 
 tofu-validate:
 	$(TOFU) validate
+	$(MAKE) -C runtime tofu-validate
 
 test:
 	$(TOFU) test
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py'
+	$(MAKE) -C runtime test
 
 yaml-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl

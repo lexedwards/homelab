@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 import yaml
@@ -10,10 +11,22 @@ class InputExampleTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         example = (root / 'terraform.tfvars.example').read_text()
         self.assertTrue(all(not line.strip() or line.lstrip().startswith('#') for line in example.splitlines()))
-        declared = set(re.findall(r'^variable "([^"]+)"', (root / 'variables.tf').read_text(), re.M))
+        definitions = '\n'.join(path.read_text() for path in root.glob('*.tf'))
+        blocks = re.findall(r'^variable "([^"]+)" \{(.*?)^\}', definitions, re.M | re.S)
+        ephemeral = {name for name, body in blocks if re.search(r'^\s*ephemeral\s*=\s*true\s*$', body, re.M)}
+        declared = {name for name, _ in blocks} - ephemeral
         documented = set(re.findall(r'^# ([a-z][a-z0-9_]*)\s*=', example, re.M))
         self.assertEqual(declared, documented)
         self.assertNotIn('proxmox_api_token', declared)
+        for name in ephemeral:
+            self.assertIn('TF_VAR_' + name, example)
+            self.assertNotIn(name, documented)
+
+    def test_vm_provisioning_provider_graph_is_independent_of_runtime_apis(self):
+        root = Path(__file__).resolve().parents[1]
+        graph = subprocess.check_output(['tofu', 'providers'], cwd=root, text=True, timeout=20)
+        self.assertNotIn('hashicorp/kubernetes', graph)
+        self.assertNotIn('hashicorp/vault', graph)
 
 
 class KataRolloutTests(unittest.TestCase):

@@ -144,7 +144,7 @@ def read_config(path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Prepare private OpenBao Kubernetes authentication and service enrollment; no network or deployment.')
+    parser = argparse.ArgumentParser(description='Inspect private OpenBao Kubernetes authentication and service contracts offline; deployed objects are OpenTofu-owned.')
     parser.add_argument('--input', type=Path, required=True, help='Protected JSON configuration; never include credential or secret values')
     parser.add_argument('--output-dir', type=Path, required=True, help='New private directory outside the repository')
     args = parser.parse_args()
@@ -158,7 +158,7 @@ def main():
         fd = os.open(args.output_dir / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, 'w') as output:
             output.write(content)
-    print('Prepared private authentication/enrollment artifacts. No network access, secret values or deployment; inspect ownership and trust before authorized use.')
+    print('Prepared private contract-inspection artifacts. No network access, secret values or deployment. Do not apply exports alongside the OpenTofu-owned objects.')
 
 
 if __name__ == '__main__':

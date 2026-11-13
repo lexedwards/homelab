@@ -23,7 +23,7 @@ variable "dns_zone" {
 }
 
 variable "dns_name" {
-  description = "Private fully qualified DNS name for the HTTP API and UI. TLS is explicitly deferred."
+  description = "Private fully qualified DNS name for the native HTTPS API and UI."
   type        = string
   sensitive   = true
   nullable    = false

@@ -24,6 +24,11 @@ variables {
 run "persistent_server_with_service_owned_dns" {
   command = plan
 
+  assert {
+    condition     = output.api_endpoint == "https://bao.example.invalid:8200"
+    error_message = "Consumers must reuse the service-owned native HTTPS endpoint rather than duplicating deployment locators."
+  }
+
   override_resource {
     target = incus_instance.openbao
     values = { ipv4_address = "192.0.2.10" }

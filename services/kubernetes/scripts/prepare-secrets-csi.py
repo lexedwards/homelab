@@ -106,7 +106,7 @@ def verify_rendered(driver_documents, provider_documents, audience, address):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Verify local pinned CSI/provider charts and prepare an embedded native installer; no network or deployment.')
+    parser = argparse.ArgumentParser(description='Verify pinned CSI/provider charts and export optional inspection artifacts; live objects are OpenTofu-owned. No network or deployment.')
     parser.add_argument('--driver-chart', type=Path, required=True)
     parser.add_argument('--provider-chart', type=Path, required=True)
     parser.add_argument('--enrollment', type=Path, required=True, help='Protected service-enrollment.yaml from prepare-secret-auth.py')
@@ -150,7 +150,7 @@ def main():
             fd = os.open(args.output_dir / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, 'w') as output:
                 output.write(content)
-    print('Pinned CSI/provider chart validation passed: worker-only placement, exact embedded bytes, scoped provider permissions and no workload-secret synchronization. No deployment performed.')
+    print('Pinned CSI/provider chart validation passed: worker-only placement, exact embedded bytes, scoped provider permissions and no workload-secret synchronization. Inspection only; deploy through the owning OpenTofu root.')
 
 
 if __name__ == '__main__':

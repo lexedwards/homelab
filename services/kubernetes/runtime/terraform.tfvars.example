@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars, fill runtime configuration, and never commit it.
+# Runtime-only definitions. Keep populated metadata private and actual values out.
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+# Inject TF_VAR_openbao_admin_token ephemerally; never put the token in tfvars.
+# Load the approved guest SSH identity into the operator's agent.
+# API/SSH-user/worker-cohort metadata comes from the infrastructure state.
+# OpenBao endpoint comes from its hosting state; do not duplicate either endpoint.
+
+# -----------------------------------------------------------------------------
+# Core (optional until the cluster is enrolled)
+# -----------------------------------------------------------------------------
+# secrets_platform = null
+# secrets_platform = {
+#   kubeconfig_path =
+#   auth_mount      =
+#   api_audience    =
+#   workers = {
+#     # Both actual worker names: { node_uid = <verified>, host_key = <pinned public key> }
+#   }
+# }
+# -----------------------------------------------------------------------------
+# Qualification (optional; enable only after the platform CRDs are installed)
+# -----------------------------------------------------------------------------
+# secrets_qualification = null
+# secrets_qualification = {
+#   secret_path =
+#   replicas    = 0
+# }

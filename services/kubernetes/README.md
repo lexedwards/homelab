@@ -3,8 +3,9 @@
 This OpenTofu root defines the Rocky Linux 10 amd64 RKE2 control-plane VM on
 `compute`, with one colocated etcd member and RKE2-managed Cilium, and an optional
 worker on each physical host. [Worker enrollment and runtime operations][workers]
-are separate from infrastructure apply. VLAN service pools, application policy,
-NFS storage and OpenBao workload-secret delivery are not deployed by this root.
+are separate from first-boot provisioning. VLAN service pools, application policy
+and NFS storage retain their explicit rollout boundaries. OpenBao workload-secret
+delivery has a separately enabled [API runtime root](runtime/README.md) alongside it.
 Implementation context and qualification gates
 remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
 
@@ -21,11 +22,12 @@ private StorageClass/qualification outputs. TrueNAS ownership, client restrictio
 quota and backups remain an explicit operator boundary; local checks do not prove
 real-backend compatibility.
 
-[Mounted-secret authentication](SECRETS.md) prepares private OpenBao Kubernetes-auth
-and exact service enrollment without stored reviewer credentials, secret values
-or network access. It also documents pinned worker-only CSI/provider preparation,
-the narrow host-labeling boundary and ordinary/Kata reload qualification. These
-offline tools do not deploy the stack or authorize live OpenBao changes.
+[Mounted-secret delivery](SECRETS.md) has an opt-in OpenTofu-owned runtime root
+for native RKE2 charts, worker prerequisites, OpenBao Kubernetes auth and exact
+service access definitions. Its separate state preserves VM recovery when those
+APIs are unavailable. It preserves bootstrap and keeps actual values
+and credentials outside state/plans. Offline tools remain inspection helpers,
+not competing live owners. Enabling the layer requires separate reviewed applies.
 
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
@@ -42,7 +44,8 @@ acceptance is recorded separately in ALE-28.
 - Existing Technitium zone and service-owned API/worker A records that are not
   already owned elsewhere. Optional worker PTR ownership needs an approved
   existing reverse zone. The API name stays stable through future HA expansion.
-- OpenTofu 1.9+, Python 3 with PyYAML, and yamllint. Providers are pinned by the
+- OpenTofu 1.9+ for infrastructure, 1.11+ for the runtime's ephemeral setup
+  credentials, Python 3 with PyYAML, and yamllint. Providers are pinned by the
   lock file. The Python checks parse authored Kubernetes manifests with PyYAML.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
