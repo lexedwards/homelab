@@ -1,0 +1,14 @@
+[Unit]
+Description=Verified off-node RKE2 etcd recovery point
+After=network-online.target rke2-server.service
+Wants=network-online.target
+Requisite=rke2-server.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 -B /usr/local/libexec/homelab/etcd-backup.py backup --execute
+TimeoutStartSec=45min
+NoNewPrivileges=true
+PrivateTmp=true
