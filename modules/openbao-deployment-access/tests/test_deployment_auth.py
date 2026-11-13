@@ -159,7 +159,7 @@ module "access" {
     @classmethod
     def mint_deployment(cls):
         return cls.api('POST', 'auth/token/create/demo-reader-deploy', cls.issuer, {
-            'policies': ['demo-reader-deploy'], 'ttl': '900s', 'renewable': False, 'no_default_policy': True,
+            'policies': ['demo-reader-deploy'], 'ttl': '900s', 'explicit_max_ttl': '900s', 'renewable': False, 'no_default_policy': True,
         })
 
     def denied(self, method, path, token, data=None):
@@ -236,16 +236,26 @@ module "access" {
         self.assertLessEqual(auth['lease_duration'], 900)
         self.assertEqual(auth['policies'], ['demo-reader-deploy'])
 
+    def test_issued_writer_has_an_actual_explicit_maximum_lifetime(self):
+        data = self.api('GET', 'auth/token/lookup-self', self.deployment)['data']
+        self.assertEqual(data['explicit_max_ttl'], 900)
+        self.assertFalse(data['renewable'])
+        self.assertFalse(data['orphan'])
+        self.assertLessEqual(data['ttl'], 900)
+
     def test_issuer_cannot_mint_a_reader_admin_or_unbounded_token(self):
-        body = {'policies': ['demo-reader-deploy'], 'ttl': '900s', 'renewable': False, 'no_default_policy': True}
+        body = {'policies': ['demo-reader-deploy'], 'ttl': '900s', 'explicit_max_ttl': '900s', 'renewable': False, 'no_default_policy': True}
         for key, value in [('policies', ['demo-reader']), ('policies', ['root']), ('policies', []), ('ttl', '24h'),
-                           ('renewable', True), ('no_default_policy', False), ('orphan', True),
+                            ('explicit_max_ttl', '3600s'), ('explicit_max_ttl', '0s'),
+                            ('renewable', True), ('no_default_policy', False), ('orphan', True),
                            ('entity_alias', 'unapproved')]:
             with self.subTest(parameter=key, value=value):
                 self.denied('POST', 'auth/token/create/demo-reader-deploy', self.issuer, dict(body, **{key: value}))
-        missing = dict(body)
-        del missing['no_default_policy']
-        self.denied('POST', 'auth/token/create/demo-reader-deploy', self.issuer, missing)
+        for required in body:
+            with self.subTest(missing=required):
+                missing = dict(body)
+                del missing[required]
+                self.denied('POST', 'auth/token/create/demo-reader-deploy', self.issuer, missing)
         self.denied('POST', 'auth/token/create', self.issuer, body)
         self.denied('GET', 'secret/data/demo', self.issuer)
 
@@ -268,7 +278,7 @@ module "access" {
             'policies': ['demo-reader-issuer'], 'no_default_policy': True, 'ttl': '900s', 'renewable': False,
         })['auth']['client_token']
         child = self.api('POST', 'auth/token/create/demo-reader-deploy', issuer, {
-            'policies': ['demo-reader-deploy'], 'ttl': '900s', 'renewable': False, 'no_default_policy': True,
+            'policies': ['demo-reader-deploy'], 'ttl': '900s', 'explicit_max_ttl': '900s', 'renewable': False, 'no_default_policy': True,
         })['auth']['client_token']
         self.api('POST', 'auth/token/revoke-self', issuer, {})
         self.denied('GET', 'auth/token/lookup-self', child)

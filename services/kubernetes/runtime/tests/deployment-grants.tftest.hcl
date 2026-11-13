@@ -17,6 +17,8 @@ run "bound_writer_issuance_and_exact_records_without_default_or_orphan_tokens" {
       !vault_token_auth_backend_role.deployment.orphan &&
       !vault_policy.deployment.allow_overwrite &&
       !vault_policy.issuer.allow_overwrite &&
+      strcontains(vault_policy.issuer.policy, "\"explicit_max_ttl\" = [\"900s\"]") &&
+      strcontains(vault_policy.issuer.policy, "required_parameters = [\"policies\", \"ttl\", \"explicit_max_ttl\", \"renewable\", \"no_default_policy\"]") &&
       output.enrollment.secret_paths == tolist(["apps/data/demo"])
     )
     error_message = "Writer issuance must be bounded, non-renewable, parented and restricted to its exact deployment policy/records."

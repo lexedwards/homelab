@@ -35,10 +35,11 @@ resource "vault_policy" "issuer" {
       allowed_parameters = {
         "policies" = [["${local.deployment_name}"]]
         "ttl" = ["900s"]
+        "explicit_max_ttl" = ["900s"]
         "renewable" = [false]
         "no_default_policy" = [true]
       }
-      required_parameters = ["policies", "ttl", "renewable", "no_default_policy"]
+      required_parameters = ["policies", "ttl", "explicit_max_ttl", "renewable", "no_default_policy"]
     }
   POLICY
 }
