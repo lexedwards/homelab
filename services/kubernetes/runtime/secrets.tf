@@ -39,6 +39,19 @@ provider "vault" {
   token            = var.openbao_admin_token
 }
 
+module "secrets_qualification_delegation" {
+  count        = local.secrets_qualification_enabled ? 1 : 0
+  source       = "../../openbao/modules/deployment-access"
+  name         = "kubernetes-secrets-qualification"
+  secret_paths = [var.secrets_qualification.secret_path]
+}
+
+output "secrets_qualification_enrollment" {
+  description = "Non-secret role/policy names for protected token issuance; no credential is minted or stored by OpenTofu."
+  sensitive   = true
+  value       = local.secrets_qualification_enabled ? merge(module.secrets_qualification_delegation[0].enrollment, { address = local.openbao_endpoint }) : null
+}
+
 data "terraform_remote_state" "openbao" {
   count   = local.secrets_enabled ? 1 : 0
   backend = "local"

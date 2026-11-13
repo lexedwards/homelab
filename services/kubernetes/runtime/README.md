@@ -21,6 +21,13 @@ explicit ephemeral OpenBao administration and reviewed worker trust. Review a
 saved runtime plan before applying it. A native chart object is not Ready proof;
 wait for real CRDs/releases before enabling service definitions.
 
+This is a privileged platform/authorization root, not an ordinary app deployment
+identity. Its qualification definition also enrolls a separate exact-record
+writer token role and bounded issuer policy. `secrets_qualification_enrollment`
+exports only non-secret issuance metadata. Mint tokens and populate values through
+the protected OpenBao helper, never through OpenTofu. That writer cannot manage
+or refresh this root's auth resources; authorization remains administrative.
+
 Enabled runtime plans fetch pinned charts over HTTPS and fail on checksum or
 network errors. No charts are vendored and there is no offline fallback. Saved
 plans contain the verified chart bytes; cluster image pulls still require

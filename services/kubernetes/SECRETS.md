@@ -81,9 +81,13 @@ ownership to hide a second writer.
    `depends_on` cannot make a missing CRD available to an earlier plan. This
    creates the owned namespace/account, default-deny policy, read policy/auth
    role, TokenReview binding, SecretProviderClass, source ConfigMap and parked
-   Deployments. It neither creates a KV engine nor populates/reads the record.
-3. **Value enrollment and consumers:** populate only the approved owned
-   synthetic record through the separately authorized protected API/CLI flow.
+   Deployments. It also defines the exact value-writer token role and separate
+   issuer policy. It neither creates a KV engine nor mints credentials or
+   populates/reads the record.
+3. **Value enrollment and consumers:** export `secrets_qualification_enrollment`
+   privately. Use OpenBao's [protected credential helper][deployment-credentials]
+   to mint a bounded value-writer and populate only its declared synthetic record
+   through stdin. Issuer/admin credentials must never reach the pods.
    Set `replicas = 2`, inspect a fresh plan and apply it from canonical `main`.
    Perform the ordinary/Kata file-delivery, reload and identity checks below.
 4. **Park/dispose:** return replicas to zero through a reviewed OpenTofu apply,
@@ -102,6 +106,23 @@ values or every service's access policy in the cluster root. Its
 `allow_overwrite = false` policy guard is intentionally retained despite the
 pinned provider's deprecation warning; dropping it would allow adoption of an
 unrelated policy. Review this behavior when upgrading the provider.
+
+Per [ADR 008][administrative-auth], these authorization modules use the trusted
+administrative configuration identity, not an ordinary deployment token. Native
+provider configuration reads and drift repair remain enabled. A service root
+that declares auth roles/policies is a privileged authorization stage; its
+value-writer token cannot plan or apply those resources. Service ownership does
+not mean the ordinary deployer can author or broaden its own permissions.
+
+Declare OpenBao's `modules/deployment-access` alongside the consuming service's
+authorization, using the same exact record paths. It defines only record-write
+permissions, a bounded token role and an optional delegated issuer policy; no
+credential or value is created by OpenTofu. The Kubernetes runtime root does this
+for its own qualification service and exports private enrollment metadata.
+Writers can create/update those records but cannot read values/metadata, list,
+patch, delete, mint tokens, or edit auth roles/policies. Reader workloads retain
+only their exact record-read policy. Kubernetes workload/host administration can
+still expose mounted data and is a separate trust boundary.
 
 Non-secret endpoint/path/role metadata and downloaded chart bytes necessarily enter
 protected state/plans; `sensitive` redacts normal display, not persistence. Actual
@@ -462,4 +483,6 @@ Scale down and remove only owned test resources/roles/values after approved
 disposition. Preserve the existing NFS witness claim and shared platform objects.
 
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
+[administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
+[deployment-credentials]: ../openbao/README.md#service-deployment-credentials
 [runtime-state]: ../../docs/adrs/006-kubernetes-runtime-state-boundary.md
