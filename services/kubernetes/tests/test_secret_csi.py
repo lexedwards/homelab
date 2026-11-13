@@ -15,6 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SecretCSIContractTests(unittest.TestCase):
+    def test_native_chart_fields_match_helm_controller_serialization(self):
+        charts = [document for document in yaml.safe_load_all((ROOT / 'platform/secrets-csi.yaml.tftpl').read_text())
+                  if document['kind'] == 'HelmChart']
+        for chart in charts:
+            with self.subTest(chart=chart['metadata']['name']):
+                self.assertNotIn('createNamespace', chart['spec'])
+                self.assertEqual(chart['spec']['timeout'], '10m0s')
+
     def test_native_charts_are_embedded_worker_only_without_secret_sync_or_agent(self):
         text = (ROOT / 'platform/secrets-csi.yaml.tftpl').read_text()
         charts = [d for d in yaml.safe_load_all(text) if d['kind'] == 'HelmChart']
