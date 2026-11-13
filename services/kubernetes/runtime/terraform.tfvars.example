@@ -23,6 +23,14 @@
 #   }
 # }
 # -----------------------------------------------------------------------------
+# Private DNS (optional; requires enabled API runtime inputs)
+# -----------------------------------------------------------------------------
+# private_dns_forwarding = null
+# private_dns_forwarding = {
+#   zone     =
+#   resolver =
+# }
+# -----------------------------------------------------------------------------
 # Qualification (optional; enable only after the platform CRDs are installed)
 # -----------------------------------------------------------------------------
 # secrets_qualification = null

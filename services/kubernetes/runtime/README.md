@@ -39,5 +39,29 @@ network errors. No charts are vendored and there is no offline fallback. Saved
 plans contain the verified chart bytes; cluster image pulls still require
 reachable registries. Reliable internet access is an operating prerequisite.
 
+## Private DNS routing
+
+Set optional `private_dns_forwarding` in protected runtime inputs to an exact
+private suffix (`zone`) and its existing internal IPv4 `resolver`. The enabled
+`secrets_platform` currently supplies this root's API authentication and trust.
+Do not mix public resolvers with internal resolvers for private-zone forwarding:
+public negative answers can produce intermittent resolution failures.
+
+This root owns only the native `rke2-coredns` HelmChartConfig. RKE2 still owns
+the HelmChart and release; do not edit its rendered ConfigMap or install a second
+DNS server. The chart imports one mounted server-block file through `extraConfig`
+and `zoneFiles`, leaving its `servers` defaults, cluster discovery, public
+forwarding, image and availability settings unchanged. An existing chart config
+requires ownership review before adoption; do not force field ownership.
+
+The interface was rendered against the RKE2-provided `rke2-coredns` chart
+`1.49.002`. Recheck that interface on RKE2 upgrades. After the approved canonical
+apply, wait for the native Helm rollout, verify every DNS backend returns the
+private address from both workers, and check cluster/public resolution. Then
+check failed consumer mounts retry successfully and the next plan converges.
+This changes cluster DNS configuration, not upstream DNS records, firewall rules,
+guest resolvers or OpenBao ownership. Disabling the input is destruction-guarded;
+review rollback explicitly rather than deleting the config out of band.
+
 [decision]: ../../../docs/adrs/006-kubernetes-runtime-state-boundary.md
 [secrets]: ../SECRETS.md
