@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-import socket
 import stat
 import subprocess
 import tempfile
@@ -219,6 +218,22 @@ def write_report(operation, report):
             Path(temporary).unlink()
 
 
+def verify_control_plane(target, runner=subprocess.run):
+    require(os.geteuid() == 0 and (DATA / 'server/db/etcd').is_dir(), 'Execution requires the enrolled control-plane host')
+    certificate = str(DATA / 'agent/client-kubelet.crt')
+    verified = runner(['openssl', 'verify', '-purpose', 'sslclient', '-CAfile', str(DATA / 'server/tls/client-ca.crt'), certificate],
+                      capture_output=True, text=True, timeout=15)
+    require(verified.returncode == 0, 'Node certificate is not trusted by the local cluster')
+    subject = runner(['openssl', 'x509', '-in', certificate, '-noout', '-subject', '-nameopt', 'RFC2253'],
+                     capture_output=True, text=True, timeout=15)
+    require(subject.returncode == 0 and subject.stdout.strip().startswith('subject=') and '\\' not in subject.stdout,
+            'Cannot establish an unambiguous node certificate identity')
+    attributes = subject.stdout.strip().removeprefix('subject=').split(',')
+    require(attributes.count('CN=system:node:' + target['node_name']) == 1 and
+            sum(attribute.startswith('CN=') for attribute in attributes) == 1 and
+            attributes.count('O=system:nodes') == 1, 'Node certificate does not match the enrolled Kubernetes identity')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Plan or explicitly execute native, scoped off-node etcd backup operations. Never prints child output or recovery material.')
     parser.add_argument('operation', choices=['backup', 'status'])
@@ -234,8 +249,7 @@ def main():
         if not args.execute:
             print('Plan only: no native command, credential access or writes. Six-hour schedule; fourteen-day logical recovery window; no version purge.')
             return
-        require(os.geteuid() == 0 and socket.gethostname().split('.')[0] == target['node_name'] and
-                (DATA / 'server/db/etcd').is_dir(), 'Execution requires the enrolled control-plane host')
+        verify_control_plane(target)
         descriptor = os.open('/run/homelab-etcd-backup.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         with os.fdopen(descriptor, 'w') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

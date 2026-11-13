@@ -229,6 +229,71 @@ class EtcdBackupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             backup.server_token_hash('K10' + 'f' * 64 + '::node:' + short)
 
+    def test_control_plane_identity_uses_issued_node_certificate_not_os_hostname(self):
+        calls = []
+        def runner(args, **kwargs):
+            calls.append(args)
+            subject = 'subject=CN=system:node:test-control,O=system:nodes\n' if 'x509' in args else 'certificate: OK\n'
+            return subprocess.CompletedProcess(args, 0, stdout=subject, stderr='')
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory)
+            (data / 'server/db/etcd').mkdir(parents=True)
+            with patch.object(backup, 'DATA', data), patch('os.geteuid', return_value=0), \
+                    patch('socket.gethostname', side_effect=AssertionError('OS hostname is not Kubernetes identity')):
+                backup.verify_control_plane(TARGET, runner)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(args[0] == 'openssl' for args in calls))
+        self.assertNotIn('/server/token', ' '.join(part for args in calls for part in args))
+
+    def test_control_plane_identity_rejects_wrong_node_or_untrusted_certificate(self):
+        for invalid_chain in [False, True]:
+            def runner(args, **kwargs):
+                code = 1 if invalid_chain and 'verify' in args else 0
+                node = 'test-control' if invalid_chain else 'foreign-node'
+                return subprocess.CompletedProcess(args, code, stdout=f'subject=CN=system:node:{node},O=system:nodes\n', stderr='')
+            with tempfile.TemporaryDirectory() as directory:
+                data = Path(directory)
+                (data / 'server/db/etcd').mkdir(parents=True)
+                with patch.object(backup, 'DATA', data), patch('os.geteuid', return_value=0):
+                    with self.assertRaises(ValueError):
+                        backup.verify_control_plane(TARGET, runner)
+
+    def test_control_plane_identity_with_real_openssl_certificates(self):
+        def openssl(*args):
+            subprocess.run(['openssl', *args], check=True, capture_output=True, text=True, timeout=15)
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory)
+            (data / 'server/db/etcd').mkdir(parents=True)
+            (data / 'server/tls').mkdir()
+            (data / 'agent').mkdir()
+            ca = str(data / 'server/tls/client-ca.crt')
+            key = str(data / 'ca.key')
+            openssl('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', ca,
+                    '-subj', '/CN=Synthetic Client CA', '-days', '1')
+            request = str(data / 'node.csr')
+            openssl('req', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(data / 'node.key'), '-out', request,
+                    '-subj', '/O=system:nodes/CN=system:node:test-control')
+            openssl('x509', '-req', '-in', request, '-CA', ca, '-CAkey', key, '-CAcreateserial',
+                    '-out', str(data / 'agent/client-kubelet.crt'), '-days', '1')
+            with patch.object(backup, 'DATA', data), patch('os.geteuid', return_value=0):
+                backup.verify_control_plane(TARGET)
+                with self.assertRaises(ValueError):
+                    backup.verify_control_plane(dict(TARGET, node_name='foreign-node'))
+                openssl('req', '-new', '-key', str(data / 'node.key'), '-out', request,
+                        '-subj', '/O=system:nodes/OU=prefix,CN=system:node:test-control')
+                openssl('x509', '-req', '-in', request, '-CA', ca, '-CAkey', key, '-CAcreateserial',
+                        '-out', str(data / 'agent/client-kubelet.crt'), '-days', '1')
+                with self.assertRaises(ValueError):
+                    backup.verify_control_plane(TARGET)
+                openssl('req', '-new', '-key', str(data / 'node.key'), '-out', request,
+                        '-subj', '/O=system:nodes/CN=system:node:test-control')
+                openssl('x509', '-req', '-in', request, '-CA', ca, '-CAkey', key, '-CAcreateserial',
+                        '-out', str(data / 'agent/client-kubelet.crt'), '-days', '1')
+                openssl('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(data / 'foreign.key'),
+                        '-out', ca, '-subj', '/CN=Foreign CA', '-days', '1')
+                with self.assertRaises(ValueError):
+                    backup.verify_control_plane(TARGET)
+
     def test_custody_cli_keeps_old_token_associations_without_printing_values(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
