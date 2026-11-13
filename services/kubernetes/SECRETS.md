@@ -71,6 +71,19 @@ the opt-in to remove them. Review ownership/imports before adoption and stop on
 any unexpected existing object or field-manager conflict. Do not use forced field
 ownership to hide a second writer.
 
+The native Helm controller omits false boolean fields and serializes a ten-minute
+timeout as `10m0s`. Keep the blueprint in that canonical form: an explicit
+`createNamespace: false` or `timeout: 10m` causes perpetual object drift. The
+namespace remains an explicit OpenTofu resource; omitting the false flag does
+not ask Helm to create it.
+
+The pinned Vault provider refreshes an auth mount through
+`GET sys/mounts/auth/<auth-mount>` as well as its tune endpoint. A scoped setup
+identity needs read access to that exact metadata route, not secret-value access.
+If creation succeeds but that refresh is denied, preserve `prevent_destroy`.
+Verify the exact owned mount's identity before clearing only its failed-creation
+taint in canonical state; never destroy/re-enable it to work around a read denial.
+
 ### Apply phases and qualification
 
 1. **Platform:** keep `secrets_qualification = null`. Review/apply the saved
@@ -405,6 +418,11 @@ changes retrigger preparation. It is a bounded apply-time enrollment operation,
 not a general remote configuration provider or continuous OS-drift detector.
 Do not replace/delete/re-enroll nodes between plan review and apply. A registered
 worker replacement must remove its old Node and require new UID/host-key review.
+
+OpenTofu's Go SSH client can negotiate a different host-key algorithm from the
+OpenSSH client used during enrollment. Pin the negotiated key, obtained through
+the existing trusted connection, and verify it with strict host-key checking.
+Do not accept an unverified scan or disable host-key verification on mismatch.
 
 For a separately approved read-only drift/preflight check, run the same script
 as root without flags. Do not rerun host changes or set capability labels outside
