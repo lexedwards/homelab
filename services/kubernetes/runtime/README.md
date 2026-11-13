@@ -29,6 +29,12 @@ exports only non-secret issuance metadata. Mint tokens and populate values throu
 the protected OpenBao helper, never through OpenTofu. That writer cannot manage
 or refresh this root's auth resources; authorization remains administrative.
 
+Optional `recovery_custody` similarly defines only two fingerprint-addressed
+recovery records and their separate bounded writer/issuer, after checking the
+initialized cluster UID. It grants no workload read access and populates nothing.
+See [backup custody and host operations](../BACKUP.md); daily native backups do
+not depend on this API-managed authorization stage being available.
+
 Reusable implementations live in repository-level `modules/`; this root imports
 no module, script or state from another service. OpenBao publishes its endpoint
 as a JSON output export, not access to its hosting state. Republish after endpoint

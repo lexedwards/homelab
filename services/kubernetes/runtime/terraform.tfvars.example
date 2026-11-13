@@ -38,3 +38,14 @@
 #   secret_path =
 #   replicas    = 0
 # }
+
+# -----------------------------------------------------------------------------
+# Recovery custody (optional administrative definitions, never populated values)
+# -----------------------------------------------------------------------------
+# recovery_custody = null
+# recovery_custody = {
+#   kv_v2_mount              =
+#   cluster_uid              =
+#   server_token_hash        =
+#   backup_credential_sha256 =
+# }

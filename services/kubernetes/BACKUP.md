@@ -37,6 +37,45 @@ change VM/bootstrap configuration or restart RKE2 to deploy this workflow.
 
 ## Protected host inputs
 
+### Service-owned OpenBao records
+
+The adjacent runtime root's optional `recovery_custody` declaration manages only
+administrative authorization through the shared deployment-access module. It
+checks the actual `kube-system` UID, then grants a separate bounded writer access
+to exactly these two records in an explicitly approved existing KV-v2 engine:
+
+| Record suffix under `kubernetes/recovery/<cluster_uid>/` | Fields |
+| --- | --- |
+| `server-token/<native_token_hash>` | `server_token` |
+| `s3-credentials/<credential_sha256>` | `access_key_id`, `secret_access_key` |
+
+The fingerprints are protected metadata, not values. The native token hash is a
+correlation identifier, not an authentication or collision-resistant custody
+proof. Authorization planning needs the available API/OpenBao services; ordinary
+backup/restore credentials do not depend on that planning path being available.
+No root-host or workload read policy is granted, no KV engine is created, and
+OpenTofu neither mints a token nor writes/reads the values. The ordinary writer
+cannot read records or manage authorization; its separate issuer can mint only
+the non-renewable, non-orphan, maximum-900-second writer role without default policy.
+
+Review/apply this opt-in definition separately from host installation, using a
+fresh scoped administrative identity and the runtime state on canonical `main`.
+The setup policy must explicitly cover the named recovery policies/token role;
+do not broaden the qualification writer or grant direct administrative value
+access. Privately export `recovery_custody_enrollment` and use the shared protected
+credential helper to issue the bounded writer. Populate only the declared
+schemas through protected stdin, initially with KV-v2 CAS=0. A collision stops
+enrollment; do not overwrite or read an existing record to repair it.
+
+Fingerprint-addressed paths and CAS=0 prevent accidental first-write overwrite,
+not hostile-writer isolation: this writer still has update capability on its
+exact records, and trusted administrators control the policies. Rotation needs
+reviewed authorization updates for the new fingerprints and independent copies.
+Preserve historical records and actual token copies while their snapshots or
+versions are retained. Do not use the read-only workload role for recovery custody.
+
+### Native host files
+
 Prepare inputs outside Git, owned by the operator with mode `0600`. Install the
 reviewed copies root-owned with mode `0600` under `/etc/rancher/rke2/`:
 
@@ -46,10 +85,12 @@ reviewed copies root-owned with mode `0600` under `/etc/rancher/rke2/`:
 | `backup-credentials.json` | `access_key_id`, `secret_access_key`; see `backup/credentials.json.example` |
 | `backup-recovery-custody.json` | Stable cluster UID, current credential fingerprint and retained server-token fingerprints from the attestation helper |
 
-Use the producer's HTTPS origin and approved existing bucket. Obtain `node_name`
-and the stable `kube-system` namespace UID from the owning cluster under read-only
-authorization. Verify that UID against the initialized cluster before installing
-inputs. It namespaces objects under `rke2/<cluster_uid>`; it is not a credential.
+Generate the endpoint/bucket fields from the producer's published export, not a
+second independently maintained endpoint declaration. Obtain `node_name` from the
+owning cluster and use the `cluster_uid` in its verified recovery enrollment
+export. Verify those identities against the initialized cluster before installing
+inputs. The UID namespaces objects under `rke2/<cluster_uid>`; it is not a
+credential. Republish and review the host inputs after a producer-interface change.
 
 For custody attestation, use independently recovered private files, never the
 live server-token file. The helper rejects the live default path, but the operator

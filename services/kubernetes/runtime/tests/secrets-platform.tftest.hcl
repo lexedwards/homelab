@@ -5,6 +5,9 @@ mock_provider "kubernetes" {
   mock_data "kubernetes_resource" {
     defaults = { object = { metadata = { uid = "worker-a-uid" } } }
   }
+  mock_data "kubernetes_namespace_v1" {
+    defaults = { metadata = { uid = "00000000-0000-0000-0000-000000000001" } }
+  }
 }
 mock_provider "vault" {}
 mock_provider "external" {
@@ -123,6 +126,83 @@ run "manage_native_charts_auth_and_host_prerequisites_without_secret_values" {
       length(module.secrets_qualification) == 0
     )
     error_message = "OpenTofu must own the actual native chart, cluster auth and verified worker prerequisite resources, not merely export manifests or create secret values."
+  }
+}
+
+run "recovery_custody_has_no_resources_until_explicitly_enabled" {
+  command = plan
+  assert {
+    condition     = length(module.recovery_deployment_access) == 0
+    error_message = "Recovery authorization must remain opt-in and never mint values or credentials."
+  }
+}
+
+run "recovery_writer_owns_only_two_fingerprint_bound_records_and_no_workload_reader" {
+  command = plan
+  variables {
+    recovery_custody = {
+      kv_v2_mount              = "apps"
+      cluster_uid              = "00000000-0000-0000-0000-000000000001"
+      server_token_hash        = "aaaaaaaaaaaa"
+      backup_credential_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+  assert {
+    condition = (
+      length(module.recovery_deployment_access) == 1 &&
+      toset(module.recovery_deployment_access[0].enrollment.secret_paths) == toset([
+        "apps/data/kubernetes/recovery/00000000-0000-0000-0000-000000000001/server-token/aaaaaaaaaaaa",
+        "apps/data/kubernetes/recovery/00000000-0000-0000-0000-000000000001/s3-credentials/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]) &&
+      toset(output.recovery_custody_enrollment.records.server_token.fields) == toset(["server_token"]) &&
+      toset(output.recovery_custody_enrollment.records.s3_credentials.fields) == toset(["access_key_id", "secret_access_key"]) &&
+      length(module.secrets_qualification) == 0
+    )
+    error_message = "Recovery enrollment needs exact fingerprint-addressed schemas and a separate bounded writer, not workload-reader access or values in state."
+  }
+}
+
+run "recovery_custody_rejects_a_different_initialized_cluster" {
+  command = plan
+  variables {
+    recovery_custody = {
+      kv_v2_mount              = "apps"
+      cluster_uid              = "00000000-0000-0000-0000-000000000002"
+      server_token_hash        = "aaaaaaaaaaaa"
+      backup_credential_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+  expect_failures = [data.kubernetes_namespace_v1.recovery_cluster[0]]
+}
+
+run "recovery_fingerprints_are_metadata_not_plain_values" {
+  command = plan
+  variables {
+    recovery_custody = {
+      kv_v2_mount              = "apps"
+      cluster_uid              = "00000000-0000-0000-0000-000000000001"
+      server_token_hash        = "not-a-native-fingerprint"
+      backup_credential_sha256 = "bb"
+    }
+  }
+  expect_failures = [var.recovery_custody]
+}
+
+run "recovery_without_runtime_inputs_does_not_fetch_a_cluster" {
+  command = plan
+  variables {
+    secrets_platform = null
+    recovery_custody = {
+      kv_v2_mount              = "apps"
+      cluster_uid              = "00000000-0000-0000-0000-000000000001"
+      server_token_hash        = "aaaaaaaaaaaa"
+      backup_credential_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+  expect_failures = [var.recovery_custody]
+  assert {
+    condition     = length(data.kubernetes_namespace_v1.recovery_cluster) == 0 && length(module.recovery_deployment_access) == 0
+    error_message = "Invalid recovery configuration must not fall back to ambient Kubernetes configuration."
   }
 }
 
