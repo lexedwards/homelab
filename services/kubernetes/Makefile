@@ -4,7 +4,7 @@ PYTHON ?= python3
 HELM ?= helm
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare plan apply
 
 help:
 	@printf '%s\n' \
@@ -18,6 +18,8 @@ help:
 		'validate         Run all local checks without infrastructure access' \
 		'nfs-chart-validate Render/check a previously downloaded NFS_CHART archive using HELM' \
 		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
+		'secrets-csi-validate Verify/render local CSI_DRIVER_CHART and CSI_PROVIDER_CHART with SECRET_ENROLLMENT' \
+		'secrets-csi-prepare Verify/render those inputs and emit private files in new SECRETS_OUTPUT' \
 		'plan             Write an authorized online plan to PLAN_FILE' \
 		'apply            Apply only a previously inspected, unchanged PLAN_FILE'
 
@@ -49,6 +51,8 @@ yaml-validate:
 	$(YAMLLINT) examples/service-exposure.yaml
 	$(YAMLLINT) platform/nfs.yaml.tftpl
 	$(YAMLLINT) examples/nfs-workloads.yaml.tftpl
+	$(YAMLLINT) platform/secrets-csi.yaml.tftpl
+	$(YAMLLINT) examples/secrets-workloads.yaml
 
 shell-validate:
 	bash -n cloud-init/install-server.sh
@@ -65,6 +69,13 @@ nfs-prepare:
 	test -f "$(NFS_CHART)"
 	test -n "$(NFS_MANIFEST)"
 	$(PYTHON) -B scripts/validate-nfs-chart.py --chart "$(NFS_CHART)" --helm "$(HELM)" --output "$(NFS_MANIFEST)"
+
+secrets-csi-validate:
+	$(PYTHON) -B scripts/prepare-secrets-csi.py --driver-chart "$(CSI_DRIVER_CHART)" --provider-chart "$(CSI_PROVIDER_CHART)" --enrollment "$(SECRET_ENROLLMENT)" --helm "$(HELM)"
+
+secrets-csi-prepare:
+	test -n "$(SECRETS_OUTPUT)"
+	$(PYTHON) -B scripts/prepare-secrets-csi.py --driver-chart "$(CSI_DRIVER_CHART)" --provider-chart "$(CSI_PROVIDER_CHART)" --enrollment "$(SECRET_ENROLLMENT)" --helm "$(HELM)" --output-dir "$(SECRETS_OUTPUT)"
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

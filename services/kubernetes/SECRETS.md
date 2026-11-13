@@ -2,9 +2,10 @@
 
 `scripts/prepare-secret-auth.py` prepares the platform authentication contract and
 one service's exact enrollment. It runs offline, does not read secret values or
-credentials, and does not contact Kubernetes or OpenBao. It does not install the
-Secrets Store CSI driver/provider or change a running service. ALE-49 owns that
-later integration and its production qualification.
+credentials, and does not contact Kubernetes or OpenBao.
+`scripts/prepare-secrets-csi.py` verifies the pinned CSI/provider charts and
+prepares their native RKE2 installer separately. Neither tool deploys anything
+or changes a running service. ALE-49 owns authorized production qualification.
 
 ## Authentication model
 
@@ -147,7 +148,7 @@ Rendering grants no live-change authority. Before deployment:
    from the exact account using a read-only inline `secrets-store.csi.k8s.io` volume.
    Keep Secret synchronization disabled. Confirm `0444` non-root reads and actual
    runc/Kata execution on both workers under SELinux enforcing. Provider socket
-   labeling and chart installation are not implemented by this preparation tool.
+   labeling and chart installation use the separate procedures below.
 5. Test allowed and forbidden namespace/account/path requests, wrong audience,
    token expiry and service-account revocation with owned synthetic data. Do not
    publish JWTs, issued OpenBao tokens, mounted values or API responses. Confirm a
@@ -163,5 +164,177 @@ values and the existing auth configuration during diagnosis; do not seal OpenBao
 delete an auth mount or reset the cluster as automatic rollback. To remove one
 service's access, review its provider class, reviewer binding, role, policy and
 issued-token lifecycle without removing the shared mount or ClusterRole.
+
+## Pinned CSI and provider stack
+
+`platform/secrets-csi.yaml.tftpl` is a blueprint, **not an installable manifest**.
+It selects Secrets Store CSI Driver **1.6.2**, OpenBao chart **0.30.7** with only
+provider **2.0.3**, and digest-pinned driver, registrar, liveness and provider
+images. The qualification application image is pinned too. Versions retain the
+earlier synthetic compatibility baseline; this is not production acceptance or
+a claim that every selected version is the latest release.
+
+Download the two public chart archives from the blueprint's source annotations
+into an operator-owned location. The preparer checks their exact SHA-256 values
+before Helm sees them, renders copies of those verified bytes locally for RKE2
+1.36.6, and checks the resulting resource, image and security contract. It embeds
+the same verified bytes in `chartContent`; installation does not fetch an archive
+from a release URL. Publisher-index checksums and registry manifest digests bind
+the reviewed inputs, but are not independent publisher-signature attestations.
+
+With Helm available and `service-enrollment.yaml` prepared above:
+
+```bash
+make secrets-csi-prepare \
+  CSI_DRIVER_CHART=/protected/location/secrets-store-csi-driver-1.6.2.tgz \
+  CSI_PROVIDER_CHART=/protected/location/openbao-0.30.7.tgz \
+  SECRET_ENROLLMENT=/protected/location/prepared-auth/service-enrollment.yaml \
+  SECRETS_OUTPUT=/protected/location/prepared-csi
+```
+
+The script's required flags are `--driver-chart PATH`, `--provider-chart PATH`
+and `--enrollment PATH`. `--helm EXECUTABLE` defaults to `helm`.
+`--output-dir PATH` is optional: omit it, or use `make secrets-csi-validate`,
+for validation only. The enrollment must be a protected regular file with one
+OpenBao class, no Secret synchronization and the expected verified-HTTPS
+parameters. The script copies its audience and OpenBao origin into the installer;
+it does not infer or change API audiences. All classes using this initial driver
+must use that same API-accepted audience. Multiple audience support needs review.
+
+The optional new output directory is mode `0700` with two mode-`0600` files:
+
+- `secrets-csi.yaml`: namespace and two native RKE2 HelmChart objects.
+- `rendered.yaml`: the exact local Helm render for private inspection/schema checks.
+
+Existing output directories are never overwritten. Exit `0` means validation
+passed, exit `1` means preparation failed, and argument errors use exit `2`.
+Values and endpoint-bearing render failures are not printed. A file-write failure
+can leave partial output; do not apply partial artifacts. Keep both files outside
+Git/state/plans/logs. `make validate` covers local code/template contracts and the
+reload application, without downloading charts or contacting infrastructure.
+The separate chart targets exercise actual Helm rendering with supplied archives.
+
+### Runtime security and ownership
+
+Both DaemonSets select only workers with the administrator-controlled
+`homelab.node-restriction.kubernetes.io/secrets-ready=true` capability label.
+An unlabeled replacement cannot silently start the stack before host checks.
+The privileged namespace is only for trusted CSI components, not applications.
+Native Helm installer jobs are RKE2 controller operations; the worker selector
+applies to the installed CSI/provider DaemonSets.
+
+The Linux CSI driver keeps its required privileged, bidirectional kubelet mounts.
+The OpenBao provider is UID 0/GID 1000 but **not privileged**, drops all
+capabilities, denies privilege escalation, uses a read-only root filesystem and
+RuntimeDefault seccomp. The chart's container security context is specified in
+full because setting a partial context replaces its defaults. Server, injector,
+agent, Windows components and workload-Secret synchronization are disabled.
+Provider debug logging and its in-memory token cache are disabled; fresh rotation
+requests must authenticate again. No OpenBao server or cache sidecar is installed.
+
+The CSIDriver requests a pod-bound token for the configured API audience with
+600-second requested lifetime. Verify the actual lifetime and renewal at runtime.
+Kubelet's `serviceAccountTokenInSecrets: true` puts the JWT in the CSI RPC's
+sensitive `secrets` map; it **does not create a Kubernetes Secret object**.
+The provider consumes the audience-matching forwarded token. Its stock chart
+also retains cluster-wide `serviceaccounts/token` creation permission for its
+token-request fallback: this trusted provider is not a workload least-privilege
+boundary. Qualification must confirm the normal forwarded pod-bound path rather
+than infer it from the configuration.
+
+The provider retains namespaced access to its HMAC-key Secret: `get` of the named
+key and `create` in `secrets-system` (Kubernetes cannot resource-name-restrict
+creation). That internal version-HMAC key is not synchronized workload content.
+Do not store application values there or grant this provider account to workloads.
+The CSI driver has no Secret-read/write synchronization RBAC.
+
+The chart includes the two upstream CRDs on initial installation. Its
+CRD upgrade-hook Job is disabled. Helm does not automatically upgrade CRDs in
+`crds/`; future version changes require a separately reviewed CRD migration and
+ownership check, not blind chart replacement. Check existing CRDs, CSIDriver,
+release names, RBAC and namespace ownership before installation. Do not adopt a
+second driver/provider owner.
+
+### Worker provider-directory preparation
+
+After explicit host-change approval, copy `scripts/label-secrets-provider.py` to
+each selected worker through the existing pinned SSH trust path. Run it as root
+without flags to **check only**, or with `--apply` to add the approved mapping:
+
+```bash
+sudo python3 -B /protected/location/label-secrets-provider.py --apply
+sudo python3 -B /protected/location/label-secrets-provider.py
+```
+
+It requires an enrolled Rocky 10 amd64 worker with active RKE2 agent, enforcing
+SELinux and no control-plane datastore/server. It does not install packages,
+change cloud-init, restart services, set cluster labels or weaken SELinux.
+The existing worker package baseline supplies the SELinux tools.
+The only mapping is `/etc/kubernetes/secrets-store-csi-providers(/.*)?` to
+`container_file_t:s0`. Conflicting exact mappings, symlinks and unrelated provider
+contents cause a stop; they are not overwritten. `--apply` restores labels only
+inside that directory and never changes existing directory/socket permissions.
+Failure may leave an added mapping or created directory; inspect rather than
+blindly retry or delete it. Both the persistent mapping and current labels must
+pass before an administrator sets the capability label on the exact worker.
+
+This is the accepted shared-container-data exception, not provider-exclusive
+socket isolation. Do not broaden it to kubelet directories, add allow rules or
+use privileged provider mode. Keep workload hostPath/privilege restrictions.
+The local mapping and labels persist across normal reboot; after any replacement,
+repeat preparation before restoring the capability label. No immutable VM
+bootstrap or control-plane identity changes are needed.
+
+After ownership/trust review and explicit deployment approval, install only the
+prepared `secrets-csi.yaml` as root-owned mode `0600` in the existing RKE2 server
+manifest directory. Wait for both worker DaemonSets and both node registrations,
+the two CRDs and expected Helm releases before service enrollment or test pods.
+Do not persist qualification workloads in that auto-reconciled directory.
+
+## Owned ordinary/Kata qualification
+
+Use only a new, approved `secrets-check` namespace, `reader` service account and
+`qualification-files` class mapping one synthetic field to filename `value`.
+The service-owned OpenBao role must bind that exact account and namespace. Stop
+if these names already belong to something else. The example namespace is
+restricted; its NetworkPolicy denies application ingress/egress, and no Service
+or VLAN address is allocated. Use authorized pod exec with loopback requests;
+check node readiness probes under the actual Cilium policy.
+
+After separate synthetic-value/enrollment approval, create the owned namespace
+and account first, enroll its exact role/class, and create `reload-app` from
+`examples/secret-reload.py` using `--from-file=reload.py=examples/secret-reload.py`.
+Only this non-secret application source belongs in that ConfigMap. Then apply
+`examples/secrets-workloads.yaml`: it creates two ordinary and two explicit Kata
+consumers, one of each per verified worker, without service-account token mounts,
+writable secret mounts, hostPath or writable root filesystems.
+
+The sample application polls `/secrets/value` and keeps its active value **only
+in memory**. It reopens the path rather than watching an old inode or using a
+subPath mount, so CSI atomic replacement can be observed. It accepts at most
+64 KiB. No mounted values, digests or request bodies are logged or returned:
+
+- `GET /ready` reports only whether any value was loaded. It does not establish
+  refresh health and remains ready with an old loaded value during an outage.
+- `POST /verify` takes expected raw bytes in the body and returns only `matches`
+  and an application reload counter. This is a **synthetic test oracle**, not a
+  production endpoint: keep it inaccessible to peers/public clients and use
+  high-entropy owned test values. Do not pass expected values in URLs or argv.
+
+Use a protected client input/stdin and suppress request/response tracing. Prove
+the first value matches, rotate the owned OpenBao record, observe mounted-file
+delivery separately, and then prove the second value matches, the first no longer
+matches and the in-memory reload counter increased on all four consumers.
+The driver polls every two minutes and the application every second; record actual
+elapsed times without promising a hard refresh SLA. Offline tests prove the
+application reacts to local atomic file replacement, not production CSI rotation.
+
+Record actual Kata/KVM execution, non-root identity, `0444` read-only files,
+host tmpfs-backed CSI targets and enforcing SELinux on both workers. Exercise
+wrong account/path/audience and expired/revoked identities without emitting
+values or tokens. Review any OpenBao unavailability or provider/worker restart
+test separately so unrelated users and the initialized cluster are preserved.
+Scale down and remove only owned test resources/roles/values after approved
+disposition. Preserve the existing NFS witness claim and shared platform objects.
 
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
