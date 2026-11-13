@@ -57,6 +57,51 @@ run "disabled_platform_needs_no_cluster_or_openbao_objects" {
   }
 }
 
+run "private_dns_forwarding_is_opt_in" {
+  command = plan
+  assert {
+    condition     = length(kubernetes_manifest.private_dns_forwarding) == 0
+    error_message = "Private-zone routing must not alter an unconfigured cluster."
+  }
+}
+
+run "forward_only_the_declared_private_zone_without_replacing_native_servers" {
+  command = plan
+  variables { private_dns_forwarding = { zone = "lab.example.invalid", resolver = "192.0.2.53" } }
+  assert {
+    condition = (
+      kubernetes_manifest.private_dns_forwarding[0].manifest.kind == "HelmChartConfig" &&
+      kubernetes_manifest.private_dns_forwarding[0].manifest.metadata.name == "rke2-coredns" &&
+      kubernetes_manifest.private_dns_forwarding[0].manifest.metadata.namespace == "kube-system" &&
+      yamldecode(kubernetes_manifest.private_dns_forwarding[0].manifest.spec.valuesContent).extraConfig.import.parameters == "/etc/coredns/private-forward.server" &&
+      yamldecode(kubernetes_manifest.private_dns_forwarding[0].manifest.spec.valuesContent).zoneFiles == [{
+        filename = "private-forward.server"
+        contents = "lab.example.invalid:53 {\n    errors\n    cache 30\n    forward . 192.0.2.53\n}\n"
+      }] &&
+      !contains(keys(yamldecode(kubernetes_manifest.private_dns_forwarding[0].manifest.spec.valuesContent)), "servers")
+    )
+    error_message = "Use the native chart's import and mounted config file without replacing cluster/public DNS servers or adopting its HelmChart."
+  }
+}
+
+run "reject_private_dns_directive_injection" {
+  command = plan
+  variables { private_dns_forwarding = { zone = "lab.example.invalid\n.:53", resolver = "192.0.2.53" } }
+  expect_failures = [var.private_dns_forwarding]
+}
+
+run "reject_private_dns_cluster_zone_override" {
+  command = plan
+  variables { private_dns_forwarding = { zone = "cluster.local", resolver = "192.0.2.53" } }
+  expect_failures = [var.private_dns_forwarding]
+}
+
+run "reject_private_dns_resolver_directive_injection" {
+  command = plan
+  variables { private_dns_forwarding = { zone = "lab.example.invalid", resolver = "192.0.2.53\n    forward . 127.0.0.1" } }
+  expect_failures = [var.private_dns_forwarding]
+}
+
 run "manage_native_charts_auth_and_host_prerequisites_without_secret_values" {
   command = plan
   assert {
