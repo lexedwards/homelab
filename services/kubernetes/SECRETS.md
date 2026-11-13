@@ -100,6 +100,11 @@ taint in canonical state; never destroy/re-enable it to work around a read denia
    Deployments. It also defines the exact value-writer token role and separate
    issuer policy. It neither creates a KV engine nor mints credentials or
    populates/reads the record.
+
+   The qualification NetworkPolicy explicitly selects both `Ingress` and `Egress`
+   but omits empty rule lists. With no rules it still denies both directions;
+   omission matches the API representation and avoids manifest-provider
+   inconsistent-result errors from empty-list-to-null normalization.
 3. **Value enrollment and consumers:** export `secrets_qualification_enrollment`
    privately. Use OpenBao's [protected credential helper][deployment-credentials]
    to mint a bounded value-writer and populate only its declared synthetic record
