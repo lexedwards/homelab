@@ -37,7 +37,7 @@ class ServiceCredentialTests(unittest.TestCase):
         self.assertEqual(output.read_text(), 'synthetic-deployment\n')
         self.assertEqual(output.stat().st_mode & 0o777, 0o600)
         self.assertEqual(request.call_args.args[2], 'auth/token/create/demo-deploy')
-        self.assertEqual(request.call_args.args[3], {'policies': ['demo-deploy'], 'ttl': '900s',
+        self.assertEqual(request.call_args.args[3], {'policies': ['demo-deploy'], 'ttl': '900s', 'explicit_max_ttl': '900s',
                                                    'renewable': False, 'no_default_policy': True})
 
     def test_existing_output_is_preserved_without_issuing_another_token(self):

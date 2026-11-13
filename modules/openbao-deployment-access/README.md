@@ -6,17 +6,31 @@ trusted configuration identity; never the deployment token this module defines.
 The module does not enable a KV engine, populate values or issue credentials.
 
 It defines `<name>-deploy`, a create/update-only record policy and a non-renewable
-token role with a 900-second explicit maximum lifetime. No default policy is
-attached. `<name>-issuer` can mint only that role with exactly its deployment
-policy and fixed issuance parameters. It cannot manage roles/policies, read
+token role. The constrained issuer and helper require both `ttl=900s` and
+`explicit_max_ttl=900s` on every issuance. No default policy is attached.
+`<name>-issuer` can mint only that role with exactly its deployment policy and
+fixed issuance parameters. It cannot manage roles/policies, read
 records, mint readers or request orphan tokens. Tokens remain children of their
 issuer. Both identities may inspect/revoke themselves; neither can renew itself.
+
+OpenBao 2.7.2 can return a token with `explicit_max_ttl=0` even when the role's
+`token_explicit_max_ttl` is 900. Do not infer the issued-token cap from that role
+field alone. The explicit request parameter is enforced by the issuer ACL and
+verified through token self-lookup in the isolated real-server test. Trusted
+administrators issuing directly must also supply `explicit_max_ttl=900s`.
 
 `enrollment` returns names and paths, never tokens. Add the service-owned HTTPS
 endpoint to this metadata and export it privately for
 `scripts/service-credentials.py`. Issue credentials only after the
 administrative plan is reviewed/applied. Existing policy-name collisions fail
 instead of being silently adopted; inspect token-role ownership too before apply.
+
+When upgrading from the earlier helper, review/apply the issuer-policy update
+before using the new request shape. An older policy rejects the additional
+parameter, and the updated policy rejects requests that omit it; neither has a
+compatibility fallback. Existing issued tokens are not changed or revoked by
+this update. No value reads, workload reader-policy changes or pod restarts are
+needed. Obtain explicit authorization for each consuming root's saved plan.
 
 Runtime read policies and auth roles remain service-owned but administrative.
 See [ADR 008][decision] for the refresh/security trade-off and Kubernetes limits.

@@ -65,7 +65,7 @@ def issue(enrollment, issuer_token, output):
         with os.fdopen(descriptor, 'w') as destination:
             os.fchmod(destination.fileno(), 0o600)
             auth = request(enrollment, issuer_token, 'auth/token/create/' + enrollment['token_role'], {
-                'policies': [enrollment['deployment_policy']], 'ttl': '900s',
+                'policies': [enrollment['deployment_policy']], 'ttl': '900s', 'explicit_max_ttl': '900s',
                 'renewable': False, 'no_default_policy': True,
             })['auth']
             token = auth['client_token']
