@@ -11,8 +11,11 @@ a datastore or upgrade a node. Local validation is not live backup evidence.
   RustFS publishes an explicit endpoint/trust interface. Do not import another
   service's implementation, credentials, tfvars or state.
 - Use the enrolled Rocky 10 control-plane host and its signed, pinned RKE2
-  `v1.36.6+rke2r1`. The helper rejects workers, a different hostname and other
-  versions. Review the native CLI and metadata contract before an upgrade.
+  `v1.36.6+rke2r1`. The helper rejects workers, an untrusted or different kubelet
+  certificate identity and other versions. Kubernetes node names need not match
+  OS hostnames. Identity uses the local client CA and the public kubelet client
+  certificate; no token read is needed for this check. Review the native CLI and
+  metadata contract before an upgrade.
 - The producer endpoint must pass system-trusted HTTPS from the control plane.
   Private-CA distribution needs separate review; neither plaintext nor TLS
   verification bypass is supported. Use a dedicated bucket-scoped credential.
