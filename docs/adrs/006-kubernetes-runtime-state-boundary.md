@@ -20,9 +20,12 @@ API-managed platform resources in `services/kubernetes/runtime`, with its own
 protected state and pinned Kubernetes/API-compatible Vault providers. Both remain
 part of the Kubernetes service and deploy only from canonical `main`.
 
-Read only non-secret connection metadata from the existing Kubernetes and OpenBao
-hosting states. Their state files remain authoritative and are not migrated or
-replaced. State readers still need access to the whole hosting state; protect it.
+Read non-secret connection metadata from the same-service Kubernetes provisioning
+state. OpenBao publishes its `api_endpoint` JSON output separately; the consumer
+receives the exported file and does not read another service's state. This explicit
+interface replaces the original cross-service remote-state handoff to enforce
+service isolation. Both existing states remain authoritative and are not migrated
+or replaced. Same-service state readers still have access to their whole state.
 Never export actual credentials or secret values as connection metadata.
 
 OpenTofu owns native RKE2 HelmChart objects; RKE2 owns their releases. Service roots

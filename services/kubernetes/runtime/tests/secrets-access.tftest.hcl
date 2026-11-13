@@ -18,7 +18,7 @@ variables {
 
 run "manage_exact_record_policy_role_binding_and_class_without_populated_values" {
   command = plan
-  module { source = "../modules/openbao-access" }
+  module { source = "../../../modules/kubernetes-openbao-access" }
   assert {
     condition = (
       vault_policy.read.policy == "path \"apps/data/demo\" {\n  capabilities = [\"read\"]\n}\n" &&
@@ -42,21 +42,21 @@ run "manage_exact_record_policy_role_binding_and_class_without_populated_values"
 
 run "reject_wildcard_record_access" {
   command = plan
-  module { source = "../modules/openbao-access" }
+  module { source = "../../../modules/kubernetes-openbao-access" }
   variables { files = { value = { secret_path = "apps/data/*", secret_key = "value" } } }
   expect_failures = [var.files]
 }
 
 run "reject_wildcard_service_accounts" {
   command = plan
-  module { source = "../modules/openbao-access" }
+  module { source = "../../../modules/kubernetes-openbao-access" }
   variables { service_account = "*" }
   expect_failures = [var.name]
 }
 
 run "reject_plaintext_openbao_transport" {
   command = plan
-  module { source = "../modules/openbao-access" }
+  module { source = "../../../modules/kubernetes-openbao-access" }
   variables { openbao_endpoint = "http://bao.example.invalid:8200" }
   expect_failures = [var.openbao_endpoint]
 }

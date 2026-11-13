@@ -26,15 +26,18 @@ No persisted apply runs from a feature worktree.
 
 - OpenBao's service root exports `api_endpoint`, derived from its service-owned
   DNS name and native HTTPS port. Make that output available through an inspected
-  output-only apply in canonical `services/openbao` first. Do not duplicate its
-  hostname/port in an ad hoc enrollment file or expose authentication material.
-- The runtime root reads that existing OpenBao state and the parent Kubernetes
-  state's `runtime_connection` output. Make the latter available through a
+  output-only apply in canonical `services/openbao` first. The producer publishes
+  `tofu output -json api_endpoint` into a protected file outside Git. Supply its
+  absolute path as `openbao_endpoint_file`. Do not duplicate its hostname/port,
+  import its service implementation, read its state or expose authentication.
+  Republish the export after endpoint changes; consumers validate the JSON origin.
+- The runtime root reads only its own service's parent Kubernetes state's
+  `runtime_connection` output. Make that available through a
   reviewed output-only parent apply first. It supplies the stable API origin,
   SSH user and complete worker cohort, not credentials.
-  Remote-state access grants access to the entire protected hosting state, not
-  only the output. Keep access/backups protected and keep actual secret values
-  out of them. Both infrastructure states remain authoritative. The parent root
+  This same-service state access still exposes the whole protected provisioning
+  state, not only its output. Keep it protected and free of actual secret values.
+  Both infrastructure states remain authoritative. The parent root
   has no Kubernetes or OpenBao API provider dependency.
 - Supply an explicit protected `kubeconfig_path`. The provider is pinned to the
   cluster's existing API DNS name and verified TLS, and obtains the public API CA
@@ -96,8 +99,9 @@ ownership to hide a second writer.
    not the shared platform or stored OpenBao values. Value deletion needs its own
    approved disposition. Preserve the retained NFS claim and initialized cluster.
 
-Future consuming services declare `modules/openbao-access` in **their own roots**
-(the path is relative to this Kubernetes root). Pass the shared auth mount,
+Future consuming services declare repository-level
+`modules/kubernetes-openbao-access` in **their own roots**. Do not import modules
+under another service. Pass the shared auth mount,
 reviewer-role name, audience and service endpoint, plus their own namespace,
 account and exact record/field mappings. The module owns its policy, OpenBao role,
 reviewer binding and SecretProviderClass and returns the class reference. The
@@ -114,7 +118,7 @@ that declares auth roles/policies is a privileged authorization stage; its
 value-writer token cannot plan or apply those resources. Service ownership does
 not mean the ordinary deployer can author or broaden its own permissions.
 
-Declare OpenBao's `modules/deployment-access` alongside the consuming service's
+Declare repository-level `modules/openbao-deployment-access` alongside the consuming service's
 authorization, using the same exact record paths. It defines only record-write
 permissions, a bounded token role and an optional delegated issuer policy; no
 credential or value is created by OpenTofu. The Kubernetes runtime root does this
@@ -162,7 +166,7 @@ Follow [ADR 002][ownership]. Each deployed object has one OpenTofu owner:
 | Owner | Managed declaration | Responsibility |
 | --- | --- | --- |
 | Kubernetes platform | `runtime/secrets.tf` shared resources | Native charts, verified worker prerequisites, auth mount/config and exact TokenReview ClusterRole |
-| Owning service | Its `modules/openbao-access` instance | Exact record-read policy, account-bound auth role, reviewer binding and SecretProviderClass |
+| Owning service | Its shared `modules/kubernetes-openbao-access` instance | Exact record-read policy, account-bound auth role, reviewer binding and SecretProviderClass |
 | Owning service | Its namespace/account and workload resources | Workload identity and read-only class consumption |
 | Operator | Protected value-enrollment workflow | Secret population and independent OpenBao recovery custody |
 
@@ -484,5 +488,5 @@ disposition. Preserve the existing NFS witness claim and shared platform objects
 
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
-[deployment-credentials]: ../openbao/README.md#service-deployment-credentials
+[deployment-credentials]: ../../modules/openbao-deployment-access/README.md#protected-credential-operations
 [runtime-state]: ../../docs/adrs/006-kubernetes-runtime-state-boundary.md

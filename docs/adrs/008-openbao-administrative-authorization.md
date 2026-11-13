@@ -28,7 +28,7 @@ Ordinary service deployment tokens may create/update only exact approved KV-v2
 records. They cannot read values, list metadata, delete records, manage policies
 or roles, or mint tokens. Runtime identities may read only their required records.
 
-OpenBao's reusable deployment-access module defines a bounded named token role
+Repository-level `modules/openbao-deployment-access` defines a bounded named token role
 and a separate issuer policy. An approved administrator can mint a writer directly
 through that role or delegate the issuer policy to an operator identity. Issuance
 and value enrollment use protected files/stdin, outside OpenTofu. OpenTofu stores
@@ -38,6 +38,9 @@ only definitions and uses ephemeral administrative inputs.
 
 - Authorization changes remain privileged actions, even in a service-owned root.
   A root that manages authorization cannot be planned with its value-writer token.
+- Reusable modules and their tools/tests live outside `services/`. Consumers own
+  their instances and exchange published interfaces, not another service's code,
+  resources or state. OpenBao's endpoint is a narrowly exported JSON output.
 - Native provider configuration refresh and drift repair remain enabled. There
   is no new configuration provider, broker or production state in this slice.
 - The Kubernetes runtime root is already a privileged platform root; it owns its

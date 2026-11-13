@@ -48,10 +48,10 @@ class DeploymentAuthorizationTests(unittest.TestCase):
         version = cls.api('GET', 'sys/health', cls.admin)['version']
         if version != '2.7.2':
             raise RuntimeError('Use the pinned production version 2.7.2 for the ACL integration test')
-        grant_source = str(ROOT / 'modules/deployment-access')
+        grant_source = str(ROOT)
         access = cls.work / 'workload-access'
         access.mkdir()
-        owner_module = ROOT.parent / 'kubernetes/modules/openbao-access'
+        owner_module = ROOT.parent / 'kubernetes-openbao-access'
         definitions = (owner_module / 'main.tf').read_text()
         blocks = re.findall(r'^resource "vault_[^"]+" "[^"]+" \{.*?^\}', definitions, re.M | re.S)
         if len(blocks) != 2:

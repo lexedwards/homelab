@@ -7,7 +7,7 @@ variables {
 
 run "bound_writer_issuance_and_exact_records_without_default_or_orphan_tokens" {
   command = plan
-  module { source = "../../openbao/modules/deployment-access" }
+  module { source = "../../../modules/openbao-deployment-access" }
   assert {
     condition = (
       toset(vault_token_auth_backend_role.deployment.allowed_policies) == toset(["demo-reader-deploy"]) &&
@@ -25,21 +25,21 @@ run "bound_writer_issuance_and_exact_records_without_default_or_orphan_tokens" {
 
 run "reject_wildcard_value_paths" {
   command = plan
-  module { source = "../../openbao/modules/deployment-access" }
+  module { source = "../../../modules/openbao-deployment-access" }
   variables { secret_paths = ["apps/data/*"] }
   expect_failures = [var.secret_paths]
 }
 
 run "reject_reserved_or_traversal_paths" {
   command = plan
-  module { source = "../../openbao/modules/deployment-access" }
+  module { source = "../../../modules/openbao-deployment-access" }
   variables { secret_paths = ["sys/data/unrelated", "apps/data/../unrelated"] }
   expect_failures = [var.secret_paths]
 }
 
 run "reject_names_that_escape_the_service_scope" {
   command = plan
-  module { source = "../../openbao/modules/deployment-access" }
+  module { source = "../../../modules/openbao-deployment-access" }
   variables { name = "demo/*" }
   expect_failures = [var.name]
 }

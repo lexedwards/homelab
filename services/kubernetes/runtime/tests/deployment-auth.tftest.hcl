@@ -11,10 +11,6 @@ mock_provider "external" {
 }
 
 override_data {
-  target = data.terraform_remote_state.openbao[0]
-  values = { outputs = { api_endpoint = "https://bao.example.invalid:8200" } }
-}
-override_data {
   target = data.terraform_remote_state.cluster[0]
   values = { outputs = { runtime_connection = { api_host = "https://api.example.invalid:6443", ssh_user = "testadmin", workers = ["worker-a", "worker-b"] } } }
 }
@@ -27,7 +23,8 @@ override_data {
   values = { object = { metadata = { uid = "b" }, status = { addresses = [{ type = "InternalIP", address = "192.0.2.12" }] } } }
 }
 variables {
-  openbao_admin_token = "synthetic-administration"
+  openbao_endpoint_file = abspath("tests/fixtures/openbao-endpoint.json")
+  openbao_admin_token   = "synthetic-administration"
   secrets_platform = {
     kubeconfig_path = "/synthetic/kubeconfig"
     auth_mount      = "kubernetes-test"

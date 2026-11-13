@@ -60,6 +60,12 @@ persisted data intensive applications and multi-threaded workloads.
 
 ## Services
 
+Each service owns its deployment and state. Reusable implementation lives in
+repository-level `modules/`, never under another service. Integrations use published
+APIs or exported outputs, not private state/code imports. The service skill's
+[ownership gate](.agents/skills/create-a-service/SKILL.md#enforce-service-ownership)
+and `python3 scripts/check-service-boundaries.py` enforce this separation.
+
 ### Hypervisor Cluster and Quorum Device
 
 [Proxmox QDevice](services/proxmox-qdevice/README.md) runs `corosync-qnetd` in

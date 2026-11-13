@@ -27,6 +27,20 @@ variable "secrets_platform" {
   }
 }
 
+variable "openbao_endpoint_file" {
+  description = "Absolute path to the privately published JSON api_endpoint output from OpenBao. This consumes its explicit interface, not its state or implementation. Required when the platform is enabled."
+  type        = string
+  sensitive   = true
+  default     = null
+  validation {
+    condition = var.secrets_platform == null ? true : try(
+      startswith(var.openbao_endpoint_file, "/") &&
+      can(regex("^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$", jsondecode(file(var.openbao_endpoint_file)))), false
+    )
+    error_message = "Supply a published JSON api_endpoint file containing only a verified HTTPS origin without credentials, path or query. Do not point at another service's state."
+  }
+}
+
 variable "openbao_admin_token" {
   description = "Short-lived scoped setup credential, supplied only through TF_VAR_openbao_admin_token for plan/apply. Ephemeral: never persisted in state or saved plans; no CLI token-cache fallback."
   type        = string

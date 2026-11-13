@@ -222,10 +222,18 @@ OpenTofu owner; do not create a second writer in a central root.
 This initial hosting slice does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
 The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
-consumes this root's sensitive `api_endpoint` output through the existing protected
-service state. The endpoint derives from service DNS and HTTPS port; consumers
-must not duplicate it in ad hoc deployment files. This output contains no tokens
-or secret values and does not authorize live API changes.
+consumes this root's published `api_endpoint` output, never this service's state.
+The endpoint derives from service DNS and HTTPS port. After an authorized output
+apply, publish the JSON string from this canonical root with tracing disabled:
+
+```bash
+umask 077
+tofu output -json api_endpoint > /protected/openbao-endpoint.json
+```
+
+Consumers receive that explicit non-secret export as an input. Republish it after
+endpoint changes; do not duplicate the hostname or grant access to the hosting
+state. This output contains no tokens or secret values and authorizes no API changes.
 Keep populating actual secret values separate from declaring configuration:
 ordinary secret resources/data sources can persist values in state and saved
 plans. Sensitive marking only redacts display. Runtime identities must not be
@@ -235,79 +243,17 @@ Authorization is **administrative**, even when its definitions live with the
 service. Per [ADR 008][administrative-auth], apply those definitions with the
 trusted configuration identity and keep native provider refresh enabled. Do not
 give a service's ordinary deployment token permission to edit roles or policies.
-`modules/deployment-access` is a reusable service-owned declaration, not a central
-registry of application secrets. This hosting root gains no runtime API dependency.
+The reusable [deployment-access module][deployment-access] lives at repository
+level, not inside this hosting service. Each consumer owns its instance and
+authorization stage. This hosting root gains no runtime API dependency.
 
 ## Service Deployment Credentials
 
-After a separately authorized administrative apply, export the consuming root's
-non-secret enrollment output into a private file. For the built-in Kubernetes
-qualification, run from its canonical runtime root with shell tracing disabled:
-
-```bash
-umask 077
-tofu output -json secrets_qualification_enrollment > /protected/enrollment.json
-```
-
-An approved administrator can issue a writer directly through the named token
-role. Alternatively, an administrator assigns the exact returned `issuer_policy`
-to a short-lived operator credential, with no other policies or entity/group
-grants. Do not give the issuer policy to reader pods. Subsequent issuance needs
-only that issuer token, not general administrative access.
-
-From this OpenBao directory:
-
-```bash
-python3 -B scripts/service-credentials.py \
-  --enrollment /protected/enrollment.json \
-  --token-file /protected/issuer-token \
-  issue --output /protected/deployment-token
-```
-
-The helper accepts `issue --output PATH`, `write --secret-path PATH`, or `revoke`.
-All commands require `--enrollment PATH` and `--token-file PATH` before the
-subcommand. Inputs must be operator-owned private regular files, not symlinks.
-The enrollment contains an HTTPS origin, exact token-role/policy names and owned
-KV-v2 record paths. The service output supplies the endpoint; do not duplicate it.
-
-- **Issue:** creates a new mode-`0600` raw token file; never overwrites an existing
-  path. The parent must be operator-owned and not group/world-writable. The helper
-  requests a non-renewable, no-default-policy writer lasting at most 900 seconds
-  and verifies the returned policy/lifetime before saving it. It attempts to revoke
-  a rejected credential or one it cannot save. If response validation or connectivity
-  fails, inspect authorization and reissue explicitly; there is no broad fallback.
-- **Write:** reads a nonempty JSON object from stdin (at most 1 MiB), then writes
-  the whole declared record without reading it first. For example, append
-  `write --secret-path <declared-kv-v2-data-path> < /protected/values.json`
-  to the same command, using the deployment-token file. Keep the populated file
-  outside Git and dispose of it through the owning service's approved procedure.
-  Writing replaces record data and needs a single-writer/rotation procedure;
-  it is not an automatic merge, schema validator or CAS-based rotation manager.
-- **Revoke:** revokes the supplied credential itself. Revoking an issuer also
-  revokes its non-orphan children. Expired/revoked tokens must be reissued; do not
-  renew them or fall back to an administrative token for value enrollment.
-
-The writer may create/update only its exact records. It cannot read values or
-metadata, list, patch, delete, manage authorization or mint tokens. Read-only
-workload roles remain separate. Removing a token role blocks new issuance, not
-existing tokens; revoke them or wait for their bounded expiry. Removing the ACL
-policy removes its access. Neither operation deletes the stored records.
-
-These are OpenBao API boundaries, not protection against host root, CSI platform
-administrators or someone able to replace/execute in reader pods. A rotation service
-requires its own reviewed writer identity; no ordinary reader role gains writes.
-
-The helper prints only generic success/failure. Never enable shell tracing,
-`TF_LOG`, HTTP debug output or CLI token caching. Actual values and issued tokens
-never pass through OpenTofu resources, argv, state, plans or ordinary logs.
-
-For the isolated real-server authorization suite, supply a verified OpenBao 2.7.2
-binary and run `make deployment-auth-test BAO_TEST_BINARY=/path/to/bao`. It starts
-an in-memory loopback-only development server with synthetic credentials, applies
-the real grant module and the owning access module's two Vault resource blocks,
-and checks denials, native provider refresh/drift repair and protected enrollment.
-It never reads production inputs or contacts production services. Normal local
-validation runs the helper unit tests and skips this explicitly enabled suite.
+The shared [deployment-access module][deployment-access] owns the protected
+issuance/population helper, tests and command reference. Consuming services call
+that shared implementation, not scripts or modules under `services/openbao`.
+Keep issued tokens and values outside OpenTofu, argv and logs. Runtime readers
+cannot manage authorization; rotators require a separate reviewed writer identity.
 
 ## Verify And Operate
 
@@ -387,4 +333,5 @@ using the matching old binary and snapshot.
 
 [Micro Node]: ../../hosts/micro-node/README.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
+[deployment-access]: ../../modules/openbao-deployment-access/README.md
 [ale-41]: https://linear.app/lexedwards/issue/ALE-41/enable-native-https-for-openbao-using-cloudflare-dns-01
