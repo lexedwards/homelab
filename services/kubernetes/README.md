@@ -21,6 +21,11 @@ private StorageClass/qualification outputs. TrueNAS ownership, client restrictio
 quota and backups remain an explicit operator boundary; local checks do not prove
 real-backend compatibility.
 
+[Mounted-secret authentication](SECRETS.md) prepares private OpenBao Kubernetes-auth
+and exact service enrollment without stored reviewer credentials, secret values
+or network access. It does not install the CSI/provider stack or authorize live
+OpenBao changes.
+
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
 
