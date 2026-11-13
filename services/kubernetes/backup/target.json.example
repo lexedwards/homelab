@@ -1,0 +1,7 @@
+{
+  "endpoint": "",
+  "bucket": "",
+  "region": "us-east-1",
+  "node_name": "",
+  "cluster_uid": ""
+}

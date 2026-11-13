@@ -32,6 +32,10 @@ not competing live owners. Enabling the layer requires separate reviewed applies
 **Validation is local evidence, not deployment evidence.** First-boot and restart
 acceptance is recorded separately in ALE-28.
 
+[Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
+workflow, protected recovery-custody boundary and six-hour timer. They do not
+modify VM/bootstrap state or establish live backup, restore or upgrade evidence.
+
 ## Dependencies
 
 - Reviewed Rocky template, image provenance and a supported full-clone path;
