@@ -139,8 +139,10 @@ Rendering grants no live-change authority. Before deployment:
 3. The service owner creates its namespace/account, writes its exact policy and
    role, and applies only its service enrollment. Send JSON/HCL via protected files
    or stdin through the approved CLI/API. Keep operator tokens out of argv/history,
-   disable tracing and avoid printing token-bearing API responses. Do not put
-   secret-population operations in OpenTofu.
+   disable tracing and avoid printing token-bearing API responses. Define secret
+   paths, schemas, access rules and lifecycle procedures alongside the owning
+   service. Populate actual values through a protected enrollment workflow that
+   does not persist them in Git, OpenTofu state, saved plans or logs.
 4. With an approved pinned CSI/provider installation, mount the generated class
    from the exact account using a read-only inline `secrets-store.csi.k8s.io` volume.
    Keep Secret synchronization disabled. Confirm `0444` non-root reads and actual
