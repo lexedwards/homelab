@@ -2,6 +2,8 @@ TOFU ?= tofu
 YAMLLINT ?= yamllint
 PYTHON ?= python3
 HELM ?= helm
+CSI_DRIVER_CHART ?= vendor/secrets-store-csi-driver-1.6.2.tgz
+CSI_PROVIDER_CHART ?= vendor/openbao-0.30.7.tgz
 PLAN_FILE ?= deployment.tfplan
 
 .PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare plan apply

@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     proxmox = {
@@ -9,6 +9,14 @@ terraform {
     technitium = {
       source  = "registry.terraform.io/darkhonor/technitium"
       version = "= 1.3.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "= 3.5.0"
+    }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "= 5.13.0"
     }
   }
 }
