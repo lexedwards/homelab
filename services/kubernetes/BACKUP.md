@@ -1,7 +1,10 @@
 # Off-node etcd Backups
 
-The separately reviewed [isolated restore lab](restore-lab/README.md) provides
-scratch-VM recovery qualification without modifying the production cluster.
+The [isolated restore lab](restore-lab/README.md) contains an experimental
+scratch-VM procedure, not a qualified recovery path. Its ALE-32 experiment failed;
+the operator accepted unproven recovery and deferred a smaller proof to ALE-55.
+The failed VM was removed. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade,
+outage and recovery-decision gates; do not assume a backup guarantees rollback.
 
 This workflow creates native RKE2 snapshots on the existing control-plane host
 and uploads them to the operator-owned RustFS bucket over verified HTTPS. It

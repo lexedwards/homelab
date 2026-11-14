@@ -1,5 +1,12 @@
 # Isolated control-plane restore lab
 
+**Experimental, not restore-qualified.** The ALE-32 restore attempt failed with
+an unknown failed phase/cause. The operator accepted this risk and deferred a
+smaller proof to ALE-55; the failed VM was removed through a reviewed destroy
+plan. The instructions below describe the experimental implementation, not a
+successful recovery or permission to replay it. See [lifecycle runbooks](../LIFECYCLE.md)
+for current maintenance and recovery limits.
+
 This separate, service-owned OpenTofu root creates one disposable Rocky Linux 10
 amd64 VM. It does not split, import or modify production infrastructure/runtime
 state. The lab has no DNS provider, production address reservation, external

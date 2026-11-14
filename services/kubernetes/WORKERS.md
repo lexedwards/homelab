@@ -266,6 +266,10 @@ or introduce a custom Kata build to hide failure.
 
 ## Maintenance And Replacement
 
+Use the shared [lifecycle runbooks](LIFECYCLE.md) for preflight, server-first
+upgrade ordering, host-loss expectations and return-to-service gates. The
+procedures do not authorize disruption or replace existing qualification evidence.
+
 1. Confirm API/recovery access, remaining capacity, replicas, PDBs and storage.
 2. Cordon/drain one worker with a bounded timeout. Respect PDBs and StatefulSet
    semantics; do not force-delete workloads or local data without approval.
