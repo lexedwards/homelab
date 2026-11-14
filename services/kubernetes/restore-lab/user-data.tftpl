@@ -12,6 +12,27 @@ users:
     ssh_authorized_keys: ${jsonencode(ssh_keys)}
 packages: [ca-certificates, curl, python3, iproute, qemu-guest-agent]
 write_files:
+  - path: /etc/qemu/restore-lab.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [general]
+      method=virtio-serial
+      path=/dev/virtio-ports/org.qemu.guest_agent.0
+      daemonize=false
+      retry-path=true
+      logfile=/dev/null
+      allow-rpcs=guest-sync,guest-sync-delimited,guest-ping,guest-info,guest-network-get-interfaces,guest-get-osinfo,guest-get-host-name,guest-fstrim,guest-shutdown,guest-exec,guest-exec-status
+  - path: /etc/systemd/system/qemu-guest-agent.service.d/10-restore-lab.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Service]
+      Type=simple
+      ExecStart=
+      ExecStart=/usr/bin/qemu-ga --config=/etc/qemu/restore-lab.conf
+      StandardOutput=null
+      StandardError=null
   - path: /usr/local/sbin/install-kubernetes-server
     owner: root:root
     permissions: "0700"
@@ -48,6 +69,8 @@ write_files:
       StandardOutput=null
       StandardError=null
 runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, restart, qemu-guest-agent]
   - [systemctl, enable, --now, qemu-guest-agent]
   - [bash, /usr/local/sbin/prepare-restore-lab]
 power_state:

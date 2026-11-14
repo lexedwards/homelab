@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+import yaml
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/restore-control-plane.py'
@@ -103,6 +104,39 @@ class RestoreBoundaryTests(unittest.TestCase):
             api.guest({'operation': 'prepare'})
         self.assertFalse(any(path.endswith('/agent/exec') for path in paths))
 
+    def test_disabled_guest_execution_is_rejected_before_mutation(self):
+        api = self.restore.API(self.target, 'fixture@pam!test=synthetic-api-token')
+        for disabled in ['guest-exec', 'guest-exec-status']:
+            commands = [{'name': name, 'enabled': name != disabled} for name in ['guest-exec', 'guest-exec-status']]
+            api.call = mock.Mock(return_value={'result': {'supported_commands': commands}})
+            with self.subTest(disabled=disabled), self.assertRaises(ValueError):
+                api.require_exec_capability()
+
+    def test_enabled_guest_execution_capabilities_are_accepted(self):
+        api = self.restore.API(self.target, 'fixture@pam!test=synthetic-api-token')
+        api.call = mock.Mock(return_value={'result': {'supported_commands': [
+            {'name': 'guest-exec', 'enabled': True}, {'name': 'guest-exec-status', 'enabled': True},
+            {'name': 'guest-file-open', 'enabled': False},
+        ]}})
+        api.require_exec_capability()
+        api.call.assert_called_once_with(api.path + '/agent/info')
+
+    def test_lab_enables_only_required_agent_rpcs_with_its_own_config(self):
+        template = SCRIPT.parent.parent / 'restore-lab/user-data.tftpl'
+        data = yaml.safe_load(template.read_text())
+        files = {item['path']: item['content'] for item in data['write_files']}
+        config = files['/etc/qemu/restore-lab.conf']
+        allow = next(line.split('=', 1)[1] for line in config.splitlines() if line.startswith('allow-rpcs='))
+        self.assertEqual(set(allow.split(',')), {
+            'guest-sync', 'guest-sync-delimited', 'guest-ping', 'guest-info',
+            'guest-network-get-interfaces', 'guest-get-osinfo', 'guest-get-host-name',
+            'guest-fstrim', 'guest-shutdown', 'guest-exec', 'guest-exec-status',
+        })
+        unit = files['/etc/systemd/system/qemu-guest-agent.service.d/10-restore-lab.conf']
+        self.assertIn('ExecStart=/usr/bin/qemu-ga --config=/etc/qemu/restore-lab.conf', unit)
+        self.assertIn(['systemctl', 'daemon-reload'], data['runcmd'])
+        self.assertIn(['systemctl', 'restart', 'qemu-guest-agent'], data['runcmd'])
+
     def test_mismatched_recovery_material_cannot_mutate_guest(self):
         snapshot = b'synthetic-snapshot'
         target = dict(self.target, snapshot_sha256=hashlib.sha256(snapshot).hexdigest(),
@@ -132,6 +166,7 @@ class RestoreBoundaryTests(unittest.TestCase):
         self.assertTrue(result['hypervisor_fence_verified'])
         self.assertTrue(result['duration_excludes_lab_provisioning_and_snapshot_download'])
         self.assertNotIn('fixture-password', json.dumps(result))
+        api.require_exec_capability.assert_called_once()
         api.guard.assert_called_once()
 
     def test_failed_reset_cannot_start_server(self):

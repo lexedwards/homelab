@@ -106,6 +106,14 @@ class API:
         verify_fence(self.target, self.call(self.path + '/config?current=1'))
         require(self.call(self.path + '/status/current')['status'] == 'running', 'Scratch VM must be running')
 
+    def require_exec_capability(self):
+        document = self.call(self.path + '/agent/info')
+        document = document.get('result', document)
+        commands = document.get('supported_commands', document.get('supported-commands', []))
+        enabled = {item.get('name') for item in commands if item.get('enabled') is True}
+        require({'guest-exec', 'guest-exec-status'} <= enabled,
+                'Scratch guest agent must explicitly permit execution and status before restoration')
+
     def guest(self, payload, timeout=60):
         self.guard()
         data = json.dumps(payload)
@@ -217,6 +225,7 @@ def execute(target, snapshot, server_token, api):
     require(hashlib.sha256(snapshot).hexdigest() == target['snapshot_sha256'] and
             backup.server_token_hash(server_token) == target['server_token_hash'], 'Recovery material does not match the selected point')
     started = time.monotonic()
+    api.require_exec_capability()
     api.guest({'operation': 'prepare', 'scratch_address': target['scratch_address']})
     for offset in range(0, len(snapshot), 32768):
         api.guest({'operation': 'append', 'offset': offset, 'data': base64.b64encode(snapshot[offset:offset + 32768]).decode()})
