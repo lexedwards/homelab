@@ -6,6 +6,10 @@ configure_guest_admin() {
   [[ $(getenforce) == Enforcing ]] || return 1
   if [[ $1 == true ]]; then
     getsebool virt_qemu_ga_run_unconfined >/dev/null || return 1
+    local helper=/usr/libexec/qemu-ga/fsfreeze-hook.d/homelab-restore
+    [[ $(matchpathcon -n "$helper") == *:virt_qemu_ga_unconfined_exec_t:* ]] || return 1
+    restorecon "$helper" || return 1
+    [[ $(stat -c %C "$helper") == *:virt_qemu_ga_unconfined_exec_t:* ]] || return 1
     setsebool -P virt_qemu_ga_run_unconfined on || return 1
     [[ $(getsebool virt_qemu_ga_run_unconfined) == 'virt_qemu_ga_run_unconfined --> on' ]] || return 1
     systemctl restart qemu-guest-agent || return 1
@@ -17,6 +21,7 @@ configure_guest_admin() {
 [[ $EUID == 0 && $# == 1 ]]
 [[ ! -e /var/lib/rancher/rke2/server/db/etcd ]]
 [[ ! -e /run/homelab-restore-fenced ]]
+hostnamectl set-hostname "$(cat /etc/hostname)"
 bash /usr/local/sbin/install-kubernetes-server 1.36.6~rke2r1-0.el10 0.24-1.el10
 systemctl disable rke2-server
 ! systemctl is-active --quiet rke2-server
