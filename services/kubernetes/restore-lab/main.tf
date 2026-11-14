@@ -32,6 +32,9 @@ resource "proxmox_virtual_environment_file" "bootstrap" {
     file_name = "${var.lab.name}-cloud-config.yaml"
     data      = local.user_data
   }
+  lifecycle {
+    ignore_changes = [source_raw[0].data]
+  }
 }
 
 resource "proxmox_virtual_environment_vm" "scratch" {

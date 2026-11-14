@@ -6,6 +6,30 @@ mock_provider "proxmox" {
   }
 }
 
+run "bootstrap_empty_fixture" {
+  command = apply
+  variables {
+    fenced = false
+  }
+}
+
+run "bootstrap_content_is_immutable_but_nic_can_be_fenced" {
+  command = plan
+  variables {
+    allow_unconfined_guest_exec = true
+    fenced                     = true
+  }
+  assert {
+    condition = (
+      one([for step in yamldecode(proxmox_virtual_environment_file.bootstrap.source_raw[0].data).runcmd : step[2] if step[0] == "bash"]) == "false" &&
+      one([for step in yamldecode(local.user_data).runcmd : step[2] if step[0] == "bash"]) == "true" &&
+      proxmox_virtual_environment_vm.scratch.initialization[0].user_data_file_id == proxmox_virtual_environment_file.bootstrap.id &&
+      proxmox_virtual_environment_vm.scratch.network_device[0].disconnected
+    )
+    error_message = "First-boot content must remain unchanged without preventing NIC fencing."
+  }
+}
+
 variables {
   proxmox_endpoint     = "https://proxmox.example.invalid:8006/"
   proxmox_ssh_username = "fixture"
