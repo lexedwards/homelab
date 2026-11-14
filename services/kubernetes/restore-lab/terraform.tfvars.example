@@ -1,0 +1,28 @@
+# Copy to terraform.tfvars; assign required values privately. Never commit it.
+# Provider --------------------------------------------------------------------
+# Required. Set PROXMOX_VE_API_TOKEN separately; load the SSH key into an agent.
+# proxmox_endpoint     =
+# proxmox_ssh_username =
+# Core ------------------------------------------------------------------------
+# Required
+# host = {
+#   node                 =
+#   ssh_address          =
+#   vm_datastore_id      =
+#   snippet_datastore_id =
+#   bridge               =
+#   vlan_id              =
+# }
+# template = {
+#   node  =
+#   vm_id =
+# }
+# lab = {
+#   vm_id      =
+#   name       =
+#   cloud_user =
+#   ssh_keys   = []
+# }
+# production_vm_ids = []
+# Optional. False is ONLY for prerequisite provisioning before staging data.
+# fenced = true
