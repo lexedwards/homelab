@@ -24,6 +24,15 @@ NICs, passthrough devices and custom QEMU arguments. QEMU guest-agent access use
 the hypervisor channel, not guest networking. The guest also brings its physical
 interface down and checks that it has no default routes before receiving data.
 
+The scratch VM has its own guest-agent configuration and service drop-in. It
+permits `guest-exec` and `guest-exec-status`, plus the listed management/metadata
+RPCs needed by Proxmox; file RPCs remain blocked. Distribution defaults can block
+execution, so the runner verifies the advertised capabilities before guest
+mutation. This exception is local to the disposable lab, not the source template,
+production guests or hypervisor. Guest execution is a trusted root-administration
+boundary; blocking file RPCs does not isolate data from an administrator who can
+execute commands. SELinux stays enforcing, without a new allow rule or boolean.
+
 **Never reconnect a VM after recovery material has entered it.** Do not change
 its first-boot data or run concurrent lab applies during restoration. Keep the
 fenced VM for diagnosis if an operation fails; inspect partial state before
