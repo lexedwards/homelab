@@ -15,7 +15,8 @@ enrollment remains a separate, coordinated operation.
 - DHCP, routing, and DNS on the QDevice VLAN
 - A stable DHCP reservation or DNS record for the QDevice
 - OpenTofu 1.6 or newer, `make`, and `yamllint`
-- TCP `5403` from every Proxmox node and TCP `22` from the setup node
+- Quorum-service connectivity from every Proxmox node and SSH from the setup node;
+  resolve connection values from protected operator configuration
 
 ## Quick Start
 
@@ -79,8 +80,8 @@ enrollment remains a separate, coordinated operation.
 flowchart LR
     T[OpenTofu root] -->|reads| H[Micro Node pool and bridge]
     T -->|creates| Q[QDevice Incus instance]
-    P1[Proxmox node] -->|TCP 5403| Q
-    P2[Proxmox node] -->|TCP 5403| Q
+    P1[Proxmox node] -->|Quorum service| Q
+    P2[Proxmox node] -->|Quorum service| Q
     Q -->|tagged VLAN| N[Upstream network]
 ```
 
@@ -132,9 +133,9 @@ incus exec <remote-name>:proxmox-qdevice -- cloud-init status --long
 incus exec <remote-name>:proxmox-qdevice -- systemctl status corosync-qnetd --no-pager
 ```
 
-If `pvecm status` reports the QDevice as `NA`, verify its stable address and TCP
-`5403` connectivity from every Proxmox node. TCP `22` must also be reachable
-from the node that runs `pvecm qdevice setup`.
+If `pvecm status` reports the QDevice as `NA`, verify its stable private identity
+and quorum-service connectivity from every Proxmox node. SSH must also be reachable
+from the node that runs `pvecm qdevice setup`. Use the protected connection record.
 
 Changing `cloud-init.user-data` does not rerun cloud-init on an existing
 instance. Use a coordinated replacement when first-boot provisioning must run

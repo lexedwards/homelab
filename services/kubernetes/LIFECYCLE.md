@@ -211,7 +211,7 @@ failure domains. Permanent two-member etcd is not fault tolerant.
 
 1. Approve placement, capacity, failure domains and an API/registration frontend
    independent of Kubernetes and Cilium workload L2 announcements. Keep the
-   existing stable API DNS name and TLS SAN; support verified TCP 6443 and 9345.
+   existing stable API DNS name and TLS SAN; support the verified API and registration listeners.
 2. Confirm backups and independent matching token custody, acknowledging unproven
    restoration. Define trust, health checks, DNS transition, permitted etcd
    peer/client paths and rollback/stop bounds before changing the live endpoint.

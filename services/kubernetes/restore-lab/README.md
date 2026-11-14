@@ -139,7 +139,7 @@ The protected restore-target JSON contains these non-secret metadata fields:
 | `production_vm_ids`, `template_vm_id` | Approved inventory; target must differ |
 | `cluster_uid`, `namespace_uids` | Recorded namespace names/UIDs present in the snapshot |
 | `cluster_cidr`, `service_cidr` | Owning Kubernetes network definition |
-| `scratch_address` | Isolated documentation-only IPv4 address within `192.0.2.0/24` |
+| `scratch_address` | Isolated documentation-only IPv4 address within the range enforced by the runner; obtain the exact private input from the approved lab configuration |
 | `snapshot_sha256`, `snapshot_timestamp`, `server_token_hash` | Selected recovery-point metadata and corresponding independent token association |
 | `server_ca_sha256` | SHA-256 of the original public `server-ca.crt` bytes |
 

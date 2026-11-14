@@ -259,11 +259,11 @@ the consolidated root has completed a successful refresh and apply.
 
 | Signal | Collector input | Warehouse output |
 | --- | --- | --- |
-| Prometheus metrics | `http://<collector>:9090/api/v1/metrics/write` | Mimir `:9009/api/v1/push` |
-| Loki logs | `http://<collector>:3100/loki/api/v1/push` | Loki `:3100/loki/api/v1/push` |
-| OTLP metrics | gRPC `:4317` or HTTP `:4318/v1/metrics` | Converted to Prometheus and sent to Mimir |
-| OTLP logs | gRPC `:4317` or HTTP `:4318/v1/logs` | Converted to Loki entries and sent to Loki |
-| OTLP traces | gRPC `:4317` or HTTP `:4318/v1/traces` | Tempo OTLP/gRPC `:4317` |
+| Prometheus metrics | Collector Prometheus remote-write listener | Mimir write API |
+| Loki logs | Collector Loki push listener | Loki write API |
+| OTLP metrics | Collector OTLP gRPC or HTTP listener | Converted to Prometheus and sent to Mimir |
+| OTLP logs | Collector OTLP gRPC or HTTP listener | Converted to Loki entries and sent to Loki |
+| OTLP traces | Collector OTLP gRPC or HTTP listener | Tempo OTLP/gRPC listener |
 
 All OTLP traces continue to Tempo. Spans carrying the GitHub Copilot AI-credit
 attribute also generate request, token, duration, error, and AI-credit metrics
@@ -278,14 +278,16 @@ metrics are dropped by Alloy's generally available converter.
 Alloy uses the warehouse VM's private IPv4 address reported by the QEMU guest
 agent. Grafana and administrative clients use that address as well:
 
-| Caller | Purpose | Endpoint |
+Connection values belong in protected operator configuration, not this table.
+
+| Caller | Purpose | Logical destination |
 | --- | --- | --- |
-| Alloy | Prometheus remote write | `http://<warehouse>:9009/api/v1/push` |
-| Alloy | Loki write API | `http://<warehouse>:3100/loki/api/v1/push` |
-| Alloy | OTLP gRPC | `<warehouse>:4317` |
-| Grafana | Prometheus data source | `http://<warehouse>:9009/prometheus` |
-| Grafana | Loki data source | `http://<warehouse>:3100` |
-| Grafana | Tempo data source | `http://<warehouse>:3200` |
+| Alloy | Prometheus remote write | Mimir write API |
+| Alloy | Loki write API | Loki write API |
+| Alloy | OTLP gRPC | Tempo ingestion listener |
+| Grafana | Prometheus data source | Mimir query API |
+| Grafana | Loki data source | Loki query API |
+| Grafana | Tempo data source | Tempo query API |
 
 ## Architecture
 
@@ -326,15 +328,16 @@ service HA, replication, cross-node startup ordering, or automatic failover.
 ## Security
 
 The collector and warehouse use plaintext, unauthenticated protocols on their
-private network. Restrict collector ports `9090`, `3100`, `4317`, and `4318` to
-approved telemetry producers, and restrict the Alloy administration port
-`12345` to approved administrators. Restrict warehouse ingestion ports to the
+private network. Restrict collector ingestion listeners to
+approved telemetry producers, and restrict the Alloy administration listener
+to approved administrators. Restrict warehouse ingestion ports to the
 collector and warehouse query ports to Grafana and approved administrators. Do
 not expose these VMs to an untrusted network. Restrict Grafana's plaintext HTTP
-port `3000` to approved users or a trusted reverse proxy.
+listener to approved users or a trusted reverse proxy. Keep numeric listener
+values in protected operator configuration, not documentation.
 
-The Alloy administration server listens on all collector interfaces at port
-`12345` without authentication or TLS. When the S3 credential variables are
+The Alloy administration server listens on all collector interfaces
+without authentication or TLS. When the S3 credential variables are
 assigned, RustFS credentials are rendered into cloud-init, the uploaded Proxmox
 snippet, saved plans, and OpenTofu state before being installed in a root-owned
 file on the warehouse VM. Marking the variables sensitive redacts normal CLI
@@ -377,9 +380,9 @@ sudo systemctl status alloy
 sudo journalctl -u alloy
 sudo bash -c 'set -a; . /etc/default/alloy; set +a; alloy validate --stability.level=experimental /etc/alloy'
 sudo systemctl reload alloy
-curl --fail http://127.0.0.1:12345/-/ready
+curl --fail "${ALLOY_LOCAL_URL:?set the private local administration origin}/-/ready"
 # From an approved administrator host:
-curl --fail http://<collector-address>:12345/-/ready
+curl --fail "${ALLOY_ADMIN_URL:?set the private collector administration origin}/-/ready"
 ```
 
 The validation command above uses Debian's APT package environment path.
@@ -389,7 +392,7 @@ Check Grafana:
 ```bash
 sudo systemctl status grafana-server
 sudo journalctl -u grafana-server
-curl --fail http://127.0.0.1:3000/api/health
+curl --fail "${GRAFANA_LOCAL_URL:?set the private local Grafana origin}/api/health"
 ```
 
 Upgrade one pinned component at a time after reviewing release notes and backup

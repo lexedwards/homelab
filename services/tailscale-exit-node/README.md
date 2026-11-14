@@ -73,7 +73,7 @@ policy, and client selection remain operator-managed.
 6. In the Tailscale admin console, approve **Use as exit node** and each subnet
    route. If the tailnet uses a custom access policy, grant intended users
    access to `autogroup:internet` and only the internal destinations and ports
-   they need. This includes UDP and TCP port 53 to the internal DNS server if
+   they need. This includes the reviewed DNS query paths to the internal resolver if
    clients need internal names. Disable key expiry for this unattended machine,
    or monitor its expiry and reauthenticate it before that date. Connect a
    client to the tailnet and test private-address access; selecting the exit
@@ -181,7 +181,7 @@ If internal services fail, test by address before testing by name. Confirm
 that all required VLAN routes are advertised and approved, the tailnet policy
 allows the destination ports, and the guest can reach each VLAN. If addresses
 work but names fail, check that the internal DNS server is included in an
-approved route, accepts UDP and TCP port 53, and resolves those names for the
+approved route, accepts the reviewed DNS query traffic, and resolves those names for the
 client using the exit node. Without an exit node selected, configure split DNS
 for the internal zone if clients need to resolve those names.
 

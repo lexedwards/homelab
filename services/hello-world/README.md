@@ -56,7 +56,7 @@ Inspect the instance, DHCP address, cloud-init status, and HTTP endpoint:
 incus list <remote-name>: hello-world
 incus config show <remote-name>:hello-world
 incus exec <remote-name>:hello-world -- cloud-init status --long
-incus exec <remote-name>:hello-world -- curl --fail http://127.0.0.1/hello-world
+incus exec <remote-name>:hello-world -- curl --fail '<private-local-hello-world-url>'
 ```
 
 [Micro Node]: ../../hosts/micro-node/README.md

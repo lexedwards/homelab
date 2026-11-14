@@ -1,5 +1,13 @@
 # Homelab Infrastructure and Services
 
+Infrastructure definitions and operating guidance for the homelab. Start with the
+[documentation guide](docs/README.md), [service inventory](docs/inventory.md), or
+[architecture views](docs/architecture.md).
+
+Documentation uses logical service and subnet names. Addresses, port numbers,
+private DNS names, network identifiers, credentials, and raw operational evidence
+belong in protected operator records, not this repository's documentation.
+
 <!--toc:start-->
 - [Homelab Infrastructure and Services](#homelab-infrastructure-and-services)
   - [Hosts](#hosts)
@@ -23,9 +31,6 @@
     - [Observability Warehouse](#observability-warehouse)
   - [Network](#network)
   - [Operations](#operations)
-  - [Retired Services](#retired-services)
-    - [Local LLM Hosting](#local-llm-hosting)
-    - [AI Platforms](#ai-platforms)
 <!--toc:end-->
 
 ## Hosts
@@ -103,21 +108,41 @@ service-owned DNS. Initialization and unseal remain operator-managed.
 
 ### Networked Storage
 
+TrueNAS-backed NFS provides persistent storage for Kubernetes and a backup
+destination for observability. RustFS provides object storage for telemetry and
+Kubernetes snapshots. These are operator-managed dependencies; exact placement
+and recovery coverage remain [unverified](docs/inventory.md#operator-managed-infrastructure).
+
 ### Kubernetes
 
-[Kubernetes](services/kubernetes/README.md) defines the initial RKE2 control-plane
-VM and managed Cilium bootstrap. Worker, storage and workload integration are
-separate slices; local validation does not establish deployment.
+[Kubernetes](services/kubernetes/README.md) defines an RKE2 control-plane VM on
+`compute`, optional workers on `compute` and `store`, Cilium networking, and
+opt-in NFS and OpenBao integration. The lifecycle runbooks record operating
+evidence and limitations; snapshot restoration remains unproven.
 
 ### Service Proxy
 
+Internal Nginx reverse proxy for ACME certificate management and TLS termination.
+Placement and configuration ownership are not yet documented.
+
 ### Home Assistant
+
+[Home Assistant](https://www.home-assistant.io/installation/) is hosted on
+`compute` in the IoT subnet and is operator-managed.
 
 ### Media Server
 
+Jellyfin is hosted on `store` in the Service subnet and is operator-managed.
+
 ### Roon
 
+[Roon](https://roon.app/en/) is hosted on `store` in the Trusted subnet to support
+local device discovery, including wireless DACs. It is operator-managed.
+
 ### Remote Workstation
+
+An operator-managed Arch-based Linux workstation is hosted on `compute` with
+GPU passthrough.
 
 ### Observability Warehouse
 
@@ -127,6 +152,11 @@ in a dedicated collector VM, Mimir, Loki, and Tempo run in a warehouse VM, and
 Grafana runs in a separate visualization VM.
 
 ## Network
+
+UniFi provides the network platform. The IoT, Service, and Trusted subnets are
+logical boundaries, not a claim about their firewall rules. Routing, DHCP,
+reservations, and firewall policy remain operator-managed; see the
+[deployment/network view](docs/architecture.md#deployment-and-network).
 
 - Unifi Dream Machine
 - Unifi USW Aggregation
@@ -138,11 +168,5 @@ Grafana runs in a separate visualization VM.
 - APC UPS - 2200VA
 
 Architecture choices are recorded in the [architecture decision records](docs/adrs/).
-
-## Retired Services
-
-### Local LLM Hosting
-
-### AI Platforms
-
-### Virtual Windows Desktop
+See [operations and recovery](docs/operations.md) for cross-service dependencies
+and [contributor guidance](docs/contributing.md) before changing infrastructure.

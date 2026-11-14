@@ -190,8 +190,8 @@ single-NIC server acceptance does not establish dual-NIC behavior.
 
 OpenTofu selects the guest-agent address by the managed primary NIC's MAC, not
 the first non-loopback/pod address, and publishes API DNS after VM address discovery.
-The API's stable DNS name remains in initial TLS SANs. Cilium uses that name on
-TCP 6443, not a rewritten node IP or the Kubernetes Service IP. The pinned
+The API's stable DNS name remains in initial TLS SANs. Cilium uses that name with
+the configured API listener, not a rewritten node IP or the Kubernetes Service IP. The pinned
 RKE2-managed Cilium chart has no API-host default suitable for kube-proxy-free
 bootstrap. Its agent and operator use host networking and host DNS, so the
 external DNS record must resolve from the guest without CoreDNS/Cilium. The VM
@@ -209,7 +209,7 @@ the guest and run it locally with protected kubeconfig access:
 ```text
 sudo python3 check-control-plane.py --node-name <server-node-name> \
   --expected-version <reviewed-rke2-version> \
-  --api-server https://<stable-api-name>:6443
+  --api-server '<private-verified-api-url>'
 ```
 
 The checker defaults to a 300-second total observation bound and checks API
@@ -256,14 +256,15 @@ reviewed operating procedure instead of assuming snippet upload updated the gues
 
 | Dependency | Required path |
 | --- | --- |
-| Administrators | SSH TCP 22; Kubernetes API TCP 6443 through the stable private name |
-| Future workers/servers | API TCP 6443 and supervisor/registration TCP 9345 |
-| Node/CNI communication | RKE2/Cilium documented node paths, including kubelet TCP 10250 and VXLAN UDP 8472 where needed |
-| Additional etcd servers later | Server-only peer/client TCP 2380/2379; not public/workload access |
+| Administrators | SSH and Kubernetes API through the stable private identity |
+| Future workers/servers | API and supervisor/registration listeners |
+| Node/CNI communication | RKE2/Cilium documented node paths, including kubelet and VXLAN where needed |
+| Additional etcd servers later | Server-only etcd peer/client listeners; not public/workload access |
 | First-boot outbound | Approved DNS/NTP, distribution/Rancher HTTPS package repos and release/container registries |
 
 Use existing routing/firewall ownership; do not expose these management ports to
-untrusted clients. First-boot failure must not be repaired by disabling firewall
+untrusted clients. Resolve exact listener values from protected configuration.
+First-boot failure must not be repaired by disabling firewall
 or SELinux globally. Service exposure/policy and cross-worker verification are
 later slices.
 
