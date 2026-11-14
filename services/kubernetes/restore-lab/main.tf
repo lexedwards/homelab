@@ -19,6 +19,7 @@ locals {
     installer                   = base64encode(file("${path.module}/../cloud-init/install-server.sh"))
     node_preflight              = base64encode(file("${path.module}/../config/node-preflight.sh"))
     prepare_script              = base64encode(file("${path.module}/prepare.sh"))
+    restore_guest               = base64encode(file("${path.module}/guest-restore.py"))
     allow_unconfined_guest_exec = tostring(var.allow_unconfined_guest_exec)
   })
 }

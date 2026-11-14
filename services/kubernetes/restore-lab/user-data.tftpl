@@ -1,5 +1,6 @@
 #cloud-config
 hostname: ${jsonencode(name)}
+preserve_hostname: true
 manage_etc_hosts: true
 ssh_pwauth: false
 disable_root: true
@@ -12,6 +13,15 @@ users:
     ssh_authorized_keys: ${jsonencode(ssh_keys)}
 packages: [ca-certificates, curl, python3, iproute, qemu-guest-agent]
 write_files:
+  - path: /etc/hostname
+    owner: root:root
+    permissions: "0644"
+    content: ${jsonencode(name)}
+  - path: /usr/libexec/qemu-ga/fsfreeze-hook.d/homelab-restore
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${restore_guest}
   - path: /etc/qemu/restore-lab.conf
     owner: root:root
     permissions: "0644"

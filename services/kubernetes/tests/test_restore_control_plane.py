@@ -73,6 +73,8 @@ class RestoreBoundaryTests(unittest.TestCase):
             if path.endswith('/status/current'):
                 return {'status': 'running'}
             if path.endswith('/agent/exec'):
+                self.assertEqual(payload['command'], ['/usr/libexec/qemu-ga/fsfreeze-hook.d/homelab-restore'])
+                self.assertNotIn('-c', payload['command'])
                 return {'pid': 1234}
             self.assertTrue(path.endswith('/exec-status?pid=1234'))
             return next(statuses)
@@ -155,7 +157,7 @@ class RestoreBoundaryTests(unittest.TestCase):
         api.guest.return_value = {'successful': True}
         result = self.restore.execute(target, snapshot, 'fixture-password', api)
         payloads = [call.args[0] for call in api.guest.call_args_list]
-        self.assertEqual(payloads[0]['operation'], 'prepare')
+        self.assertEqual([v['operation'] for v in payloads[:2]], ['probe', 'prepare'])
         self.assertEqual([v['operation'] for v in payloads[-4:]], ['configure', 'reset', 'start', 'verify'])
         chunks = [v for v in payloads if v['operation'] == 'append']
         import base64
@@ -187,6 +189,17 @@ class RestoreBoundaryTests(unittest.TestCase):
 
     def test_guest_program_compiles_without_running_it(self):
         compile(self.restore.GUEST, 'isolated-restore-guest', 'exec')
+
+    def test_bootstrap_installs_stock_labeled_fixed_restore_helper(self):
+        template = SCRIPT.parent.parent / 'restore-lab/user-data.tftpl'
+        data = yaml.safe_load(template.read_text())
+        files = {item['path']: item for item in data['write_files']}
+        helper = files['/usr/libexec/qemu-ga/fsfreeze-hook.d/homelab-restore']
+        self.assertEqual(helper['owner'], 'root:root')
+        self.assertEqual(helper['permissions'], '0700')
+        self.assertEqual(helper['encoding'], 'b64')
+        self.assertEqual(helper['content'].strip(), '${restore_guest}')
+        self.assertIs(data['preserve_hostname'], True)
 
     def test_foreign_vm_name_or_owner_is_rejected(self):
         for change in [{'name': 'useful-service'}, {'tags': 'iac;other-service'}, {'template': 1}]:

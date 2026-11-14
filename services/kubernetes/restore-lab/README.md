@@ -39,10 +39,32 @@ For an approved disposable lab, true verifies that the installed policy supports
 `virt_qemu_ga_run_unconfined`, enables only that boolean, verifies it is on and
 restarts the lab agent. Global SELinux must remain enforcing before and after.
 Missing support or failed verification stops preparation; there is no permissive
-mode, custom allow module or context-label fallback. This permits unconfined
-administrative commands inside the scratch VM, not production guests, the source
-template or the hypervisor. Treat it as a lab security exception, not workload
-confinement evidence. Without it, this guest-agent restore path may be unavailable.
+mode or custom allow module. The boolean permits transitions through the stock
+`virt_qemu_ga_unconfined_exec_t` entrypoint; it does not unconfine arbitrary
+guest-agent Python commands.
+
+With separate approval for the helper, bootstrap verifies the installed stock
+mapping for `/usr/libexec/qemu-ga/fsfreeze-hook.d/homelab-restore`, runs
+`restorecon` on that one file and checks its resulting type. No custom mapping
+or policy module is installed. The root-owned mode-0700 helper is the only
+restore execution entrypoint. It accepts bounded JSON on stdin and fixed
+probe/restore operations, not Python source, shell commands or executable paths.
+Each request requires the boolean on, global enforcing mode and the exact
+`virt_qemu_ga_unconfined_t` execution domain. The main agent remains confined.
+The directory uses an existing stock script label; the helper is not a
+filesystem-freeze hook. Freeze/thaw RPCs remain absent from the agent allowlist,
+and hook-style arguments are rejected.
+
+The read-only `probe` verifies identity, prepared-marker/reboot ordering, pins,
+image checksum, inactive/disabled server and absence of recovery data. The
+operator-side runner requires the current hypervisor fence even for its probe,
+then before every restore operation. An empty-lab preparation probe may be
+called through the guest agent before fencing; it cannot execute arbitrary code
+or change guest state. Bootstrap also writes and applies the unique lab hostname
+explicitly, rather than accepting a DHCP/template hostname as qualification.
+
+This is a lab administrative security exception, not workload-confinement
+evidence. Production guests, source templates and hypervisor policy are unchanged.
 
 **Never reconnect a VM after recovery material has entered it.** Do not change
 its first-boot data or run concurrent lab applies during restoration. Keep the
