@@ -68,7 +68,13 @@ evidence. Production guests, source templates and hypervisor policy are unchange
 
 **Never reconnect a VM after recovery material has entered it.** Do not change
 its first-boot data or run concurrent lab applies during restoration. Keep the
-fenced VM for diagnosis if an operation fails; inspect partial state before
+bootstrap snippet's content immutable after creation; OpenTofu deliberately
+ignores later changes to that content so a script update cannot replace a lab VM.
+New bootstrap content takes effect only on a deliberately cleaned-up, fresh lab.
+An existing empty lab needs a separately reviewed in-place update instead.
+Identity, placement and NIC changes are not ignored.
+
+Keep the fenced VM for diagnosis if an operation fails; inspect partial state before
 retrying. The runner has an exclusive receipt/start marker, not automatic rollback
 or a guarantee against another trusted administrator changing the VM.
 
