@@ -67,7 +67,7 @@ class RestoreBoundaryTests(unittest.TestCase):
 
         def call(path, payload=None):
             paths.append(path)
-            if path.endswith('/config'):
+            if path.endswith('/config?current=1'):
                 return self.vm
             if path.endswith('/status/current'):
                 return {'status': 'running'}
@@ -80,6 +80,28 @@ class RestoreBoundaryTests(unittest.TestCase):
         with mock.patch.object(self.restore.time, 'sleep'):
             self.assertTrue(api.guest({'operation': 'prepare'})['successful'])
         self.assertEqual(sum(path.endswith('/exec-status?pid=1234') for path in paths), 2)
+
+    def test_pending_only_fence_cannot_authorize_guest_execution(self):
+        api = self.restore.API(self.target, 'fixture@pam!test=synthetic-api-token')
+        connected = dict(self.vm, net0=self.vm['net0'].replace(',link_down=1', ''))
+        paths = []
+
+        def call(path, payload=None):
+            paths.append(path)
+            if path == api.path + '/config':
+                return self.vm
+            if path == api.path + '/config?current=1':
+                return connected
+            if path.endswith('/status/current'):
+                return {'status': 'running'}
+            if path.endswith('/agent/exec'):
+                return {'pid': 1234}
+            return {'exited': 1, 'exitcode': 0, 'out-data': '{"successful":true}'}
+
+        api.call = call
+        with self.assertRaises(ValueError):
+            api.guest({'operation': 'prepare'})
+        self.assertFalse(any(path.endswith('/agent/exec') for path in paths))
 
     def test_mismatched_recovery_material_cannot_mutate_guest(self):
         snapshot = b'synthetic-snapshot'

@@ -17,7 +17,8 @@ runtime fence marker. Check cloud-init completion and the prepared marker throug
 the guest agent after the planned kernel reboot.
 
 Next, apply a fresh, reviewed plan setting `fenced = true`. Proxmox disconnects
-the virtual NIC. The restore runner independently verifies the live VM identity,
+the virtual NIC. The restore runner reads Proxmox's `current=1` configuration,
+not its pending configuration, and independently verifies the live VM identity,
 ownership tags, exact network slot/bridge/VLAN and `link_down=1`, rejecting extra
 NICs, passthrough devices and custom QEMU arguments. QEMU guest-agent access uses
 the hypervisor channel, not guest networking. The guest also brings its physical

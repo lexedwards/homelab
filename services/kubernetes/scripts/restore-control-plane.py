@@ -103,7 +103,7 @@ class API:
             raise ValueError('Proxmox operation failed; details suppressed') from None
 
     def guard(self):
-        verify_fence(self.target, self.call(self.path + '/config'))
+        verify_fence(self.target, self.call(self.path + '/config?current=1'))
         require(self.call(self.path + '/status/current')['status'] == 'running', 'Scratch VM must be running')
 
     def guest(self, payload, timeout=60):
