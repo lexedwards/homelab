@@ -30,6 +30,10 @@ variables {
 run "fenced_by_default" {
   command = plan
   assert {
+    condition     = !var.allow_unconfined_guest_exec && one([for step in yamldecode(local.user_data).runcmd : step[2] if step[0] == "bash"]) == "false"
+    error_message = "Administrative SELinux relaxation must default off and reach bootstrap as an explicit string."
+  }
+  assert {
     condition     = proxmox_virtual_environment_vm.scratch.network_device[0].disconnected
     error_message = "Default scratch NIC must be disconnected."
   }
@@ -44,6 +48,17 @@ run "fenced_by_default" {
   assert {
     condition     = proxmox_virtual_environment_vm.scratch.agent[0].wait_for_ip[0].disabled
     error_message = "A fenced guest must not wait for a DHCP lease."
+  }
+}
+
+run "explicit_lab_admin_policy_opt_in" {
+  command = plan
+  variables {
+    allow_unconfined_guest_exec = true
+  }
+  assert {
+    condition     = one([for step in yamldecode(local.user_data).runcmd : step[2] if step[0] == "bash"]) == "true"
+    error_message = "Approved lab-only opt-in must reach the policy support/verification gate."
   }
 }
 

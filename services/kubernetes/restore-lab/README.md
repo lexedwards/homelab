@@ -31,7 +31,18 @@ execution, so the runner verifies the advertised capabilities before guest
 mutation. This exception is local to the disposable lab, not the source template,
 production guests or hypervisor. Guest execution is a trusted root-administration
 boundary; blocking file RPCs does not isolate data from an administrator who can
-execute commands. SELinux stays enforcing, without a new allow rule or boolean.
+execute commands. RPC availability alone does not grant SELinux administrative
+authority: distribution policy can keep the child in `virt_qemu_ga_t`.
+
+`allow_unconfined_guest_exec` defaults to false and requires separate approval.
+For an approved disposable lab, true verifies that the installed policy supports
+`virt_qemu_ga_run_unconfined`, enables only that boolean, verifies it is on and
+restarts the lab agent. Global SELinux must remain enforcing before and after.
+Missing support or failed verification stops preparation; there is no permissive
+mode, custom allow module or context-label fallback. This permits unconfined
+administrative commands inside the scratch VM, not production guests, the source
+template or the hypervisor. Treat it as a lab security exception, not workload
+confinement evidence. Without it, this guest-agent restore path may be unavailable.
 
 **Never reconnect a VM after recovery material has entered it.** Do not change
 its first-boot data or run concurrent lab applies during restoration. Keep the
