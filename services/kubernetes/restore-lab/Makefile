@@ -11,7 +11,7 @@ validate:
 	$(TOFU) test
 	bash -n prepare.sh
 	yamllint -c ../.yamllint user-data.tftpl
-	$(PYTHON) -B -m unittest discover -s ../tests -p test_restore_control_plane.py
+	$(PYTHON) -B -m unittest discover -s ../tests -p 'test_restore_*.py'
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"
 apply:

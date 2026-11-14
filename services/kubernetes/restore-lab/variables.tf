@@ -68,3 +68,10 @@ variable "fenced" {
   nullable    = false
   description = "Disconnect the virtual NIC. False is allowed only for empty prerequisite provisioning, never after recovery data is staged."
 }
+
+variable "allow_unconfined_guest_exec" {
+  type        = bool
+  default     = false
+  nullable    = false
+  description = "Explicit lab-only approval for the supported virt_qemu_ga_run_unconfined boolean. Global SELinux must remain enforcing."
+}

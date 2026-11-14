@@ -72,7 +72,7 @@ runcmd:
   - [systemctl, daemon-reload]
   - [systemctl, restart, qemu-guest-agent]
   - [systemctl, enable, --now, qemu-guest-agent]
-  - [bash, /usr/local/sbin/prepare-restore-lab]
+  - [bash, /usr/local/sbin/prepare-restore-lab, "${allow_unconfined_guest_exec}"]
 power_state:
   mode: reboot
   delay: now

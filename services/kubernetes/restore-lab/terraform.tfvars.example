@@ -26,3 +26,5 @@
 # production_vm_ids = []
 # Optional. False is ONLY for prerequisite provisioning before staging data.
 # fenced = true
+# Optional. Requires separate approval; permits administrative guest-agent commands.
+# allow_unconfined_guest_exec = false

@@ -13,12 +13,13 @@ provider "proxmox" {
 
 locals {
   user_data = templatefile("${path.module}/user-data.tftpl", {
-    name           = var.lab.name
-    cloud_user     = var.lab.cloud_user
-    ssh_keys       = sort(tolist(var.lab.ssh_keys))
-    installer      = base64encode(file("${path.module}/../cloud-init/install-server.sh"))
-    node_preflight = base64encode(file("${path.module}/../config/node-preflight.sh"))
-    prepare_script = base64encode(file("${path.module}/prepare.sh"))
+    name                        = var.lab.name
+    cloud_user                  = var.lab.cloud_user
+    ssh_keys                    = sort(tolist(var.lab.ssh_keys))
+    installer                   = base64encode(file("${path.module}/../cloud-init/install-server.sh"))
+    node_preflight              = base64encode(file("${path.module}/../config/node-preflight.sh"))
+    prepare_script              = base64encode(file("${path.module}/prepare.sh"))
+    allow_unconfined_guest_exec = tostring(var.allow_unconfined_guest_exec)
   })
 }
 
