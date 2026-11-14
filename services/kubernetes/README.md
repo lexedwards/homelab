@@ -34,7 +34,9 @@ acceptance is recorded separately in ALE-28.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
 workflow, protected recovery-custody boundary and six-hour timer. They do not
-modify VM/bootstrap state or establish live backup, restore or upgrade evidence.
+modify VM/bootstrap state. See [lifecycle runbooks][lifecycle] for maintenance,
+server-first upgrades, outage/recovery and future three-server expansion, with
+verified evidence distinguished from unrehearsed procedures and accepted risks.
 
 ## Dependencies
 
@@ -285,14 +287,20 @@ The source template remains separately owned; unreferenced disks are not opted
 into blanket deletion. Back up OpenTofu state independently and protect the
 corresponding RKE2 recovery material.
 
-The approved later backup policy is six-hour snapshots retained fourteen days
+The backup policy is six-hour snapshots retained fourteen days
 in a dedicated off-node bucket, verified TLS and independent credential custody.
 Approximately four hours is a planning recovery target, not an SLA or tested
-restore duration. Until backups and isolated restore are implemented/verified,
-do not describe this single-node server as backed up or production-recoverable.
+restore duration. Off-node backup and scheduled execution evidence is recorded
+in ALE-32, but the isolated restore experiment failed. The operator accepted
+unproven recovery and deferred a smaller lab to ALE-55. Do not call this server
+restore-qualified or assume a snapshot is a proven rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 
 ## Restart, expansion and troubleshooting
+
+Use the [lifecycle runbooks][lifecycle] for operation ordering, prerequisites,
+stop/recovery decisions and post-maintenance checks. Documentation is not runtime
+authorization or evidence that an upgrade/outage exercise passed.
 
 Expect API/scheduling/reconciliation downtime for a single-server restart or
 `compute` outage. Enablement persists across boot, but actual restart/rejoin must
@@ -329,14 +337,10 @@ local tests establish that the existing failed guest has recovered.
 
 ### HA expansion
 
-Future HA preserves the API name behind a frontend independent of Cilium's
-workload announcements, supporting TCP 6443/9345 and the existing certificate
-identity. Back up data/associated credentials, review failure-domain placement,
-and join two additional server/etcd members sequentially through RKE2's supported
-registration path. A permanent two-member etcd cluster is not fault tolerant;
-three VMs across two hosts are not three independent host-failure domains. This
-slice provisions no extra server/frontend, and later code must preserve
-the existing server resource identity rather than rebuild the cluster to expand.
+The [one-to-three server design checklist](LIFECYCLE.md#future-one-to-three-server-expansion)
+preserves the existing server and stable API identity, covers the independent
+frontend and temporary two-member quorum risk, and defines review/stop points.
+It deploys no additional server or frontend and makes no current HA claim.
 
 ### Troubleshooting
 
@@ -349,3 +353,4 @@ cloud-init or modify image-catalogue state as a troubleshooting shortcut.
 
 [adrs]: ../../docs/adrs/
 [workers]: WORKERS.md
+[lifecycle]: LIFECYCLE.md
