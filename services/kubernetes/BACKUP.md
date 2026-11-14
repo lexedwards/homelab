@@ -1,5 +1,8 @@
 # Off-node etcd Backups
 
+The separately reviewed [isolated restore lab](restore-lab/README.md) provides
+scratch-VM recovery qualification without modifying the production cluster.
+
 This workflow creates native RKE2 snapshots on the existing control-plane host
 and uploads them to the operator-owned RustFS bucket over verified HTTPS. It
 does not back up application volumes, create a bucket, administer TrueNAS, restore

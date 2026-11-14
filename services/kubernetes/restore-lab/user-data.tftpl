@@ -1,0 +1,57 @@
+#cloud-config
+hostname: ${jsonencode(name)}
+manage_etc_hosts: true
+ssh_pwauth: false
+disable_root: true
+users:
+  - name: ${jsonencode(cloud_user)}
+    lock_passwd: true
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: ${jsonencode(ssh_keys)}
+packages: [ca-certificates, curl, python3, iproute, qemu-guest-agent]
+write_files:
+  - path: /usr/local/sbin/install-kubernetes-server
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${installer}
+  - path: /usr/local/sbin/kubernetes-node-preflight
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${node_preflight}
+  - path: /usr/local/sbin/prepare-restore-lab
+    owner: root:root
+    permissions: "0700"
+    encoding: b64
+    content: ${prepare_script}
+  - path: /etc/rancher/rke2/config.yaml
+    owner: root:root
+    permissions: "0600"
+    content: |
+      selinux: true
+      cni: none
+      disable-scheduler: true
+      disable-cloud-controller: true
+      disable-kube-proxy: true
+      etcd-disable-snapshots: true
+      write-kubeconfig-mode: "0600"
+  - path: /etc/systemd/system/rke2-server.service.d/10-restore-fence.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      ConditionPathExists=/run/homelab-restore-fenced
+      [Service]
+      StandardOutput=null
+      StandardError=null
+runcmd:
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [bash, /usr/local/sbin/prepare-restore-lab]
+power_state:
+  mode: reboot
+  delay: now
+  timeout: 60
+  condition: [test, -f, /var/lib/homelab-restore-prepared]

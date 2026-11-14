@@ -26,6 +26,7 @@ help:
 init:
 	$(TOFU) init
 	$(MAKE) -C runtime init
+	$(MAKE) -C restore-lab init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -63,6 +64,7 @@ shell-validate:
 	bash -n cloud-init/install-agent.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate
+	$(MAKE) -C restore-lab validate
 
 nfs-chart-validate:
 	test -f "$(NFS_CHART)"
