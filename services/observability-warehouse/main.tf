@@ -42,6 +42,10 @@ locals {
     loki_config_base64    = base64encode(templatefile("${path.module}/config/loki.yaml.tftpl", local.service_config))
     tempo_config_base64   = base64encode(templatefile("${path.module}/config/tempo.yaml.tftpl", local.service_config))
     service_unit          = file("${path.module}/config/observability-warehouse.service")
+    openbao_access        = var.warehouse_openbao_access
+    credentials_script    = file("${path.module}/scripts/warehouse-credentials.sh")
+    credentials_service   = file("${path.module}/config/observability-credentials.service")
+    credentials_timer     = file("${path.module}/config/observability-credentials.timer")
   })
 
   warehouse_network_interface_index = index(

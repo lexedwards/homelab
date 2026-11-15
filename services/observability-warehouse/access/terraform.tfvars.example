@@ -1,0 +1,5 @@
+# Copy to ignored terraform.tfvars. Supply the administrative token only through
+# protected TF_VAR_configuration_token process injection.
+# openbao_address =
+# approle_mount   =
+# secret_path     =

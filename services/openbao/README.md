@@ -244,6 +244,10 @@ OpenTofu owner; do not create a second writer in a central root.
 
 This hosting root does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
+The separate [platform authorization root] owns the shared AppRole mount without
+adding an API dependency to hosting/recovery. Consumers own their roles/policies;
+the warehouse's [SSH enrollment decision] keeps reusable machine credentials out
+of state and first-boot data. Native SSH delivery does not depend on a guest agent.
 The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
 consumes this root's published `api_endpoint` output, never this service's state.
 The endpoint derives from service DNS and HTTPS port. After an authorized output
@@ -273,7 +277,7 @@ authorization stage. This hosting root gains no runtime API dependency.
 ## Service Deployment Credentials
 
 The shared [deployment-access module][deployment-access] owns the protected
-issuance/population helper, tests and command reference. Consuming services call
+issuance/population helper and command reference. Consuming services call
 that shared implementation, not scripts or modules under `services/openbao`.
 Keep issued tokens and values outside OpenTofu, argv and logs. Runtime readers
 cannot manage authorization; rotators require a separate reviewed writer identity.
@@ -363,3 +367,5 @@ using the matching old binary and snapshot.
 [Micro Node]: ../../hosts/micro-node/README.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
 [deployment-access]: ../../modules/openbao-deployment-access/README.md
+[platform authorization root]: authorization/README.md
+[SSH enrollment decision]: ../../docs/adrs/011-ssh-approle-enrollment.md

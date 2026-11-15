@@ -56,6 +56,9 @@ For input classification, read and apply
 - Establish initial machine trust separately. AppRole SecretIDs and response-
   wrapping tokens are credentials, not public bootstrap data. Do not grant access
   merely because a guest knows a role name or is on a private subnet.
+  For VM/LXC introduction, follow the accepted [trusted SSH enrollment decision]:
+  wrapped delivery, reusable root-only SecretIDs and short-lived runtime tokens,
+  without another broker or guest-agent credential transport.
 - Keep recovery access independent of the service/failure domain it recovers.
   OpenBao's own TLS renewal and recovery must not depend on fetching from sealed
   OpenBao. Reload is not restart: certificate SIGHUP preserves unsealed operation;
@@ -79,7 +82,9 @@ configuration in its OpenTofu owner; separate credential issuance/value enrollme
   limits remain distinct from the desired version.
 - Use native controllers, agents and systemd timers for recurring work. Readiness
   checks must be bounded and must distinguish waiting for enrollment from failure.
-  Do not hide guest maintenance in OpenTofu remote-execution provisioners.
+  Keep guest package/configuration maintenance out of provisioners. The explicit
+  credential-introduction hook is separate from VM resources, fails without VM
+  replacement, and must not become a configuration-repair mechanism.
 
 ## Runtime And Data
 
@@ -101,3 +106,4 @@ generic and follow repository documentation privacy. Record actual acceptance an
 remaining live checks in the tracker, not transient handoff documents.
 
 [cloudinit]: https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs
+[trusted SSH enrollment decision]: ../../../../docs/adrs/011-ssh-approle-enrollment.md
