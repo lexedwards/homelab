@@ -29,6 +29,20 @@ data "incus_network" "br0" {
   }
 }
 
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "uptime-kuma-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content = templatefile("${path.module}/cloud-init/user-data.tftpl", {
+      compose_config = file("${path.module}/config/compose.yaml")
+      service_unit   = file("${path.module}/config/uptime-kuma.service")
+    })
+  }
+}
+
 resource "incus_storage_volume" "uptime_kuma_data" {
   name         = "uptime-kuma-data"
   pool         = data.incus_storage_pool.default.name
@@ -50,7 +64,7 @@ resource "incus_instance" "uptime_kuma" {
 
   config = {
     "boot.autostart"                       = "true"
-    "cloud-init.user-data"                 = trimspace(templatefile("${path.module}/cloud-init/user-data.tftpl", {}))
+    "cloud-init.user-data"                 = data.cloudinit_config.user_data.rendered
     "limits.cpu"                           = "1"
     "limits.memory"                        = "1GiB"
     "security.nesting"                     = "true"

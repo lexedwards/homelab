@@ -9,11 +9,10 @@ service for the Micro Node and Incus.
    client workflow, `default` storage pool, and unmanaged `br0` bridge.
 2. Read `services/hello-world/` for a small Incus baseline and
    `services/openbao/` for Debian 13 nesting and native service/cgroup checks.
-3. Use specialized examples only for their matching concern:
-   `proxmox-qdevice` for authoritative SSH keys, `tailscale-exit-node` for TUN
-   and forwarding, and `uptime-kuma` only for custom-volume persistence and
-   replacement. Do not copy Uptime Kuma's Docker startup, hardening, or upgrade
-   lifecycle.
+3. Use `tailscale-exit-node` for native vendor APT, TUN and forwarding, and
+   `uptime-kuma` for systemd/Compose startup and custom-volume persistence.
+   Their device/syscall exceptions are workload-specific. QDevice retains its
+   existing ongoing SSH-key ownership; it is not a new first-boot key recipe.
 4. Use provider and OpenTofu constraints common to current roots. Do not guess
    newer versions.
 
@@ -59,9 +58,9 @@ environment value or assume an older installer is the recommended bootstrap.
   cloud-init composition, package installation, secret handling and maintenance.
 - Pass rendered user-data and separate network-data through the supported Incus
   configuration keys; verify format/encoding support and wait for cloud-init.
-- No conforming tracked Incus Compose example currently exists. For justified
-  Docker Compose, follow the lifecycle reference and manage it through a dedicated
-  systemd unit. Add Docker-specific syscall interception only when proven necessary.
+- For justified Compose, follow the lifecycle reference and Uptime Kuma's dedicated
+  unit/config pattern, not an imperative `docker run` upgrade procedure. Add
+  Docker-specific syscall interception only when proven necessary.
 - Use a bounded creation-time `exec` check when readiness can be tested locally
   and deterministically.
 

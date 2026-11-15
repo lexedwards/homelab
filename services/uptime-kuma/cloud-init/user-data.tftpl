@@ -4,23 +4,20 @@ packages:
   - ca-certificates
   - curl
   - docker.io
+  - docker-cli
   - docker-compose
 
 write_files:
   - path: /opt/uptime-kuma/compose.yaml
     permissions: "0644"
     owner: root:root
-    content: |
-      services:
-        uptime-kuma:
-          image: louislam/uptime-kuma:2
-          container_name: uptime-kuma
-          restart: unless-stopped
-          ports:
-            - "3001:3001"
-          volumes:
-            - /var/lib/uptime-kuma:/app/data
+    content: ${jsonencode(compose_config)}
+  - path: /etc/systemd/system/uptime-kuma.service
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(service_unit)}
 
 runcmd:
+  - [systemctl, daemon-reload]
   - [systemctl, enable, --now, docker]
-  - [docker, compose, --file, /opt/uptime-kuma/compose.yaml, up, --detach]
+  - [systemctl, enable, --now, uptime-kuma]

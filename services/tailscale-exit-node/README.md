@@ -13,6 +13,7 @@ policy, and client selection remain operator-managed.
 - A prepared [Micro Node] with its `default` directory pool, unmanaged `br0`
   bridge, and host `/dev/net/tun` device
 - A trusted Incus remote on the management workstation
+- A reviewed Debian 13 cloud image matching the authored APT source
 - DHCP, routing, and DNS on the service VLAN
 - Outbound HTTPS and UDP access required by Tailscale
 - A Tailscale tailnet and permission to add and approve an exit node
@@ -103,10 +104,18 @@ access to the exit node's LAN. The guest must be able to route to each VLAN,
 and upstream firewall policy must permit the required connections. Tailscale
 route approval and access policy control which tailnet clients can use them.
 
-Cloud-init runs Tailscale's current installation script. The script and
-installed release are not pinned by this repository, so a fresh deployment can
-change without an OpenTofu change. Deployment requires working access to Debian
-package repositories and `tailscale.com`.
+The pinned HashiCorp cloudinit provider composes plain MIME user-data; network-data
+remains separate. Native cloud-init APT fields configure Tailscale's Debian 13
+stable source with the reviewed key in `config/tailscale-signing-key.asc`, scoped
+through `signed-by`. Native `packages` installs Tailscale and its vendor keyring
+package; no remote installer is executed. Changes to the source's scoped bootstrap
+key require a reviewed file update rather than trusting a newly downloaded key.
+
+The installed stable release remains unpinned, matching the previous installation
+policy: a fresh deployment can select a newer package without an OpenTofu change.
+Deployment requires access to Debian repositories and `pkgs.tailscale.com`.
+Daemon readiness is not tailnet enrollment; no authentication key is supplied in
+OpenTofu or cloud-init.
 
 Tailscale identity and preferences live on the instance root disk. Replacing
 the instance creates a new tailnet machine that must be authenticated and
@@ -185,8 +194,9 @@ approved route, accepts the reviewed DNS query traffic, and resolves those names
 client using the exit node. Without an exit node selected, configure split DNS
 for the internal zone if clients need to resolve those names.
 
-Changing `cloud-init.user-data` does not rerun cloud-init on an existing
-instance. Replace the instance when first-boot provisioning must run again, then
-authenticate and approve the new tailnet machine.
+Changing `cloud-init.user-data` does not update an existing instance. Use separately
+reviewed in-place maintenance to adopt repository changes; do not rerun first boot
+or replace a working identity merely to update bootstrap definitions. Deliberate
+replacement requires tailnet authentication and route approval again.
 
 [Micro Node]: ../../hosts/micro-node/README.md
