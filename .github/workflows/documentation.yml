@@ -27,4 +27,9 @@ jobs:
         with:
           node-version: '24'
       - run: python -m pip install -r scripts/requirements-docs.txt
+      - name: Check renderer startup with synthetic input
+        run: |
+          printf 'flowchart LR\n  A-->B\n' > "$RUNNER_TEMP/renderer-smoke.mmd"
+          npm exec --yes --package=@mermaid-js/mermaid-cli@12.2.0 -- \
+            mmdc -i "$RUNNER_TEMP/renderer-smoke.mmd" -o "$RUNNER_TEMP/renderer-smoke.svg"
       - run: make docs-test docs-check docs-render
