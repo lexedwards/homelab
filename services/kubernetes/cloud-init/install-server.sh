@@ -15,14 +15,16 @@ selinux_version=$2
 [[ $selinux_version =~ ^[0-9]+\.[0-9]+-[0-9]+\.el10$ ]]
 minor=$(cut -d. -f1,2 <<< "$version")
 
-rpm -q kernel kernel-core kernel-modules kernel-modules-extra audit policycoreutils-python-utils >/dev/null
+for package in kernel kernel-core kernel-modules kernel-modules-extra audit policycoreutils-python-utils; do
+  dnf --quiet --cacheonly list --installed "$package" >/dev/null
+done
 
 dnf -y --setopt=rancher-rke2-common-stable.excludepkgs= \
   --setopt="rancher-rke2-$minor-stable.excludepkgs=" \
   install "rke2-server-$version" "rke2-common-$version" "rke2-selinux-$selinux_version"
-[[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' rke2-server) == "$version" ]]
-[[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' rke2-common) == "$version" ]]
-[[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' rke2-selinux) == "$selinux_version" ]]
+[[ $(dnf --quiet --cacheonly repoquery --installed --queryformat '%{version}-%{release}' rke2-server) == "$version" ]]
+[[ $(dnf --quiet --cacheonly repoquery --installed --queryformat '%{version}-%{release}' rke2-common) == "$version" ]]
+[[ $(dnf --quiet --cacheonly repoquery --installed --queryformat '%{version}-%{release}' rke2-selinux) == "$selinux_version" ]]
 
 swapoff -a
 sed -i -E '/^[^#].*[[:space:]]swap[[:space:]]/s/^/# kubernetes: /' /etc/fstab
