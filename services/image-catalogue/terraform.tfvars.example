@@ -1,7 +1,7 @@
-# proxmox_endpoint =
-# proxmox_api_token =
+# Copy to ignored terraform.tfvars and assign required deployment inputs.
+# Authentication: inject PROXMOX_VE_API_TOKEN and use the local SSH agent.
+# proxmox_endpoint     =
 # proxmox_ssh_username =
-# proxmox_ssh_private_key_file =
 
 # Set these to values available on the store Proxmox host.
 vm_datastore_id = "local-lvm"

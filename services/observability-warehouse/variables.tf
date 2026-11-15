@@ -10,18 +10,6 @@ variable "proxmox_endpoint" {
   }
 }
 
-variable "proxmox_api_token" {
-  description = "API token used to authenticate with Proxmox VE."
-  type        = string
-  nullable    = false
-  sensitive   = true
-
-  validation {
-    condition     = length(trimspace(var.proxmox_api_token)) > 0
-    error_message = "proxmox_api_token must not be empty."
-  }
-}
-
 variable "proxmox_insecure" {
   description = "Disable TLS certificate verification for the Proxmox VE API."
   type        = bool
@@ -38,18 +26,6 @@ variable "proxmox_ssh_username" {
   validation {
     condition     = length(trimspace(var.proxmox_ssh_username)) > 0
     error_message = "proxmox_ssh_username must not be empty."
-  }
-}
-
-variable "proxmox_ssh_private_key_file" {
-  description = "Path to the private key used for Proxmox SSH authentication."
-  type        = string
-  nullable    = false
-  sensitive   = true
-
-  validation {
-    condition     = length(trimspace(var.proxmox_ssh_private_key_file)) > 0
-    error_message = "proxmox_ssh_private_key_file must not be empty."
   }
 }
 

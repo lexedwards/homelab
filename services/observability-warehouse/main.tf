@@ -1,12 +1,10 @@
 provider "proxmox" {
-  endpoint  = var.proxmox_endpoint
-  api_token = var.proxmox_api_token
-  insecure  = var.proxmox_insecure
+  endpoint = var.proxmox_endpoint
+  insecure = var.proxmox_insecure
 
   ssh {
-    agent       = true
-    username    = var.proxmox_ssh_username
-    private_key = file(pathexpand(var.proxmox_ssh_private_key_file))
+    agent    = true
+    username = var.proxmox_ssh_username
 
     dynamic "node" {
       for_each = var.proxmox_nodes

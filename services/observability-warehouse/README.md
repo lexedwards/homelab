@@ -38,8 +38,9 @@ data.
 - An NFS export reachable from the warehouse VM.
 - OpenTofu 1.11 or newer, `make`, `yamllint`, and an Alloy binary matching the
   configured package version, plus Docker Compose for daemon-free validation.
-- A least-privilege Proxmox API token and a PAM user with an SSH private key
-  that can access every target node for uploading cloud-init snippets.
+- A least-privilege Proxmox API token supplied through `PROXMOX_VE_API_TOKEN`, and
+  a local SSH agent with the PAM user's approved key loaded for every target node
+  used to upload cloud-init snippets.
 - A `proxmox_nodes` entry for each target node. Each entry supplies the explicit
   SSH address, snippet datastore, VM datastore, and bridge used on that node.
 
@@ -224,11 +225,19 @@ endpoint/trust input; never reuse this service's credentials or private state.
    and the collector and Grafana on `compute`. Host-independent template, VLAN,
    cloud-user, and SSH-key values are shared. Define each target node once in
    `proxmox_nodes`; the provider generates its SSH mappings from that map. Set
-   the API token, PAM SSH username, and private-key path using the same provider
-   contract as the image catalogue. Supply no RustFS credential values to
-   OpenTofu. Ignored provider inputs and node addresses still require protected
-   custody; keep the variable file readable only by its owner and the private key
-   outside this repository.
+   the PAM SSH username in tfvars. Inject `PROXMOX_VE_API_TOKEN` separately and
+   expose the approved local agent through `SSH_AUTH_SOCK` for both online plan
+   and apply, including saved-plan apply. Supply no RustFS credential values to
+   OpenTofu. Keep deployment inputs readable only by their owner; do not supply
+   private-key contents to OpenTofu. The node-side provider agent and the guest
+   enrollment SSH identity are separate access grants, even if one agent holds both.
+
+   Remove the former `proxmox_api_token` and `proxmox_ssh_private_key_file` inputs
+   from local tfvars and `TF_VAR_...` injection. No resource/state migration or key
+   rotation is implied. Old plans and protected backups may still contain the
+   former credentials; input removal does not erase them. Clear alternative
+   provider password/private-key environment inputs to avoid unintended fallback.
+   Local validation needs no provider credentials and proves no online access.
 
 2. Initialize, validate, and review a saved plan.
 
@@ -548,7 +557,7 @@ the warehouse query ports. For a failed cross-node clone, confirm the source
 template location and that Proxmox can copy its disks to the selected target
 datastore, and confirm that the configured template is the catalogue's Debian
 13 image. For a snippet transfer failure, verify the selected `proxmox_nodes`
-entry, SSH agent or private key, PAM username, and target snippet datastore.
+entry, local SSH agent/key availability, PAM username, and target snippet datastore.
 
 [image catalogue]: ../image-catalogue/README.md
 [Technitium DNS root]: ../technitium-dns/README.md
