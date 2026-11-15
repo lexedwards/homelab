@@ -29,6 +29,17 @@ data "incus_network" "br0" {
   }
 }
 
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "hello-world-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content      = file("${path.module}/cloud-init/user-data.tftpl")
+  }
+}
+
 resource "incus_instance" "hello_world" {
   name     = "hello-world"
   image    = var.incus_image
@@ -39,7 +50,7 @@ resource "incus_instance" "hello_world" {
   config = {
     "boot.autostart"            = "true"
     "cloud-init.network-config" = trimspace(file("${path.module}/cloud-init/network-config.tftpl"))
-    "cloud-init.user-data"      = trimspace(file("${path.module}/cloud-init/user-data.tftpl"))
+    "cloud-init.user-data"      = data.cloudinit_config.user_data.rendered
     "limits.cpu"                = "1"
     "limits.memory"             = "256MiB"
     "security.nesting"          = "true"

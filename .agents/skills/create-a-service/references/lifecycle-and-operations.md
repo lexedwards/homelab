@@ -79,6 +79,8 @@ Prefer native packages and systemd services. When Docker is justified, use a
 declarative Compose file managed by systemd, not `docker run`. Pin images under an
 explicit update policy; drop unnecessary capabilities, use `no-new-privileges`,
 bound log growth and publish only required ports where supported.
+Keep Compose configuration native-validated without requiring a running daemon;
+an active oneshot wrapper is not application-health evidence.
 
 Separate replaceable software/configuration from durable data. Document deletion,
 replacement, migration, backup ownership and restore limitations for every durable

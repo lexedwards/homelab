@@ -17,7 +17,8 @@ use. The complete target list remains in operator-managed application settings.
   bridge
 - A trusted Incus remote on the management workstation
 - DHCP, routing, and DNS on the service VLAN
-- OpenTofu 1.6 or newer, `make`, and `yamllint`
+- OpenTofu 1.6 or newer, `make`, `yamllint`, and Docker Compose for offline
+  configuration validation (no Docker daemon required)
 - Network access from administrators and status-page clients to the configured
   application listener; keep its connection values in protected operator records
 
@@ -73,9 +74,13 @@ flowchart LR
 ```
 
 The instance uses 1 vCPU and 1 GiB of memory. It has no Incus profile and joins
-the configured VLAN through `br0`. Cloud-init installs Docker and starts
-`louislam/uptime-kuma:2`; OpenTofu waits for a successful local HTTP response
-during initial creation.
+the configured VLAN through `br0`. The pinned HashiCorp cloudinit provider composes
+plain MIME user-data. Native cloud-init fields install Docker/Compose and write
+`config/compose.yaml` and `config/uptime-kuma.service` to their guest paths.
+Systemd owns Compose startup after Docker and the data mount, and stops the
+container without removing its data. OpenTofu retains the bounded local HTTP
+creation check; neither local schema checks nor an active oneshot unit prove
+application health.
 
 Application data lives in the `uptime-kuma-data` custom volume. The
 `prevent_destroy` rule protects it from accidental OpenTofu deletion, but it is
@@ -87,16 +92,21 @@ backed up with the rest of the operator's infrastructure state.
 
 ## Operations
 
-Update the Uptime Kuma image without replacing the Incus instance:
+On a guest with the tracked Compose file and systemd unit installed, update the
+image without replacing the Incus instance:
 
 ```bash
-incus exec <remote-name>:uptime-kuma -- docker pull louislam/uptime-kuma:2
-incus exec <remote-name>:uptime-kuma -- docker rm --force uptime-kuma
-incus exec <remote-name>:uptime-kuma -- docker run --detach --restart=unless-stopped --name uptime-kuma --publish='<reviewed-listener-mapping>' --volume=/var/lib/uptime-kuma:/app/data louislam/uptime-kuma:2
+incus exec <remote-name>:uptime-kuma -- docker compose --file /opt/uptime-kuma/compose.yaml pull
+incus exec <remote-name>:uptime-kuma -- systemctl restart uptime-kuma
+incus exec <remote-name>:uptime-kuma -- docker compose --file /opt/uptime-kuma/compose.yaml ps
 ```
 
 The `:2` tag is mutable. Review release notes and take an off-host backup before
 each update. OpenTofu does not detect or apply later Docker image releases.
+The restart interrupts monitoring; verify the local HTTP endpoint afterwards.
+Existing guests need separately reviewed in-place adoption of the Compose file
+and unit before these commands apply. Inspect ownership of an existing manually
+created container; do not force-remove it to hide an adoption conflict.
 
 To adopt existing resources, import the volume before the instance. Use the
 instance's actual image in the import ID to avoid an unintended replacement.
@@ -118,12 +128,13 @@ Check Incus, cloud-init, Docker, and the local application endpoint:
 incus config show <remote-name>:uptime-kuma
 incus storage volume show <remote-name>:default uptime-kuma-data
 incus exec <remote-name>:uptime-kuma -- cloud-init status --long
+incus exec <remote-name>:uptime-kuma -- systemctl status uptime-kuma --no-pager
 incus exec <remote-name>:uptime-kuma -- docker ps --all
 incus exec <remote-name>:uptime-kuma -- curl --fail '<private-local-application-url>'
 ```
 
-Changing `cloud-init.user-data` does not rerun cloud-init on an existing
-instance. Replace the instance when first-boot provisioning must run again. The
-separate data volume remains protected, but replacement still causes downtime.
+Changing `cloud-init.user-data` does not update an existing instance. Adopt changes
+through separately reviewed maintenance, not by rerunning first boot. Deliberate
+replacement still causes downtime even though the data volume remains protected.
 
 [Micro Node]: ../../hosts/micro-node/README.md

@@ -1,0 +1,19 @@
+[Unit]
+Description=Uptime Kuma availability monitoring
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+PartOf=docker.service
+RequiresMountsFor=/var/lib/uptime-kuma
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/uptime-kuma
+ExecStart=/usr/bin/docker compose --file compose.yaml up --detach
+ExecStop=/usr/bin/docker compose --file compose.yaml stop
+TimeoutStartSec=5min
+TimeoutStopSec=2min
+
+[Install]
+WantedBy=multi-user.target

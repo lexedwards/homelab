@@ -29,6 +29,19 @@ data "incus_network" "br0" {
   }
 }
 
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "tailscale-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content = templatefile("${path.module}/cloud-init/user-data.tftpl", {
+      signing_key = file("${path.module}/config/tailscale-signing-key.asc")
+    })
+  }
+}
+
 resource "incus_instance" "tailscale_exit_node" {
   name     = "tailscale-exit-node"
   image    = var.incus_image
@@ -39,7 +52,7 @@ resource "incus_instance" "tailscale_exit_node" {
   config = {
     "boot.autostart"                            = "true"
     "cloud-init.network-config"                 = trimspace(file("${path.module}/cloud-init/network-config.tftpl"))
-    "cloud-init.user-data"                      = trimspace(file("${path.module}/cloud-init/user-data.tftpl"))
+    "cloud-init.user-data"                      = data.cloudinit_config.user_data.rendered
     "limits.cpu"                                = "1"
     "limits.memory"                             = "256MiB"
     "linux.sysctl.net.ipv4.ip_forward"          = "1"

@@ -10,7 +10,7 @@ help:
 		'fmt                   Format OpenTofu configuration' \
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting Incus' \
-		'cloud-init-validate   Validate the cloud-init template' \
+		'cloud-init-validate   Lint the cloud-init YAML templates' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE' \
 		'apply                 Apply the previously reviewed PLAN_FILE'

@@ -4,6 +4,9 @@ Hello World is an integration test for deploying services to Incus on the
 [Micro Node]. It creates a small Debian instance, obtains an IPv4 address over
 DHCP, installs Nginx, and verifies the local HTTP endpoint.
 
+The pinned HashiCorp cloudinit provider composes plain MIME user-data from the
+tracked native cloud-config; network-data stays separate.
+
 ## Dependencies
 
 - A prepared [Micro Node] with its `default` directory pool and unmanaged `br0`
