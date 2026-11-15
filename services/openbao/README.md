@@ -62,7 +62,7 @@ make init
 make validate
 ```
 
-Validation runs format/OpenTofu checks, YAML template linting, and installer and
+Validation runs format/OpenTofu checks, YAML template linting, and package-helper and
 deploy-hook syntax checks. It does not contact infrastructure, issue certificates,
 start OpenBao or prove guest systemd/cgroup behavior. The existing service has
 passed authenticated HTTPS access and real certificate renewal/reload checks;
@@ -71,9 +71,31 @@ local validation does not repeat those runtime checks.
 OpenBao 2.7.2 is installed from the upstream ARM64 DEB. The version and SHA-256
 are kept together in `main.tf`. Before changing either, verify the release
 manifest's GPG signature using the upstream published key, then verify the
-package against that manifest. The installer rejects a checksum mismatch or
-an incompatible guest OS/architecture. It preserves the authored server config
-instead of activating the package's example configuration.
+package against that manifest. `scripts/install-package.sh` is limited to this
+verified local-DEB installation: cloud-init does not provide an equivalent
+checksum-verified URL download/install operation. It rejects incompatible guests,
+non-empty data volumes and checksum mismatches, and preserves the authored server
+config instead of the package's example. It is not an upgrade or recovery command.
+
+The pinned HashiCorp cloudinit provider composes plain MIME user-data. Native
+cloud-init fields install distribution dependencies and write the configuration,
+hardening, readiness tool, renewal hook, units and `config/tmpfiles.conf` rules.
+The final command block fails fast: install the verified package, apply only the
+declared OpenBao tmpfiles rules, reload systemd, then enable Certbot and OpenBao.
+No permissions or service setup is hidden in the package helper.
+
+The package creates the `openbao` account during installation. Because this local
+DEB step occurs after cloud-init's deferred-write stage, ownership is applied with
+native systemd-tmpfiles, not `defer: true` or ad hoc `chown`/`chmod`. Rules adjust
+only the named paths, not data recursively, and preserve the existing ownership
+and modes. The package itself recursively changes ownership under `/opt/openbao`,
+so the helper refuses any non-empty data volume before invoking it. Certificate
+conditions, swap protection and manual initialization/unseal remain unchanged.
+
+These declarations affect future first boots only. Never rerun them on an
+initialized guest or replace a useful data volume merely to adopt the refactor.
+Actual ARM64 Incus boot, cgroup enforcement and TLS activation still require their
+separately authorized acceptance checks.
 
 ## Deploy And Register DNS
 
@@ -315,8 +337,13 @@ No backup or restore test has been performed by this implementation.
 
 Guest replacement must stop/detach the old instance before attaching its durable
 volume to the replacement. Never run two servers against the same volume.
-Provisioning preserves data, reapplies directory ownership, starts sealed, and
-does not initialize existing storage. Reconfirm DHCP/DNS after replacement.
+The first-boot package helper refuses populated storage, so this root does not
+currently automate retained-volume replacement. Do not bypass the guard or clear
+the volume to make provisioning pass. Replacement needs a separately reviewed
+recovery procedure that installs the verified package before exposing retained
+data to its recursive ownership hook, keeps infrastructure changes OpenTofu-owned,
+and preserves TLS gating and manual unseal. Reconfirm DHCP/DNS afterwards; never
+initialize retained storage.
 
 ## Changes And Upgrades
 
@@ -327,8 +354,9 @@ and do not assume an in-place config update has taken effect.
 Before upgrading, read upstream compatibility notes, make a verified snapshot,
 confirm key availability and rollback/recovery steps, and authorize the downtime.
 Update the package version and verified checksum together. Use a controlled
-in-guest package/config update or an explicitly reviewed instance replacement
-with the retained volume, then unseal and verify. Never assume a package downgrade
+in-guest package/config update, reviewing package hooks for data side effects,
+then unseal and verify. Retained-volume replacement requires the separate recovery
+procedure described above, not this first-boot helper. Never assume a package downgrade
 can read an upgraded storage format; rollback may require an isolated restore
 using the matching old binary and snapshot.
 

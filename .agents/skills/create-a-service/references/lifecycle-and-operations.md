@@ -21,8 +21,11 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   bounded purpose. Do not move a mixed installer into another data channel.
 - Write repository policy and systemd start conditions before package installation;
   package scripts may otherwise start daemons with default configuration. Use
-  `write_files` with `defer: true` for files needing package-created users/groups.
-  Then activate only after configuration/enrollment and any required kernel reboot.
+  deferred writes only when package-created users/groups exist by that stage.
+  For a justified later package helper, declare post-install ownership/directories
+  through systemd-tmpfiles instead of scripting `chown`/`chmod`. Inspect package
+  hooks for persistent-data side effects before allowing installation.
+  Activate only after configuration/enrollment and any required kernel reboot.
   Installing a kernel does not load its modules; failed installation must not
   enable an unsafe start or enrollment.
 - Use DHCP and upstream reservations/DNS for stable addressing. Verify effective

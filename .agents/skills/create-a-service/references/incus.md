@@ -7,8 +7,9 @@ service for the Micro Node and Incus.
 
 1. Read `hosts/micro-node/README.md` for the host/service boundary, trusted
    client workflow, `default` storage pool, and unmanaged `br0` bridge.
-2. Read `services/hello-world/` for a small Incus baseline and
-   `services/openbao/` for Debian 13 nesting and native service/cgroup checks.
+2. Read `services/hello-world/` for a small Incus baseline and `services/openbao/`
+   for Debian 13 nesting, TLS-gated activation, a bounded verified-package helper
+   and native tmpfiles ownership. Its initialization/unseal are separate operations.
 3. Use `tailscale-exit-node` for native vendor APT, TUN and forwarding, and
    `uptime-kuma` for systemd/Compose startup and custom-volume persistence.
    Their device/syscall exceptions are workload-specific. QDevice retains its
