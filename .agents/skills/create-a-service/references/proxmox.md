@@ -58,7 +58,9 @@ unless the appliance supports them.
   token variable.
 - Add the provider SSH block only when node-side file upload requires it. Use
   the local SSH agent and a required PAM username; never use password-based
-  Proxmox SSH authentication.
+  Proxmox SSH authentication. Do not read private-key files into OpenTofu. These
+  execution credentials must be available for saved-plan apply as well as plan;
+  local validation does not prove API authorization or agent/key readiness.
 
 ### Resource Gate
 

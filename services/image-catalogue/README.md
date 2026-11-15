@@ -16,7 +16,7 @@ Add images only after selecting current releases and verifying publisher checksu
 - A Proxmox bridge available to cloned VMs
 - OpenTofu 1.6 or newer and `make`
 - A least-privilege Proxmox API token and PAM user with SSH access
-- The PAM user's private key stored outside this repository
+- A local SSH agent with the PAM user's approved key loaded
 
 ## Quick Start
 
@@ -26,9 +26,12 @@ Add images only after selecting current releases and verifying publisher checksu
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-   Set the endpoint, API token, SSH username and private-key path, VM datastore,
-   cloud-init user, and real SSH public keys. The ignored variable file contains
-   credentials in plaintext and must remain readable only by its owner.
+   Set the endpoint, PAM SSH username, VM datastore, cloud-init user, and real SSH
+   public keys. Keep this deployment configuration readable only by its owner.
+   Before online planning/applying, inject the least-privilege API token through
+   `PROXMOX_VE_API_TOKEN` and expose the approved local agent through `SSH_AUTH_SOCK`.
+   Load the PAM user's key into that agent outside OpenTofu. Do not put tokens or
+   private-key contents into tfvars; no API-token or private-key-path input is needed.
 
 2. Initialize and validate the root.
 
@@ -52,6 +55,20 @@ Add images only after selecting current releases and verifying publisher checksu
 
 OpenTofu uses local state in this directory. State, saved plans, and local
 variable files are ignored by Git.
+
+### Authentication migration
+
+Remove the former `proxmox_api_token` and `proxmox_ssh_private_key_file` assignments
+from local tfvars and their `TF_VAR_...` injection. The same API identity and SSH key
+can be supplied through the provider environment and local agent; no resource or
+state migration is needed. Supply both execution channels for each online plan
+and apply, including a saved-plan apply. Clear alternative provider password and
+private-key environment inputs so they do not create an unintended fallback.
+
+Removing inputs does not erase credentials from historical plans, state backups
+or local files, and does not rotate them. Review protected artifact custody and
+rotation separately. Local `make validate` needs neither authentication nor a live
+Proxmox connection; it does not prove online permissions or SSH readiness.
 
 ## Catalogue Entries
 
