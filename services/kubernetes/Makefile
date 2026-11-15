@@ -12,7 +12,7 @@ help:
 		'fmt              Format OpenTofu configuration' \
 		'fmt-check        Check formatting' \
 		'tofu-validate    Validate the initialized root offline' \
-		'test             Run mocked infrastructure, readiness and enrollment checks' \
+		'test             Check primary-address selection and PTR-name transformations offline' \
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'validate         Run all local checks without infrastructure access' \
@@ -36,12 +36,9 @@ fmt-check:
 
 tofu-validate:
 	$(TOFU) validate
-	$(MAKE) -C runtime tofu-validate
 
 test:
 	$(TOFU) test
-	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py'
-	$(MAKE) -C runtime test
 
 yaml-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
@@ -64,6 +61,7 @@ shell-validate:
 	bash -n cloud-init/install-agent.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate
+	$(MAKE) -C runtime validate
 	$(MAKE) -C restore-lab validate
 
 nfs-chart-validate:

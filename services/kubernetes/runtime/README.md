@@ -13,8 +13,9 @@ the earlier API rollout was paused before creating any managed runtime objects.
 Never copy a feature-worktree state into production or apply the parent VM plan
 from this directory.
 
-Run `make init` then `make validate` locally. These initialize providers and run
-mocked/API-fixture checks, not deployments. Parent `make init`/`make validate`
+Run `make init` then `make validate` locally. These initialize providers and check
+OpenTofu formatting/validation and literal service boundaries, not deployments.
+Parent `make init`/`make validate`
 include this root. Live plans require the previously applied non-secret metadata
 output from the parent infrastructure root, a privately published OpenBao endpoint
 export (`openbao_endpoint_file`), protected Kubernetes credentials,

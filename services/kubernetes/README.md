@@ -55,8 +55,8 @@ verified evidence distinguished from unrehearsed procedures and accepted risks.
   already owned elsewhere. Optional worker PTR ownership needs an approved
   existing reverse zone. The API name stays stable through future HA expansion.
 - OpenTofu 1.9+ for infrastructure, 1.11+ for the runtime's ephemeral setup
-  credentials, Python 3 with PyYAML, and yamllint. Providers are pinned by the
-  lock file. The Python checks parse authored Kubernetes manifests with PyYAML.
+  credentials, Python 3, and yamllint. Providers are pinned by the lock file.
+  Optional chart inspection helpers additionally require PyYAML and Helm.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
 
@@ -83,18 +83,16 @@ Technitium provider enforces `skip_tls_verify = false`; private CA trust must be
 configured through its supported trust environment. Proxmox verification is also
 on unless a separately approved exception explicitly overrides it.
 
-`make validate` runs format/schema checks and plan/render tests
-with **both providers mocked**, readiness-CLI tests with a fake API command,
-credential-boundary/enrollment checks with mocked SSH, user-data/network-data
-and platform YAML lint, and shell syntax checks. These checks do not
-exercise RPM installation, kernel boot or SELinux policy. No infrastructure is
-created or contacted. Init downloads providers but does not plan or deploy it.
+`make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
+checks and the repository's literal service-boundary check, including the runtime
+and restore-lab roots. `make test` checks only the worker DNS transformations:
+case-insensitive primary-MAC address selection, loopback/link-local filtering,
+and reversed IPv4 PTR names, with the DNS provider mocked. Native variable and
+lifecycle validation retain responsibility for invalid inputs.
 
-OpenTofu's VM mock does not populate the computed MAC inside the configured NIC.
-The VM-focused worker checks override the DNS module; separate module checks feed
-synthetic guest-agent observations through real MAC/address selection and mocked
-DNS resources. They verify both A/PTR plans and rejection paths, not actual lease
-discovery or authenticated DNS publication.
+These checks do not exercise RPM installation, kernel boot, SELinux policy,
+authenticated DNS publication or runtime readiness. No infrastructure is created
+or contacted. Init downloads providers but does not plan or deploy it.
 
 ## Reviewed plan and deployment
 
@@ -119,7 +117,7 @@ redact normal output; they do not encrypt stored data.
 
 Run persistent plans/applies only from the canonical checkout on `main`, using
 its existing default-workspace state. Feature worktrees are for development and
-mocked tests, not a second deployment state.
+local validation, not a second deployment state.
 
 The server and future worker resources belong to one root/state with separate
 resource groups and operational procedures. The explicit server resource uses

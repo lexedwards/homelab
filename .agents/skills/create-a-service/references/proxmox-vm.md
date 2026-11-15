@@ -98,22 +98,6 @@ handling, protection handling, and rollback. Do not perform state removal or
 import unless the user explicitly requests the migration operation and the
 current state is backed up.
 
-Map the configuration deliberately:
-
-| Legacy VM clone | `proxmox_cloned_vm` |
-| --- | --- |
-| `vm_id` | `id` |
-| `clone.vm_id` | `clone.source_vm_id` |
-| `clone.node_name` | `clone.source_node_name` |
-| `clone.datastore_id` | `clone.target_datastore` |
-| `cpu` block | `cpu` attribute object |
-| `memory` block | `memory` attribute object |
-| `network_device` blocks | `network` map keyed by `netN` |
-| `network_device.vlan_id` | `network.netN.tag` |
-| `disk` blocks with `interface` | `disk` map keyed by the interface |
-| `disk.size` | `disk.<slot>.size_gb` |
-| `memory.dedicated` | `memory.size` |
-
 For each legacy setting with no cloned-resource equivalent, decide whether it
 is safely inherited from the source template or whether the migration must not
 proceed. Importing the existing `node/id` into the new resource can avoid guest
@@ -126,9 +110,10 @@ When guest-specific package or application provisioning is needed, use the
 full-control VM resource because `proxmox_cloned_vm` cannot manage cloud-init
 initialization. Then:
 
-- add `.yamllint`, `cloud-init/user-data.tftpl`, and `config/` for substantial
-  service files;
-- upload tracked raw cloud-init through a snippets-enabled datastore;
+- follow [Lifecycle And Operations](lifecycle-and-operations.md) for declarative
+  user-data composition, separate network-data, native modules and lifecycle order;
+- upload provider-rendered user-data and native network-data through a
+  snippets-enabled datastore, verifying accepted format/encoding;
 - add provider SSH only because `source_raw` requires node-side file upload;
 - create a non-root administrator with validated SSH public keys;
 - disable password login and root SSH login;
@@ -136,15 +121,11 @@ initialization. Then:
 - keep stable addressing outside the guest.
 
 The snippet datastore may default to `local` only when that is the established
-node convention. Changing cloud-init does not rerun first-boot setup on an
-existing VM.
+node convention. Updating snippets is not an existing-guest configuration rollout.
 
 ## Workload Gate
 
-- Prefer a native package and systemd service.
-- For Docker, use a VM rather than LXC. Write declarative Compose configuration,
-  manage it with systemd, and apply the hardening in
-  [Lifecycle And Operations](lifecycle-and-operations.md).
+- For Docker, use a VM rather than LXC and follow the lifecycle reference.
 - Put bounded first-boot readiness in cloud-init when suitable. Do not make
   OpenTofu depend on an unbounded application wait or operator enrollment.
 

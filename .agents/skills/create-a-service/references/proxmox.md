@@ -1,37 +1,27 @@
 # Proxmox
 
-Read this reference only after the main skill's placement gate classifies the
+Read this reference only after the main skill classifies the
 service for Proxmox. Resolve placement and guest type before loading a guest
 implementation reference.
 
 ## Read Current Evidence
 
-Treat a root as current evidence only when Git tracks it. Untracked worktree
-roots are candidate examples and cannot override tracked conventions.
-
-1. When tracked, read `hosts/compute/README.md` and `hosts/store/README.md` for
+1. Read `hosts/compute/README.md` and `hosts/store/README.md` for
    node boundaries and provider workflow.
 2. Read `services/image-catalogue/` for curated VM image inputs, cloud-init-ready
    template defaults, explicit IDs, and current provider constraints.
-3. When tracked, read `services/observability-warehouse/` for an end-to-end
+3. Read `services/observability-warehouse/` for an end-to-end
    legacy VM-resource baseline, snippet upload, cross-node clone, guest-agent
    address wait, protection, validation, and credential enrollment. Its
    `proxmox_virtual_environment_vm` clone model is evidence for capabilities
    that `proxmox_cloned_vm` does not manage, not the default for every new
-   clone. Otherwise treat it only as a candidate example.
+   clone. Follow the lifecycle reference rather than copying its legacy installers
+   or optional bootstrap-credential inputs.
 4. Inspect the schema of the provider version pinned by current roots before
    using an argument not present in those examples.
 
 The repository does not yet establish a Proxmox LXC application-bootstrap
 convention. Do not present an untested mechanism as a local pattern.
-
-## Choose Placement
-
-- Prefer `compute` for CPU-bound and general compute workloads or workloads
-  coupled to its local devices.
-- Prefer `store` for persisted-data-intensive and storage-coupled workloads.
-- Confirm the target has the required bridge, datastore content types, disk
-  capacity, template access, and physical devices.
 
 Cluster membership provides management membership, not service high
 availability. Local disks, templates, bind mounts, and passed-through devices

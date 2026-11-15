@@ -13,7 +13,7 @@ execution-specific inputs.
 This principle owns configuration classification, input channels, defaults, and
 the example-file contract across host and service roots. It does not authorize
 reading local deployment values or running infrastructure operations. Application
-credential enrollment and state-exposure decisions belong to
+credential enrollment and secret-exclusion rules belong to
 [Lifecycle And Operations](../create-a-service/references/lifecycle-and-operations.md).
 
 ## Decide What Can Be Committed
@@ -22,7 +22,8 @@ Classify each value before choosing its input channel:
 
 | Value | Tracked representation | Actual value |
 | --- | --- | --- |
-| Password, token, private key, or application credential | Variable declaration and blank commented required assignment; never a working credential | Prefer an approved secret store or environment injection; ignored local tfvars is acceptable when a variable input is unavoidable |
+| Provider authentication credential | Prefer the provider's native environment channel; declare an input only when required | Protected environment injection; never persist in resource attributes or bootstrap data |
+| Application password, token, private key or enrollment credential | Non-secret access definitions only; never a value resource or cloud-init input | OpenBao or a separately protected enrollment/recovery channel, outside OpenTofu state/plans and cloud-init |
 | Exact deployment locator: address, CIDR, gateway, DNS value, VLAN/guest ID, API/remote/storage endpoint, local path, datastore identifier, username, or public key | Typed variable without a deployment-specific default; blank commented assignment | Prefer ignored local tfvars; environment injection is also supported |
 | Established non-secret architecture: host roles, project/pool/bridge/datastore/service-name conventions | Code, documentation, and safe defaults where already established in tracked files | Override locally only when needed |
 | Reusable behavior: resource sizing, retention, package versions, feature flags | Literal/local for an invariant; typed variable with a sensible default for an operator choice | Omit unless overriding the default |
@@ -60,8 +61,8 @@ placeholders outside tfvars examples.
 - Document the supported authentication path and required variable names without
   embedding actual values in shell commands, logs, or tracked `.env` files.
   Environment injection is not encryption and does not keep values out of state
-  when resources persist them. Mark unavoidable secret inputs/outputs sensitive;
-  sensitivity redacts normal output but does not encrypt state.
+  when resources persist them. Sensitivity redacts normal output but does not
+  encrypt state or authorize persisting application secrets.
 - Avoid setting the same input in several places. OpenTofu loads `TF_VAR_...`
   before automatically loaded tfvars, so tfvars overrides the environment;
   command-line `-var`/`-var-file` inputs take precedence over those. Do not promise
