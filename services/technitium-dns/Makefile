@@ -10,7 +10,7 @@ help:
 		'fmt                   Format OpenTofu configuration' \
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
-		'cloud-init-validate   Lint the cloud-init YAML template' \
+		'cloud-init-validate   Lint cloud-init YAML and check archive-helper syntax' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE' \
 		'apply                 Apply the previously reviewed PLAN_FILE'
@@ -29,6 +29,7 @@ tofu-validate:
 
 cloud-init-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
+	sh -n scripts/install-archive.sh
 
 validate: fmt-check tofu-validate cloud-init-validate
 

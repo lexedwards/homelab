@@ -10,7 +10,7 @@ variable "incus_remote" {
 }
 
 variable "incus_image" {
-  description = "Cloud image used by the Incus instance."
+  description = "Reviewed Debian 13 cloud image used for fresh instances; preserve the original image reference for imports."
   type        = string
   default     = "images:debian/13/cloud"
   nullable    = false

@@ -12,6 +12,8 @@ service for the Micro Node and Incus.
    and native tmpfiles ownership. Its initialization/unseal are separate operations.
 3. Use `tailscale-exit-node` for native vendor APT, TUN and forwarding, and
    `uptime-kuma` for systemd/Compose startup and custom-volume persistence.
+   `technitium-dns` demonstrates pinned .NET packages and a verified application
+   archive; its initial administration still requires protected enrollment.
    Their device/syscall exceptions are workload-specific. QDevice retains its
    existing ongoing SSH-key ownership; it is not a new first-boot key recipe.
 4. Use provider and OpenTofu constraints common to current roots. Do not guess
