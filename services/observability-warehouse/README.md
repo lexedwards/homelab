@@ -43,10 +43,11 @@ data.
 - A `proxmox_nodes` entry for each target node. Each entry supplies the explicit
   SSH address, snippet datastore, VM datastore, and bridge used on that node.
 
-Grafana Alloy is installed from Grafana's signed APT repository. First boot
-verifies the repository key fingerprint and installs the exact `alloy_version`,
-which defaults to `1.18.1-1`. The repository definition follows Grafana's
-[Alloy Linux installation] instructions.
+Grafana Alloy is installed from Grafana's signed APT repository. Cloud-init uses
+the reviewed public key in `config/grafana-signing-key.asc`, scoped to that source
+with `signed-by`, and installs the exact `alloy_version` (default `1.18.1-1`).
+The repository follows the [Alloy Linux installation] instructions. Key rotation
+requires a reviewed file update; guests do not fetch an unreviewed replacement.
 
 The collector loads `config/alloy/config.alloy` and
 `config/alloy/copilot.alloy` as one Alloy configuration. Component names must
@@ -54,11 +55,41 @@ therefore remain unique across both files. The Copilot span-to-metrics pipeline
 uses an experimental Alloy component, so both runtime and validation enable
 Alloy's experimental stability level.
 
-Grafana OSS uses the same signed repository and key verification described in
-the [Grafana Debian installation] instructions. First boot
+Grafana OSS uses the same signed repository described in the
+[Grafana Debian installation] instructions. First boot
 installs the exact `grafana_version`, which defaults to `13.1.1`, provisions the
 warehouse data sources, and generates an initial administrator password inside
 the guest. The password does not enter OpenTofu state.
+
+### Fresh collector/Grafana bootstrap
+
+`cloud-init.tf` shares only the non-secret user, SSH and APT baseline. Each guest
+template declares its own packages, preference file, application files and service
+drop-in. HashiCorp's pinned `cloudinit_config` data source emits one uncompressed,
+non-base64 MIME cloud-config part per guest for its Proxmox NoCloud snippet.
+Network configuration remains Proxmox-generated DHCP data, separate from user-data.
+
+1. Cloud-init writes the APT version preference and systemd start condition before
+   package installation, then configures the signed repository through native APT
+   fields. The key's primary fingerprint is
+   `B53AE77BADB630A683046005963FA27710458545`; inspect changes with
+   `gpg --show-keys --with-fingerprint config/grafana-signing-key.asc`.
+2. Native `packages` installs the selected exact version. `write_files` entries
+   with `defer: true` then write application configuration using package-created
+   groups, directly at the final paths instead of staging and copying files.
+3. The package's daemon cannot start with default configuration: Alloy requires
+   its deferred Copilot file; Grafana requires its locally generated administrator
+   environment file. Alloy validates the full configuration through `ExecStartPre`
+   with the package service's environment before each start.
+4. Remaining first-boot commands generate Grafana's password locally, reload/enable
+   native units and perform bounded local health checks. These are activation and
+   native-gap steps, not package installers.
+
+This changes future first boots only. It does not upgrade initialized guests,
+rerun cloud-init or authorize VM replacement. Preserve existing configuration,
+credentials and application data during separately planned maintenance. The
+warehouse's legacy bootstrap and optional S3 credential inputs are unchanged in
+this slice; their secret-delivery migration remains separate work.
 
 ## Quick Start
 
@@ -195,8 +226,12 @@ Omitted/null comments remain server-managed; explicit `""` clears them.
 Removing a record entry or destroying this service deletes its record, not the
 shared zone or other services' records. Guest deletion alone does not remove
 independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
-Local validation checks OpenTofu configuration, YAML lint, shell syntax and
-native Alloy configuration. It does not exercise VM provisioning, publish DNS
+Local validation checks OpenTofu configuration, YAML lint and native Alloy
+configuration. The cloudinit provider validates MIME composition, not guest
+module semantics. Use `cloud-init schema --config-file <rendered-cloud-config>`
+on each rendered cloud-config part, not the MIME envelope or unrendered template,
+and verify native APT/systemd behavior with the target distribution's consumers.
+These checks do not exercise VM provisioning, publish DNS
 records or establish full-root production convergence.
 Use the [DNS recovery guidance] for application/state backup and recovery.
 

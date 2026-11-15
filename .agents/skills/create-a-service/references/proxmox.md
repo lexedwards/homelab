@@ -10,13 +10,11 @@ implementation reference.
    node boundaries and provider workflow.
 2. Read `services/image-catalogue/` for curated VM image inputs, cloud-init-ready
    template defaults, explicit IDs, and current provider constraints.
-3. Read `services/observability-warehouse/` for an end-to-end
-   legacy VM-resource baseline, snippet upload, cross-node clone, guest-agent
-   address wait, protection, validation, and credential enrollment. Its
-   `proxmox_virtual_environment_vm` clone model is evidence for capabilities
-   that `proxmox_cloned_vm` does not manage, not the default for every new
-   clone. Follow the lifecycle reference rather than copying its legacy installers
-   or optional bootstrap-credential inputs.
+3. Read `services/observability-warehouse/` for snippet upload, cross-node clone,
+   address discovery and protection. Its collector/Grafana `cloud-init.tf` and
+   templates demonstrate native APT, deferred writes and provider-composed MIME;
+   the warehouse still has legacy credential inputs that must not be copied.
+   Its full-control VM resource is not the default for every new clone.
 4. Inspect the schema of the provider version pinned by current roots before
    using an argument not present in those examples.
 

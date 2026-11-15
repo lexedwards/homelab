@@ -65,14 +65,10 @@ locals {
   })
 
   collector_cloud_init_user_data = templatefile("${path.module}/cloud-init/collector-user-data.tftpl", {
-    alloy_config_base64         = base64encode(file("${path.module}/config/alloy/config.alloy"))
-    alloy_environment_base64    = base64encode(local.collector_alloy_environment)
-    alloy_environment_path      = "/etc/default/alloy"
-    alloy_installer_base64      = base64encode(file("${path.module}/cloud-init/install-alloy-debian.sh"))
-    alloy_version               = var.alloy_version
-    cloud_user                  = var.cloud_user
-    cloud_ssh_public_keys       = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
-    copilot_alloy_config_base64 = base64encode(file("${path.module}/config/alloy/copilot.alloy"))
+    alloy_config         = file("${path.module}/config/alloy/config.alloy")
+    alloy_environment    = local.collector_alloy_environment
+    alloy_version        = var.alloy_version
+    copilot_alloy_config = file("${path.module}/config/alloy/copilot.alloy")
   })
 
   grafana_datasources_config = templatefile("${path.module}/config/grafana-datasources.yaml.tftpl", {
@@ -80,11 +76,8 @@ locals {
   })
 
   grafana_cloud_init_user_data = templatefile("${path.module}/cloud-init/grafana-user-data.tftpl", {
-    cloud_user                 = var.cloud_user
-    cloud_ssh_public_keys      = jsonencode(sort(tolist(var.cloud_ssh_public_keys)))
-    grafana_datasources_base64 = base64encode(local.grafana_datasources_config)
-    grafana_installer_base64   = base64encode(file("${path.module}/cloud-init/install-grafana-debian.sh"))
-    grafana_version            = var.grafana_version
+    grafana_datasources = local.grafana_datasources_config
+    grafana_version     = var.grafana_version
   })
 }
 
@@ -208,7 +201,7 @@ resource "proxmox_virtual_environment_file" "collector_cloud_init" {
   node_name    = var.collector_node_name
 
   source_raw {
-    data      = local.collector_cloud_init_user_data
+    data      = data.cloudinit_config.grafana_guest["collector"].rendered
     file_name = "telemetry-collector_cloud-config.yaml"
   }
 }
@@ -296,7 +289,7 @@ resource "proxmox_virtual_environment_file" "grafana_cloud_init" {
   node_name    = var.grafana_node_name
 
   source_raw {
-    data      = local.grafana_cloud_init_user_data
+    data      = data.cloudinit_config.grafana_guest["grafana"].rendered
     file_name = "grafana_cloud-config.yaml"
   }
 }
