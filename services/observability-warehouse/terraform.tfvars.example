@@ -105,6 +105,11 @@
 # loki_bucket_name          = "loki"
 # tempo_bucket_name         = "tempo"
 # retention_hours           = 720
+# warehouse_openbao_access  = null
+# warehouse_ssh_known_hosts_file = null
+# warehouse_enrollment_revision = "1"
+# Enable using the non-secret access-root enrollment object and verified host keys.
+# Supply openbao_issuer_token only as protected TF_VAR_openbao_issuer_token injection.
 
 # -----------------------------------------------------------------------------
 # UI

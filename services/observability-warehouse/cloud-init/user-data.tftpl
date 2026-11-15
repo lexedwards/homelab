@@ -16,6 +16,8 @@ package_update: true
 packages:
   - ca-certificates
   - curl
+  - jq
+  - openssh-server
   - docker-compose
   - docker.io
   - docker-cli
@@ -56,6 +58,29 @@ write_files:
     permissions: "0644"
     owner: root:root
     content: ${jsonencode(service_unit)}
+  - path: /usr/local/sbin/warehouse-credentials
+    permissions: "0700"
+    owner: root:root
+    content: ${jsonencode(credentials_script)}
+  - path: /etc/systemd/system/observability-credentials.service
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(credentials_service)}
+  - path: /etc/systemd/system/observability-credentials.timer
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(credentials_timer)}
+  - path: /etc/tmpfiles.d/observability-credentials.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      d /run/observability-credentials 0700 root root - -
+# %{ if openbao_access != null }
+  - path: /etc/observability-warehouse/openbao.json
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(jsonencode(openbao_access))}
+# %{ endif }
 
 runcmd:
   - [systemctl, enable, --now, docker]

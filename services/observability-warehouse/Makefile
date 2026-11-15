@@ -5,7 +5,7 @@ COMPOSE ?= docker compose
 PLAN_FILE ?= deployment.tfplan
 ALLOY_CONFIGS := config/alloy/config.alloy config/alloy/copilot.alloy
 
-.PHONY: help init fmt fmt-check tofu-validate yaml-validate alloy-validate compose-validate validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate yaml-validate shell-validate alloy-validate compose-validate validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -14,6 +14,7 @@ help:
 		'fmt-check        Check OpenTofu formatting' \
 		'tofu-validate    Validate OpenTofu without contacting Proxmox' \
 		'yaml-validate    Lint cloud-init and service YAML templates' \
+		'shell-validate   Check SSH enrollment and guest credential script syntax' \
 		'alloy-validate   Validate the Alloy configuration' \
 		'compose-validate Validate Compose without credentials or a running daemon' \
 		'validate         Run all local validation' \
@@ -22,6 +23,7 @@ help:
 
 init:
 	$(TOFU) init
+	$(MAKE) -C access init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -46,7 +48,12 @@ alloy-validate:
 compose-validate:
 	$(COMPOSE) --env-file /dev/null --file config/compose.yaml config --no-interpolate --quiet
 
-validate: fmt-check tofu-validate yaml-validate alloy-validate compose-validate
+shell-validate:
+	bash -n scripts/warehouse-credentials.sh
+	bash -n scripts/enroll-warehouse.sh
+
+validate: fmt-check tofu-validate yaml-validate shell-validate alloy-validate compose-validate
+	$(MAKE) -C access validate
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

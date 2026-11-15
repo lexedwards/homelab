@@ -36,7 +36,7 @@ data.
 - A RustFS HTTPS S3 endpoint with a trusted certificate matching its configured
   hostname, and three existing buckets for Mimir, Loki, and Tempo.
 - An NFS export reachable from the warehouse VM.
-- OpenTofu 1.9 or newer, `make`, `yamllint`, and an Alloy binary matching the
+- OpenTofu 1.11 or newer, `make`, `yamllint`, and an Alloy binary matching the
   configured package version, plus Docker Compose for daemon-free validation.
 - A least-privilege Proxmox API token and a PAM user with an SSH private key
   that can access every target node for uploading cloud-init snippets.
@@ -110,14 +110,71 @@ The former `s3_access_key_id` and `s3_secret_access_key` OpenTofu inputs are rem
 Remove them from protected tfvars and `TF_VAR_...` injection before planning; never
 substitute another cloud-init or resource attribute. First boot does not write an
 active credential file or stage secret values in the guest's cloud-init directory.
-Unattended retrieval still needs an explicit initial machine-trust handoff to
-OpenBao. That enrollment procedure remains separate; bootstrap does not invent one
-or grant access based on network location.
+Automated SSH enrollment is available after the administrative access stage below.
+It does not grant access based on network location or put bootstrap secrets into
+first-boot metadata.
 
 If the former inputs were used, their values may remain in old state/plans,
 Proxmox snippets, guest cloud-init caches and VM/backups. Removing declarations
 does not erase those copies or rotate credentials. Plan rotation and protected
 artifact cleanup separately; no cleanup or live credential change is implied here.
+
+### Automated SSH enrollment
+
+The [accepted introduction decision] uses a trusted deployment orchestrator,
+verified SSH and a reusable, non-expiring, service-scoped SecretID. The wrapping
+token used to deliver it is short-lived and single-use. No guest agent transports
+credentials; existing Proxmox address discovery is unchanged.
+
+1. Authorize the platform [AppRole mount] once, then this service's [access root].
+   These separate API states contain authorization definitions, not application
+   values. The RustFS credential record must already be populated through its
+   protected value-enrollment procedure.
+2. Supply the access root's `enrollment` output as `warehouse_openbao_access`.
+   Supply a dedicated, operator-owned `warehouse_ssh_known_hosts_file` containing
+   an independently verified guest host key or trusted host CA. Blind `ssh-keyscan`
+   or first-contact acceptance is not verification. The deployment workstation
+   needs Bash, curl, jq, OpenSSH, `timeout`, and a usable approved guest SSH identity.
+   Native cloud-init installs the corresponding public keys and noninteractive sudo.
+3. Inject only the scoped issuer credential as ephemeral
+   `TF_VAR_openbao_issuer_token` for the infrastructure apply. Do not put it in
+   tfvars. Initial enrollment needs this credential to remain valid through VM
+   creation and the bounded cloud-init readiness wait; later retries do not need
+   an issuer if the guest is already enrolled.
+4. After VM creation, `terraform_data.warehouse_enrollment` invokes the service-local
+   SSH procedure. It waits for cloud-init, checks the guest's non-secret metadata
+   fingerprint and OpenBao TLS/health, then issues a two-minute wrapped SecretID.
+   The value travels on SSH stdin, never as inline provisioner text or an argument.
+   The guest verifies the wrapping creation path/lifetime, unwraps and authenticates
+   before retaining `/etc/observability-warehouse/approle.json` as root, mode `0600`.
+5. Enrollment enables the native credential timer and starts its oneshot service.
+   It fetches the exact record directly, atomically installs the protected environment
+   file, and starts the warehouse. Every five minutes it renews/reuses its cached
+   token or logs in with the retained SecretID. A changed credential file restarts
+   the stack; unchanged values do not. This validates schema, not S3 authorization
+   or application health: coordinate rotations and verify real writes/reads.
+
+The hook is a separate resource, not a VM provisioner. Failed enrollment leaves
+the VM intact and fails the apply. After inspecting the failure, retry that
+enrollment resource; `warehouse_enrollment_revision` provides an explicit retry
+trigger. Guest configuration mismatch, unsafe permissions, unknown SSH host keys,
+invalid wrapping responses or failed reads stop without an insecure fallback.
+Existing SecretIDs are not overwritten; failed reads preserve the last environment
+file and running application. A failed application restart is not automatically
+rolled back—inspect partial state before retrying.
+
+The default `warehouse_openbao_access = null` preserves existing manual enrollment.
+For a fresh enabled guest, cloud-init supplies only non-secret metadata and the
+tracked scripts/units. Existing guests need separately reviewed installation of
+those same assets before enabling the hook; snippet changes do not perform that
+adoption, and the hook does not install packages or repair guest configuration.
+Do not rerun cloud-init or replace useful data to make enrollment pass.
+
+No always-on enrollment controller is needed. After a guest reboot, its root-only
+SecretID obtains a new token; OpenBao unavailability causes bounded failures and
+timer retries without deleting working credentials. OpenBao's own restart still
+requires the separately agreed manual unseal. Credential rotation, revocation and
+retirement remain explicit administrative operations described in the access guide.
 
 ## Quick Start
 
@@ -193,7 +250,8 @@ endpoint/trust input; never reuse this service's credentials or private state.
 
 4. Confirm that the RustFS operator provides the configured Mimir, Loki and Tempo
    buckets and a bucket-scoped service identity held in OpenBao. A fresh warehouse
-   remains stopped pending separately authorized protected credential enrollment.
+   remains stopped pending authorized protected credential enrollment, automated
+   through the SSH hook when enabled above.
    Do not copy the example file as working credentials or put secret values in
    command arguments, logs or cloud-init. After enrollment and an authorized start,
    inspect the service and verify actual S3 writes/reads:
@@ -428,9 +486,15 @@ Check the warehouse:
 
 ```bash
 sudo systemctl status observability-warehouse
+sudo systemctl status observability-credentials.timer observability-credentials.service
 sudo docker compose --file /opt/observability-warehouse/compose.yaml ps
 sudo docker compose --file /opt/observability-warehouse/compose.yaml logs --tail=200 <mimir|loki|tempo>
 ```
+
+The optional credential service logs generic failures only. Never enable shell
+tracing, `TF_LOG`, SSH/HTTP debug logging or print its protected JSON/environment
+files into deployment logs. Its token cache lives under root-only
+`/run/observability-credentials`; it is not a second persistent machine identity.
 
 Check and reload Alloy on the collector:
 
@@ -492,3 +556,6 @@ entry, SSH agent or private key, PAM username, and target snippet datastore.
 [DNS recovery guidance]: ../technitium-dns/README.md#backup-and-recovery
 [Alloy Linux installation]: https://grafana.com/docs/alloy/latest/set-up/install/linux/
 [Grafana Debian installation]: https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/
+[accepted introduction decision]: ../../docs/adrs/011-ssh-approle-enrollment.md
+[AppRole mount]: ../openbao/authorization/README.md
+[access root]: access/README.md
