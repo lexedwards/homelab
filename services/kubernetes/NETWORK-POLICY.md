@@ -1,8 +1,8 @@
 # Workload Network Policy
 
 The reusable baseline denies ingress and egress in one explicitly selected
-namespace. A separate policy allows only TCP/UDP port 53 to CoreDNS pods in
-`kube-system`. It does not change Cilium, node networking, VLAN routing, system
+namespace. A separate policy allows only the declared DNS query listeners on
+CoreDNS pods in `kube-system`. It does not change Cilium, node networking, VLAN routing, system
 namespaces, existing applications or admission policy. No Layer 7 rule is added.
 
 ## Onboard A Namespace
@@ -38,8 +38,8 @@ editing as trusted owner/operator permissions, not as tenant self-authorization.
 The fixtures are not applications A through E and do not invent their dependency
 matrix. They create two ordinary and two isolated client/server Deployments,
 each spread across both workers, one unapproved client and an unprotected
-outside-namespace HTTP witness. Each server listens on 8080 **and** 9090; a closed
-port cannot manufacture a denied-port pass. No token mount, host networking,
+outside-namespace HTTP witness. Each server has primary **and** secondary HTTP
+listeners; a closed port cannot manufacture a denied-port pass. No token mount, host networking,
 privileged container, persistent volume or LoadBalancer is requested.
 
 ### Prerequisites And Ownership
@@ -79,16 +79,16 @@ directions. Never substitute a Service that might route back to the source pod.
 python3 scripts/check-policy-probe.py \
   --source 'policy-check/<client-pod>' \
   --destination 'policy-check/<server-pod>' \
-  --port 8080 --expect allow \
-  --api-server 'https://<stable-api-name>:6443' \
+  --port '<reviewed-fixture-listener>' --expect allow \
+  --api-server '<private-verified-api-url>' \
   --evidence '<protected-new-receipt.json>'
 ```
 
 - `--source`, `--destination`: distinct `namespace/pod` identities. Both must be
   Ready, non-host-network pods labeled `homelab.io/policy-check=true`.
-- `--port`: required TCP destination port, 1–65535.
+- `--port`: required TCP destination listener value from the reviewed fixture.
 - `--expect`: required `allow` or `deny`.
-- `--api-server`: required verified HTTPS API identity on port 6443.
+- `--api-server`: required verified HTTPS API URL from protected configuration.
 - `--kubectl`: executable, default `kubectl`.
 - `--kubeconfig`: defaults to `/etc/rancher/rke2/rke2.yaml` for in-guest use.
 - `--evidence`: required new file in an existing protected directory. Created
@@ -130,12 +130,12 @@ a failed assertion by adding broad allow rules.
 
 | Probe | No policy | Default deny | Add DNS | Add peer rules |
 | --- | --- | --- | --- | --- |
-| Approved client → server TCP 8080 | Allow | Deny | Deny | Allow |
-| Approved client → server TCP 9090 | Allow | Deny | Deny | Deny |
-| Unapproved client → server TCP 8080 | Allow | Deny | Deny | Deny |
-| Outside witness → server TCP 8080 | Allow | Deny | Deny | Deny |
-| Approved client → outside witness TCP 8080 | Allow | Deny | Deny | Deny |
-| Unapproved client → outside witness TCP 8080 | Allow | Deny | Deny | Deny |
+| Approved client → server primary HTTP listener | Allow | Deny | Deny | Allow |
+| Approved client → server secondary HTTP listener | Allow | Deny | Deny | Deny |
+| Unapproved client → server primary HTTP listener | Allow | Deny | Deny | Deny |
+| Outside witness → server primary HTTP listener | Allow | Deny | Deny | Deny |
+| Approved client → outside witness primary HTTP listener | Allow | Deny | Deny | Deny |
+| Unapproved client → outside witness primary HTTP listener | Allow | Deny | Deny | Deny |
 | Protected clients → cluster DNS | Allow | Deny | Allow | Allow |
 
 The outside witness intentionally carries both the approved-source and server
@@ -144,9 +144,9 @@ label. Its own namespace stays unprotected so outside→server demonstrates targ
 ingress enforcement, while client→outside demonstrates source egress enforcement.
 
 The HTTP checker is TCP-only. For the DNS-deny stage, also retain fresh native
-monitor UDP/53 policy-drop evidence matching the client and actual DNS endpoint;
-an `nslookup` timeout alone is not enforcement proof. DNS restoration must not
-restore unrelated HTTP egress. For TCP DNS fallback, retain a real TCP/53 query
+monitor DNS-over-UDP policy-drop evidence matching the client and actual DNS
+endpoint; an `nslookup` timeout alone is not enforcement proof. DNS restoration must not
+restore unrelated HTTP egress. For TCP DNS fallback, retain a real DNS-over-TCP query
 when qualifying the deployed resolver path; the manifest's port list alone is
 configuration evidence, not that runtime check.
 
@@ -168,8 +168,8 @@ retain sanitized results in ALE-30; keep raw evidence private.
 Check API/etcd availability, pod readiness and listeners before policy. Inspect
 namespace/pod labels, endpoint addresses and all additive policies, then Cilium
 endpoint policy state and correlated flows on the intended source/target nodes.
-Check DNS selectors and TCP/UDP 53 separately from the application path. Only
-after internal paths pass, investigate Service endpoints, VLAN address allocation,
+Check DNS selectors and both DNS transport paths separately from the application
+path. Only after internal paths pass, investigate Service endpoints, VLAN address allocation,
 L2 announcements and upstream routing/firewall state.
 
 During API loss, existing forwarding is not proof that new policies or scheduling

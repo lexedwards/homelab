@@ -127,7 +127,7 @@ On each external client, use its intended interface and the allocated address:
 ip route get "$service_ip"
 arping -I "$interface" -c 3 "$service_ip"
 curl --noproxy '*' --interface "$interface" --connect-timeout 3 --max-time 5 \
-  --fail --silent --show-error "http://$service_ip:8080/"
+  --fail --silent --show-error "http://$service_ip:${service_port:?set from the reviewed fixture}/"
 ip neigh show to "$service_ip" dev "$interface"
 ```
 
@@ -175,7 +175,8 @@ default-deny just to make the external HTTP test pass.
 worker's `cilium_host` address while retaining the external/world identity.
 Consequently, a client `/32` IP-block allowance alone is not reliable on every
 backend path. For the owned synthetic routing checks, use an explicit Cilium
-ingress rule from `world`, limited to TCP 8080 and the synthetic server selector;
+ingress rule from `world`, limited to the reviewed fixture's primary HTTP listener
+and the synthetic server selector;
 retain default-deny and repeat the internal positive/negative matrix afterwards.
 This is an external service-port allowance, **not** a source-IP client ACL or a
 production policy template. Application-specific client restrictions need a

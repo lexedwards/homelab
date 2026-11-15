@@ -7,6 +7,10 @@ the [Micro Node].
 The root manages the instance and a separate data volume. It does not manage the
 Incus host, application settings, monitors, or ongoing Uptime Kuma upgrades.
 
+Uptime Kuma polls health-check and readiness endpoints across the homelab.
+Monitors are configured manually because no suitable automation is currently in
+use. The complete target list remains in operator-managed application settings.
+
 ## Dependencies
 
 - A prepared [Micro Node] with its `default` directory pool and unmanaged `br0`
@@ -14,7 +18,8 @@ Incus host, application settings, monitors, or ongoing Uptime Kuma upgrades.
 - A trusted Incus remote on the management workstation
 - DHCP, routing, and DNS on the service VLAN
 - OpenTofu 1.6 or newer, `make`, and `yamllint`
-- Network access from administrators and monitored clients to TCP `3001`
+- Network access from administrators and status-page clients to the configured
+  application listener; keep its connection values in protected operator records
 
 ## Quick Start
 
@@ -51,8 +56,8 @@ Incus host, application settings, monitors, or ongoing Uptime Kuma upgrades.
    tofu output -raw ipv4_address
    ```
 
-   Open `http://<uptime-kuma-address>:3001/` and create the administrator
-   account. Restrict access or place the service behind a trusted reverse proxy
+   Open the application URL from the protected connection record and create the
+   administrator account. Restrict access or place it behind a trusted reverse proxy
    before exposing it outside the administration network.
 
 ## Architecture
@@ -87,7 +92,7 @@ Update the Uptime Kuma image without replacing the Incus instance:
 ```bash
 incus exec <remote-name>:uptime-kuma -- docker pull louislam/uptime-kuma:2
 incus exec <remote-name>:uptime-kuma -- docker rm --force uptime-kuma
-incus exec <remote-name>:uptime-kuma -- docker run --detach --restart=unless-stopped --name uptime-kuma --publish=3001:3001 --volume=/var/lib/uptime-kuma:/app/data louislam/uptime-kuma:2
+incus exec <remote-name>:uptime-kuma -- docker run --detach --restart=unless-stopped --name uptime-kuma --publish='<reviewed-listener-mapping>' --volume=/var/lib/uptime-kuma:/app/data louislam/uptime-kuma:2
 ```
 
 The `:2` tag is mutable. Review release notes and take an off-host backup before
@@ -114,7 +119,7 @@ incus config show <remote-name>:uptime-kuma
 incus storage volume show <remote-name>:default uptime-kuma-data
 incus exec <remote-name>:uptime-kuma -- cloud-init status --long
 incus exec <remote-name>:uptime-kuma -- docker ps --all
-incus exec <remote-name>:uptime-kuma -- curl --fail http://127.0.0.1:3001/
+incus exec <remote-name>:uptime-kuma -- curl --fail '<private-local-application-url>'
 ```
 
 Changing `cloud-init.user-data` does not rerun cloud-init on an existing

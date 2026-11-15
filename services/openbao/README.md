@@ -21,7 +21,7 @@ This is a single server, not an HA cluster.
 - A reviewed Debian 13 ARM64 cloud image. The upstream Incus image catalogue
   provides `images:debian/13/cloud/arm64`; supply the reviewed reference locally.
 - Upstream VLAN connectivity, DHCP, routing, DNS, and firewall policy permitting
-  only intended private clients to reach TCP 8200.
+  only intended private clients to reach the configured OpenBao API listener.
 - An existing Technitium zone and an API token injected through
   `TECHNITIUM_API_TOKEN`. Do not put the token in OpenTofu input files.
 
@@ -31,8 +31,9 @@ public authoritative DNS provider for the certificate name. Technitium resolves
 that name to the private guest address. Do not publish an OpenBao A/AAAA record
 or open inbound ACME ports: DNS-01 needs only public challenge TXT records.
 Public issuance exposes the certificate name in certificate-transparency logs.
-The native HTTPS API and UI listen on TCP 8200; the single-node cluster listener
-uses loopback TCP 8201 and is not published to the network.
+The native HTTPS API and UI use the privately configured listener; the single-node
+cluster listener is loopback-only and is not published to the network. Keep exact
+connection values in protected operator configuration.
 
 The initial resource limit is one CPU and 1 GiB RAM. Monitor memory, disk, and
 request load before increasing usage. The guest remains unprivileged and has no
@@ -189,7 +190,7 @@ Run these commands yourself in a private interactive terminal, not an agent
 transcript. Use the certificate's private DNS name and normal system trust:
 
 ```bash
-export BAO_ADDR='https://<private-service-fqdn>:8200'
+export BAO_ADDR='<private-verified-openbao-https-origin>'
 bao status
 bao operator init -key-shares='<share-count>' -key-threshold='<threshold>'
 bao operator unseal

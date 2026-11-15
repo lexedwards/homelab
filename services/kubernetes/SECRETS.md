@@ -223,8 +223,8 @@ issuer text or this example. Changing API audiences is not part of enrollment.
 
 ```json
 {
-  "openbao_address": "https://bao.example.invalid:8200",
-  "kubernetes_host": "https://api.example.invalid:6443",
+  "openbao_address": "REPLACE WITH THE PRIVATE VERIFIED OPENBAO HTTPS ORIGIN",
+  "kubernetes_host": "REPLACE WITH THE PRIVATE VERIFIED KUBERNETES HTTPS ORIGIN",
   "kubernetes_ca_cert": "REPLACE WITH THE ACTUAL PEM CERTIFICATE BUNDLE",
   "api_audience": "REPLACE WITH AN EXISTING API-ACCEPTED AUDIENCE",
   "auth_mount": "kubernetes-platform",
@@ -303,8 +303,8 @@ Rendering grants no live-change authority. Before deployment:
    fresh token can authenticate again without replacing reviewer credentials.
 6. Verify file rotation separately from actual application reload, distinct
    existing/new-consumer behavior during an approved OpenBao failure, and fresh
-   mounts after approved provider/worker maintenance. These remain runtime gates,
-   not claims established by rendering.
+   mounts after approved provider/worker maintenance. Record runtime evidence for
+   each check; rendering alone cannot verify these behaviors.
 
 On an outage, existing files may remain readable while refresh or new mounts fail.
 Do not promise immediate erasure or revocation of mounted content. Preserve useful

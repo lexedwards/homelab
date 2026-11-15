@@ -116,7 +116,7 @@ python3 scripts/enroll-worker.py \
   --server-known-hosts '<reviewed-server-host-keys>' \
   --worker-known-hosts '<reviewed-worker-host-keys>' \
   --node-name '<worker-name>' --host '<compute-or-store>' \
-  --api-server 'https://<stable-api-name>:6443'
+  --api-server '<private-verified-api-url>'
 ```
 
 Host keys must already be reviewed; new keys are never accepted automatically.
@@ -148,7 +148,7 @@ The worker file remains for native startup syntax/CA pinning after revocation;
 reconnect is intended to use its enrolled client certificate/node password.
 Verify service and guest restart after revocation before claiming independence.
 
-On failure inspect protected cloud-init/kernel, DNS, TCP 9345/6443, agent journals,
+On failure inspect protected cloud-init/kernel, DNS, registration/API connectivity, agent journals,
 node-password and Cilium diagnostics. Do not blindly overwrite a token file,
 delete credentials or rerun first-boot installation. Deliberately reconcile a
 failed pre-certificate attempt before issuing another short-lived credential.

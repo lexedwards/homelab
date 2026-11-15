@@ -34,4 +34,4 @@ service announcements as the future control-plane frontend.
   cross-vendor live migration.
 - Adding servers later must preserve the API identity, recovery material and
   existing datastore. A permanent two-member etcd cluster is not fault tolerant.
-- This is an approved design, not a claim of production deployment or tested HA.
+- The design is approved. Production deployment and HA testing require separate evidence.

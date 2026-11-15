@@ -1,5 +1,15 @@
 # Homelab Infrastructure and Services
 
+Infrastructure definitions and operating guidance for the homelab. Hosts and
+services are listed below. See the [architecture views](docs/architecture.md) for
+their relationships and [operations and recovery](docs/operations.md) for failure
+impact and recovery planning.
+
+Documentation uses logical service and subnet names. IP and MAC addresses, numeric
+ports, private DNS names, network identifiers, credentials, private artifact
+locations, and raw operational evidence belong only in protected operator records.
+Use placeholders even in synthetic documentation examples.
+
 <!--toc:start-->
 - [Homelab Infrastructure and Services](#homelab-infrastructure-and-services)
   - [Hosts](#hosts)
@@ -23,9 +33,6 @@
     - [Observability Warehouse](#observability-warehouse)
   - [Network](#network)
   - [Operations](#operations)
-  - [Retired Services](#retired-services)
-    - [Local LLM Hosting](#local-llm-hosting)
-    - [AI Platforms](#ai-platforms)
 <!--toc:end-->
 
 ## Hosts
@@ -35,6 +42,8 @@
 Designed to host lightweight services deemed critical enough to be hosted,
 clustered, or replicated outside of the main VM platform.
 
+[Host preparation](hosts/micro-node/README.md) covers Ubuntu and Incus setup.
+
 - Raspberry Pi 5 8GB
 - WaveShare PoE and M.2 hat
 
@@ -42,6 +51,9 @@ clustered, or replicated outside of the main VM platform.
 
 Built in Feb '24, originally for experimentation and local LLM Hosting (back
 when 8GB VRAM was just enough). Focuses on being primary host for CPU bound tasks.
+
+[Host configuration](hosts/compute/README.md) currently defines the Proxmox
+provider only; service roots manage their guests separately.
 
 - 1x AMD Epyc 7302
 - 128GB DDR4 ECC
@@ -53,12 +65,20 @@ when 8GB VRAM was just enough). Focuses on being primary host for CPU bound task
 Second-hand in Jul '25 to replace an off-the-shelf 2-drive NAS gone bad. For
 persisted data intensive applications and multi-threaded workloads.
 
+This host is named `store` in the infrastructure definitions.
+[Host configuration](hosts/store/README.md) currently defines the Proxmox provider
+only; service roots manage their guests separately.
+
 - 2x Intel Xeon Gold 6132
 - 128GB DDR4 ECC
 - 12x Crucial 2TB SSD
 - Intel Arc A380 6GB
 
 ## Services
+
+The summaries below describe repository definitions and operator-confirmed
+details. Service READMEs hold prerequisites, state ownership, procedures, and
+operating evidence. Definitions alone leave live deployment and health unverified.
 
 Each service owns its deployment and state. Reusable implementation lives in
 repository-level `modules/`, never under another service. Integrations use published
@@ -75,7 +95,7 @@ external quorum vote outside the cluster itself.
 ### Image Catalogue
 
 [Image Catalogue](services/image-catalogue/README.md) downloads curated cloud
-images and exposes them as uniform Proxmox VM templates on the storage host.
+images and exposes them as uniform Proxmox VM templates on `store`.
 
 ### Local DNS
 
@@ -87,7 +107,9 @@ cluster.
 
 [Uptime Kuma](services/uptime-kuma/README.md) runs in an Incus instance on
 `micro-node`. It monitors service availability and hosts the homelab's
-lightweight status page outside the Proxmox cluster.
+lightweight status page outside the Proxmox cluster. It polls health-check and
+readiness endpoints across the homelab. Monitors are configured manually; no
+suitable automation is currently in use.
 
 ### Tailscale Exit Node
 
@@ -103,30 +125,68 @@ service-owned DNS. Initialization and unseal remain operator-managed.
 
 ### Networked Storage
 
+TrueNAS is the mass-storage system. It exposes NFS and SMB shares, providing
+persistent storage for Kubernetes workloads that use NFS, Jellyfin's media, and
+Roon's music. Observability also requires an NFS backup destination. RustFS
+provides object storage for telemetry and Kubernetes snapshots. Exact placement,
+share layout, and recovery coverage remain unverified. The share protocols used
+by Jellyfin and Roon, and the backend of observability's NFS destination, also need
+confirming.
+
 ### Kubernetes
 
-[Kubernetes](services/kubernetes/README.md) defines the initial RKE2 control-plane
-VM and managed Cilium bootstrap. Worker, storage and workload integration are
-separate slices; local validation does not establish deployment.
+[Kubernetes](services/kubernetes/README.md) defines an RKE2 control-plane VM on
+`compute`, optional workers on `compute` and `store`, Cilium networking, and
+opt-in NFS and OpenBao integration. The lifecycle runbooks record operating
+evidence and limitations; snapshot restoration remains unproven.
 
 ### Service Proxy
 
+Internal Nginx reverse proxy for ACME certificate management and TLS termination.
+It fronts Jellyfin, Home Assistant, and other HTTP-only services such as web apps.
+CrowdSec is installed alongside Nginx for additional firewall protection,
+supplementing the strict firewall on the UniFi Dream Machine. Proxy placement and
+the CrowdSec enforcement configuration still need documenting.
+
 ### Home Assistant
+
+[Home Assistant](https://www.home-assistant.io/installation/) is hosted on
+`compute` in the IoT subnet and connects to IoT devices over Zigbee. It is
+operator-managed.
 
 ### Media Server
 
+Jellyfin is hosted on `store` in the Service subnet, with its media on TrueNAS.
+It is operator-managed.
+
 ### Roon
 
+[Roon](https://roon.app/en/) is hosted on `store` in the Trusted subnet to support
+local device discovery, including wireless DACs. Its music is stored on TrueNAS.
+It is operator-managed.
+
 ### Remote Workstation
+
+An operator-managed Arch-based Linux workstation is hosted on `compute` with
+GPU passthrough.
 
 ### Observability Warehouse
 
 [Grafana Alloy, Mimir, Loki, and Tempo](services/observability-warehouse/README.md)
 form one observability service with Grafana on three Debian 13 VMs. Alloy runs
 in a dedicated collector VM, Mimir, Loki, and Tempo run in a warehouse VM, and
-Grafana runs in a separate visualization VM.
+Grafana runs in a separate visualization VM. The definitions place the collector
+and Grafana on `compute`, and the warehouse on `store`, by default; current
+deployment inputs and health have not been rechecked.
+
+The [Hello World](services/hello-world/README.md) root is an Incus provisioning
+example on `micro-node`; its current deployment is unverified.
 
 ## Network
+
+UniFi provides the network platform, including the logical IoT, Service, and
+Trusted subnets. The operator manages routing, DHCP, reservations, and firewall
+policy. See the [deployment/network view](docs/architecture.md#deployment-and-network).
 
 - Unifi Dream Machine
 - Unifi USW Aggregation
@@ -137,12 +197,10 @@ Grafana runs in a separate visualization VM.
 
 - APC UPS - 2200VA
 
-Architecture choices are recorded in the [architecture decision records](docs/adrs/).
+UPS coverage and shutdown/restart coordination remain unverified.
 
-## Retired Services
-
-### Local LLM Hosting
-
-### AI Platforms
-
-### Virtual Windows Desktop
+[Operations and recovery](docs/operations.md) covers failures that span services
+and links to the relevant runbooks. Host READMEs cover host preparation; service
+READMEs own service procedures; module READMEs describe shared implementation
+contracts. [Architecture decision records](docs/adrs/) preserve design rationale.
+Deployment evidence and review records stay in the linked issues and PRs.

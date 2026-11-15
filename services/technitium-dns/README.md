@@ -18,7 +18,8 @@ upgrades remain operator-managed.
   bridge, and a trusted Incus remote on the management workstation
 - DHCP, routing, and initial DNS on the service VLAN
 - OpenTofu 1.9 or newer, `make`, and `yamllint`; tested with OpenTofu 1.13.1
-- UDP and TCP `53` from DNS clients; administration access only from trusted clients
+- DNS query connectivity from approved clients; administration access only from
+  trusted clients, using the protected connection record
 - The existing Technitium server; adoption was audited against version 15.6.2
 - `registry.terraform.io/darkhonor/technitium` pinned to `1.3.0`
 - An admin-level API token supplied privately as `TECHNITIUM_API_TOKEN`
@@ -92,7 +93,7 @@ flowchart LR
     S["Observability root and existing state"] -->|"Collector A and proxy-routed Grafana CNAME"| D
     S -->|Proxmox API| V["Collector, warehouse and Grafana VMs"]
     O["Operator"] -->|"6 apex SOA/NS records, other configuration and recovery"| D
-    C["DNS clients"] -->|UDP/TCP 53| D
+    C["DNS clients"] -->|DNS queries| D
     D -->|configured forwarding| U["Upstream resolvers"]
 ```
 
