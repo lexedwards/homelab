@@ -1,9 +1,17 @@
 # Architecture views
 
-These Mermaid views describe logical relationships. The [inventory](inventory.md)
-records names, placement, and evidence status, and defines the labels Defined,
-Recorded, Operator-confirmed, and Unverified. Consult it for deployment evidence.
+These Mermaid views show relationships between the hosts and services listed in
+the [root README](../README.md). Service READMEs own operating details and evidence.
 Live health and firewall configuration are outside the scope of these views.
+
+The diagram labels distinguish the available evidence:
+
+- Defined: declared in repository configuration; live deployment is unverified.
+- Recorded: operating documentation or linked issues report deployment or
+  qualification. Current health has not been rechecked.
+- Operator-confirmed: the operator supplied the role or placement. Packaging and
+  recovery still need their own evidence.
+- Unverified: the relevant detail has not been confirmed.
 
 The lab boundary includes operator-managed services as well as repository-managed
 ones. C4 containers mean runnable applications or datastores. The deployment view
@@ -83,12 +91,11 @@ flowchart LR
     kuma -->|"Polls health/readiness"| monitored
 ```
 
-TrueNAS supplies Jellyfin media and Roon music; their share protocols remain
-unverified. The proxy's remaining route list and Kuma's individual targets still
-need documenting. CrowdSec is installed on the proxy as additional protection
-alongside the strict UniFi Dream Machine firewall; enforcement details remain
-unverified. Kubernetes is grouped here for readability; its API server and etcd
-datastore are shown separately below. Both views stay at the C4 container level.
+Kubernetes is grouped here for readability; its API server and etcd datastore
+are shown separately below. Both views stay at the C4 container level. The
+[root README](../README.md#services) describes confirmed integrations and remaining
+unknowns; Kuma's target configuration belongs to its
+[service settings](../services/uptime-kuma/README.md).
 
 ### Kubernetes and observability applications
 
@@ -144,7 +151,7 @@ stay outside host and subnet groups.
 flowchart TB
     subgraph lab["Homelab deployment boundary"]
         subgraph micro["micro-node — physical host / Ubuntu / Incus"]
-            microapps["Separate Incus instances<br/>Technitium DNS, OpenBao, Uptime Kuma,<br/>Tailscale Exit Node, Proxmox QDevice<br/>See inventory for evidence status"]
+            microapps["Separate Incus instances<br/>Technitium DNS, OpenBao, Uptime Kuma,<br/>Tailscale Exit Node, Proxmox QDevice<br/>Operating evidence in service READMEs"]
             hello["Hello World Incus instance<br/>Defined demo; live status unverified"]
         end
         subgraph compute["compute — physical Proxmox host"]
@@ -198,19 +205,27 @@ The worker runbook defines dual-network attachment, but no numeric network IDs o
 address ranges belong here. Do not infer the deployment of Cilium exposure pools
 or the subnet of other guests from this simplified view.
 
-CrowdSec runs with the proxy and supplements the Dream Machine firewall. Its
-enforcement integration and the full proxy route list remain unverified. Zigbee
-connects Home Assistant to devices separately from its logical IoT subnet
-membership; coordinator hardware and placement still need documenting.
+Zigbee connects Home Assistant to devices separately from its logical IoT subnet
+membership. Coordinator hardware and placement still need documenting.
 
 ## Maintaining these views
 
 Edit Mermaid fences in this file; GitHub renders them in place. No public diagram
-renderer or hosted documentation service is required. For a local syntax/render
-check, use the pinned Mermaid CLI command in [contributor guidance](contributing.md#documentation-checks).
-Keep generated output temporary; maintain the source in this file.
+renderer or hosted documentation service is required. For a local render, run
+this from the repository root with Node.js/npm and the Mermaid CLI's supported
+browser dependencies available:
 
-The change author updates the inventory and affected views alongside relevant
-infrastructure changes. The reviewer checks names, ownership, placement, status,
+```bash
+mkdir -p /tmp/opencode/homelab-diagrams
+npm exec --yes --package=@mermaid-js/mermaid-cli@12.2.0 -- \
+  mmdc -i docs/architecture.md -o /tmp/opencode/homelab-diagrams/architecture.md
+```
+
+The first run needs network access to download tooling and its browser. Rendering
+runs locally and writes temporary output outside Git. Keep the source in this
+file and do not send topology to a public renderer.
+
+Update affected views alongside infrastructure changes, using the root overview
+and service documentation. Review names, ownership, placement, status,
 and dependency meaning across views. Rendering checks syntax. Architecture
 accuracy needs review, and service health needs live checks.

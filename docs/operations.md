@@ -3,6 +3,8 @@
 This cross-service guide helps scope an operation. It does not authorize live
 discovery, plans/applies, restarts, recovery exercises, or destructive changes.
 Use the service's runbook and obtain approval for the exact operation first.
+The [root README](../README.md) lists services; [architecture views](architecture.md)
+show their relationships. This guide covers the consequences of those dependencies.
 
 ## Distinguish dependency types
 
@@ -13,25 +15,30 @@ Use the service's runbook and obtain approval for the exact operation first.
 - Recovery: needed to retrieve state, credentials, and restore useful service.
   Recovery dependencies can differ from ordinary runtime dependencies.
 
-| Consumer | Runtime / data dependency | Provisioning, renewal, or recovery boundary |
-| --- | --- | --- |
-| Proxmox cluster | Healthy nodes, operator-managed cluster network and configured QDevice voting | QDevice instance creation and cluster enrollment have separate owners; confirm quorum before replacement. |
-| Incus services | `micro-node`, its local storage, network, and applicable DNS | Host seed prepares first boot; service data needs separate backups. Reimaging the host can erase instances and volumes. |
-| OpenBao | Raft data, operator unseal custody, trusted HTTPS and applicable DNS | Cloudflare / Let's Encrypt support certificate renewal. Initializing existing storage again destroys the recovery boundary. |
-| Kubernetes | Single control plane and etcd; external API-name resolution; workers for workloads | Image Catalogue / Proxmox for provisioning; independent snapshots, matching server token, API identity, and operator access for recovery. |
-| Workloads using NFS | Worker connectivity and TrueNAS-backed data | Retain policy protects against automatic volume deletion. Storage loss requires separate backup protection. |
-| Workloads using mounted secrets | OpenBao, enabled provider and auth integration for fresh retrieval | Do not assume cached files prove OpenBao availability or delete useful mounts to test an outage. |
-| Observability | Collector → warehouse backends; Grafana → warehouse queries; backends → RustFS | Verify that backups actually reach the NFS destination. Grafana's local database needs separate protection. |
-| Jellyfin and Roon | TrueNAS supplies media and music respectively. Jellyfin also uses the Nginx proxy for proxied access. | Restore and verify the required shares before checking playback. Share protocols, application metadata, and tested recovery remain unverified. |
-| Home Assistant | Zigbee communication with IoT devices; Nginx for proxied HTTP access | Zigbee hardware, configuration custody, and recovery remain unverified. |
-| Service Proxy | Nginx fronts Jellyfin, Home Assistant, and other HTTP-only web services; CrowdSec runs alongside it for additional firewall protection. | Preserve the strict Dream Machine firewall and proxy-side protection. Exact CrowdSec enforcement and proxy recovery remain unverified. |
-| Uptime Kuma | Access to the monitored services' health-check/readiness endpoints | Monitors are configured manually. Preserve application settings and review targets after a service change. |
-| Other operator-managed applications | Confirmed host and logical subnet; other dependencies unverified | Packaging, data ownership, backups, certificate routing, and tested recovery need operator confirmation. |
+## Before an operation
 
-The complete proxy route list, individual Kuma targets, and telemetry producer
-inventory still need documenting. RustFS/OpenBao KMS coupling is mentioned in
-restore documentation; validate the recovery dependency before proposing an
-order that requires one to restore the other.
+Identify the state owner and recovery inputs in the service's runbook. Host seeds
+prepare first boot; service data needs separate backups. Reimaging `micro-node`
+can erase its instances and volumes. Never initialize existing OpenBao storage
+again or re-provision a Kubernetes server over useful etcd data.
+
+Check each affected consumer's data and credential requirements:
+
+- NFS Retain policy protects against automatic volume deletion. Storage loss
+  needs separate backups. Restore and verify shares before checking playback or
+  restarting dependent workloads.
+- Existing mounted secret files may remain readable during OpenBao loss. Check
+  fresh retrieval without deleting useful mounts or weakening authorization.
+- Verify that observability backups actually reach their destination. Grafana's
+  local database needs its own protection.
+- Preserve Kuma's application settings and review its manually configured
+  targets after a service change.
+
+The [restore lab](../services/kubernetes/restore-lab/README.md#recovery-inputs)
+records RustFS's OpenBao KMS dependency. Resolve key availability before choosing
+an order that requires one service to restore the other. The exact shared storage
+layout, encryption recovery arrangements, and application backup coverage remain
+unverified.
 
 ## Failure impact
 

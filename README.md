@@ -1,12 +1,14 @@
 # Homelab Infrastructure and Services
 
-Infrastructure definitions and operating guidance for the homelab. Start with the
-[documentation guide](docs/README.md), [service inventory](docs/inventory.md), or
-[architecture views](docs/architecture.md).
+Infrastructure definitions and operating guidance for the homelab. Hosts and
+services are listed below. See the [architecture views](docs/architecture.md) for
+their relationships and [operations and recovery](docs/operations.md) for failure
+impact and recovery planning.
 
-Documentation uses logical service and subnet names. Addresses, port numbers,
-private DNS names, network identifiers, credentials, and raw operational evidence
-belong only in protected operator records.
+Documentation uses logical service and subnet names. IP and MAC addresses, numeric
+ports, private DNS names, network identifiers, credentials, private artifact
+locations, and raw operational evidence belong only in protected operator records.
+Use placeholders even in synthetic documentation examples.
 
 <!--toc:start-->
 - [Homelab Infrastructure and Services](#homelab-infrastructure-and-services)
@@ -40,6 +42,8 @@ belong only in protected operator records.
 Designed to host lightweight services deemed critical enough to be hosted,
 clustered, or replicated outside of the main VM platform.
 
+[Host preparation](hosts/micro-node/README.md) covers Ubuntu and Incus setup.
+
 - Raspberry Pi 5 8GB
 - WaveShare PoE and M.2 hat
 
@@ -47,6 +51,9 @@ clustered, or replicated outside of the main VM platform.
 
 Built in Feb '24, originally for experimentation and local LLM Hosting (back
 when 8GB VRAM was just enough). Focuses on being primary host for CPU bound tasks.
+
+[Host configuration](hosts/compute/README.md) currently defines the Proxmox
+provider only; service roots manage their guests separately.
 
 - 1x AMD Epyc 7302
 - 128GB DDR4 ECC
@@ -58,12 +65,20 @@ when 8GB VRAM was just enough). Focuses on being primary host for CPU bound task
 Second-hand in Jul '25 to replace an off-the-shelf 2-drive NAS gone bad. For
 persisted data intensive applications and multi-threaded workloads.
 
+This host is named `store` in the infrastructure definitions.
+[Host configuration](hosts/store/README.md) currently defines the Proxmox provider
+only; service roots manage their guests separately.
+
 - 2x Intel Xeon Gold 6132
 - 128GB DDR4 ECC
 - 12x Crucial 2TB SSD
 - Intel Arc A380 6GB
 
 ## Services
+
+The summaries below describe repository definitions and operator-confirmed
+details. Service READMEs hold prerequisites, state ownership, procedures, and
+operating evidence. Definitions alone leave live deployment and health unverified.
 
 Each service owns its deployment and state. Reusable implementation lives in
 repository-level `modules/`, never under another service. Integrations use published
@@ -80,7 +95,7 @@ external quorum vote outside the cluster itself.
 ### Image Catalogue
 
 [Image Catalogue](services/image-catalogue/README.md) downloads curated cloud
-images and exposes them as uniform Proxmox VM templates on the storage host.
+images and exposes them as uniform Proxmox VM templates on `store`.
 
 ### Local DNS
 
@@ -113,8 +128,10 @@ service-owned DNS. Initialization and unseal remain operator-managed.
 TrueNAS is the mass-storage system. It exposes NFS and SMB shares, providing
 persistent storage for Kubernetes workloads that use NFS, Jellyfin's media, and
 Roon's music. Observability also requires an NFS backup destination. RustFS
-provides object storage for telemetry and Kubernetes snapshots. Exact placement
-and recovery coverage remain [unverified](docs/inventory.md#operator-managed-infrastructure).
+provides object storage for telemetry and Kubernetes snapshots. Exact placement,
+share layout, and recovery coverage remain unverified. The share protocols used
+by Jellyfin and Roon, and the backend of observability's NFS destination, also need
+confirming.
 
 ### Kubernetes
 
@@ -158,7 +175,12 @@ GPU passthrough.
 [Grafana Alloy, Mimir, Loki, and Tempo](services/observability-warehouse/README.md)
 form one observability service with Grafana on three Debian 13 VMs. Alloy runs
 in a dedicated collector VM, Mimir, Loki, and Tempo run in a warehouse VM, and
-Grafana runs in a separate visualization VM.
+Grafana runs in a separate visualization VM. The definitions place the collector
+and Grafana on `compute`, and the warehouse on `store`, by default; current
+deployment inputs and health have not been rechecked.
+
+The [Hello World](services/hello-world/README.md) root is an Incus provisioning
+example on `micro-node`; its current deployment is unverified.
 
 ## Network
 
@@ -175,6 +197,10 @@ policy. See the [deployment/network view](docs/architecture.md#deployment-and-ne
 
 - APC UPS - 2200VA
 
-Architecture choices are recorded in the [architecture decision records](docs/adrs/).
-See [operations and recovery](docs/operations.md) for cross-service dependencies
-and [contributor guidance](docs/contributing.md) before changing infrastructure.
+UPS coverage and shutdown/restart coordination remain unverified.
+
+[Operations and recovery](docs/operations.md) covers failures that span services
+and links to the relevant runbooks. Host READMEs cover host preparation; service
+READMEs own service procedures; module READMEs describe shared implementation
+contracts. [Architecture decision records](docs/adrs/) preserve design rationale.
+Deployment evidence and review records stay in the linked issues and PRs.

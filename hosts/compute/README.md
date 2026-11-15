@@ -21,8 +21,8 @@ host. It currently configures the provider only and manages no resources.
 These commands download the provider and validate the configuration. They do
 not contact the Proxmox API or deploy anything.
 
-Compute-hosted service roots include the [Observability Warehouse's telemetry
-collector and Grafana VMs](../../services/observability-warehouse/README.md).
+See the [root service overview](../../README.md#services) for guest placement and
+links to the service-owned deployment roots.
 
 Before a future online operation, provide a least-privilege API token outside
 the OpenTofu files:
