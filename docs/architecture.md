@@ -163,6 +163,7 @@ flowchart TB
             workstation["Arch Linux workstation<br/>GPU passthrough<br/>Operator-confirmed"]
         end
         subgraph store["store — physical Proxmox host"]
+            storage["TrueNAS VM / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Placement recorded in ALE-48"]
             sw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
             warehouse["Warehouse VM / Docker Compose<br/>Mimir, Loki, Tempo<br/>Defined default placement"]
             images["Image Catalogue<br/>Defined VM templates; not applications"]
@@ -170,7 +171,6 @@ flowchart TB
             roon["Roon<br/>Operator-confirmed; guest type unverified"]
         end
         subgraph unknown["Placement unverified"]
-            storage["TrueNAS mass storage / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Store failure domain recorded in runbooks"]
             rustfs["RustFS object storage<br/>Operator-owned; placement unverified"]
             backupnfs["Observability NFS backup destination<br/>Backend unverified"]
             proxy["Nginx Service Proxy + CrowdSec<br/>Colocation operator-confirmed"]
@@ -210,20 +210,39 @@ membership. Coordinator hardware and placement still need documenting.
 
 ## Maintaining these views
 
-Edit Mermaid fences in this file; GitHub renders them in place. No public diagram
-renderer or hosted documentation service is required. For a local render, run
-this from the repository root with Node.js/npm and the Mermaid CLI's supported
-browser dependencies available:
+Edit Mermaid fences in this file; GitHub renders them in place. Local checks use
+Python 3.11 or newer, Git, and the pinned Markdown parser. Rendering also needs
+Node.js 24, npm, and the Mermaid CLI's supported browser dependencies.
+
+From the repository root, prepare an isolated Python environment:
 
 ```bash
-mkdir -p /tmp/opencode/homelab-diagrams
-npm exec --yes --package=@mermaid-js/mermaid-cli@12.2.0 -- \
-  mmdc -i docs/architecture.md -o /tmp/opencode/homelab-diagrams/architecture.md
+python3 -m venv /tmp/opencode/homelab-docs-venv
+/tmp/opencode/homelab-docs-venv/bin/python -m pip install -r scripts/requirements-docs.txt
+make docs-test docs-check PYTHON=/tmp/opencode/homelab-docs-venv/bin/python
+make docs-render PYTHON=/tmp/opencode/homelab-docs-venv/bin/python
 ```
 
-The first run needs network access to download tooling and its browser. Rendering
-runs locally and writes temporary output outside Git. Keep the source in this
-file and do not send topology to a public renderer.
+Setup downloads Python dependencies. `docs-check` then runs offline: it parses
+tracked and non-ignored new Markdown/Mermaid files, checks local links, images and
+heading fragments, rejects duplicate ADR numbers, and scans prose, code examples
+and diagrams for common numeric
+connection details and credential patterns. It rejects symlinked documentation
+and local links outside the repository. Ignored files and external URLs are not
+checked. Undefined Markdown reference labels can remain plain text under the
+parser's rules, so review link labels too.
+
+`docs-render` repeats those checks, then renders every Mermaid view with CLI
+12.2.0. The first run downloads npm tooling and its browser. Rendering stays local;
+temporary source and SVG files are removed after the check. Exit zero means the
+requested checks passed; failures report file/line and category without printing
+matched values or renderer output. Run the pinned CLI locally on a reviewed,
+privacy-checked view if detailed renderer diagnostics are needed.
+
+The Documentation workflow runs these checks on pull requests and `main`. No
+infrastructure access or deployment credentials are required. Private DNS names,
+artifact locations, obfuscated credentials, live placement, and dependency meaning
+still require review; pattern checks cannot establish their correctness or safety.
 
 Update affected views alongside infrastructure changes, using the root overview
 and service documentation. Review names, ownership, placement, status,

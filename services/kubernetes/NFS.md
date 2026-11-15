@@ -2,7 +2,15 @@
 
 This integration uses the existing external TrueNAS server and stock NFS CSI
 4.13.6. It does not create datasets/exports, enforce a server quota or apply
-Kubernetes resources through OpenTofu. ALE-48 owns real-backend qualification.
+Kubernetes resources through OpenTofu.
+
+[ALE-48][qualification] records the real TrueNAS VM on `store` and completed
+ordinary/Kata read/write tests on both workers, consumer recreation, drained
+worker reboot/remount, guarded Retain rebinding, and post-interruption witness
+integrity. Measured outage duration, unaffected peer-worker service, and full NAS
+restart/grace behavior remain unqualified. The operator accepted those limits.
+The recovered witness claim and data were deliberately retained with consumers
+stopped; cleanup needs its own approval.
 
 ## Ownership And Access
 
@@ -191,3 +199,4 @@ different path from pod egress policy. Preserve default-deny for workloads and a
 only their reviewed dependencies; never permit broad egress to hide a mount issue.
 
 [exposure]: SERVICE-EXPOSURE.md
+[qualification]: https://linear.app/lexedwards/issue/ALE-48

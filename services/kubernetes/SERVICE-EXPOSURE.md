@@ -3,7 +3,10 @@
 `service_exposure` renders native Cilium IPAM pools, per-interface L2 policies and
 the existing RKE2-owned HelmChartConfig. It defaults to `null`: no pools are
 rendered and existing bootstrap networking is unchanged. Rendering or merging
-these files does not deploy them. ALE-31 records deployment and qualification.
+these files does not deploy them. [ALE-31][qualification] records the deployed
+dual-pool configuration, ordinary/Kata client checks, explicit pool exhaustion,
+backend relocation, and announcement transitions. Synthetic Services were removed;
+the platform pools and worker announcement policies remained enabled.
 
 ## Inputs And Ownership
 
@@ -211,3 +214,5 @@ for. Leave reviewed platform pools in place only if that deployment was approved
 Before removing a platform pool or L2 policy, inventory all consumers and plan
 their withdrawal. Setting `service_exposure = null` does not delete live objects
 or automatically restore the initialized server's persistent chart configuration.
+
+[qualification]: https://linear.app/lexedwards/issue/ALE-31

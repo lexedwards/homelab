@@ -207,6 +207,8 @@ complete local validation workflow:
 3. Run `make validate`, including OpenTofu format and validation plus every
    authored YAML, cloud-init, and service-configuration check.
 4. Run `git diff --check` from the repository root.
+   Run the [documentation checks](../../../docs/architecture.md#maintaining-these-views)
+   and review the root overview and affected diagrams alongside service changes.
    Run `python3 scripts/check-service-boundaries.py` and
    `python3 -B -m unittest discover -s tests -p 'test_service_boundaries.py'` there
    too. The checker covers literal local OpenTofu references only; manually

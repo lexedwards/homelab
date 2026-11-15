@@ -220,7 +220,7 @@ roles belong with the owning service, like its DNS records. Shared secret-engine
 mounts and authentication backends are platform-owned. Every object has one
 OpenTofu owner; do not create a second writer in a central root.
 
-This initial hosting slice does not configure the OpenBao API through OpenTofu.
+This hosting root does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
 The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
 consumes this root's published `api_endpoint` output, never this service's state.

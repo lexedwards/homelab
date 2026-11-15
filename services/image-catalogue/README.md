@@ -4,8 +4,10 @@ Image Catalogue downloads curated cloud images and exposes them as uniform
 Proxmox VM templates on the [`store` host]. Each catalogue entry manages one
 downloaded image and one cloud-init-ready template.
 
-The catalogue is intentionally empty. Add images only after selecting current
-releases and verifying their publisher-provided checksums.
+The committed `cloud_images` default is empty; private deployment inputs select
+the actual templates. Existing consumers use catalogue templates, so inspect the
+canonical state and a separately approved saved plan before changing an entry.
+Add images only after selecting current releases and verifying publisher checksums.
 
 ## Dependencies
 

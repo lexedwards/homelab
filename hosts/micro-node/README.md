@@ -105,14 +105,9 @@ incus list <remote-name>:
 Compare the certificate fingerprint shown by `incus remote add` with
 `incus info` over SSH before you accept it. The token expires after 10 minutes.
 
-The trusted client **should** now be able to deploy the Incus services assigned
-to the Micro Node:
-
-- [Proxmox QDevice](../../services/proxmox-qdevice/README.md)
-- [OpenBao](../../services/openbao/README.md)
-- [Tailscale Exit Node](../../services/tailscale-exit-node/README.md)
-- [Technitium DNS](../../services/technitium-dns/README.md)
-- [Uptime Kuma](../../services/uptime-kuma/README.md)
+The trusted client can now prepare service deployments. See the
+[root service overview](../../README.md#services) for the assigned services and
+their own prerequisites.
 
 ## Architecture
 
@@ -148,8 +143,12 @@ has no native VLAN.
 
 An image that has booted before can contain
 `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg`. This file prevents
-cloud-init from applying `network-config`. A fresh image is the safest fix. If
-you must reuse the image, remove the file and reset the cloud-init network state:
+cloud-init from applying `network-config`. A fresh image is the safest fix for
+a new host. If reusing an image, remove that file and reset cloud-init network state.
+
+Use this only for a reviewed host-provisioning operation. Reimaging or resetting
+an existing service host needs protected service-data backups and an approved
+recovery plan first.
 
 ```bash
 sudo rm -f /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg

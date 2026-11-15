@@ -5,6 +5,11 @@ namespace. A separate policy allows only the declared DNS query listeners on
 CoreDNS pods in `kube-system`. It does not change Cilium, node networking, VLAN routing, system
 namespaces, existing applications or admission policy. No Layer 7 rule is added.
 
+[ALE-30][qualification] records the completed ordinary/Kata ingress, egress, DNS,
+peer/listener, cross-namespace, and VLAN-facing backend matrix. Synthetic test
+resources were removed after qualification. New namespaces still need explicit
+onboarding; the baseline is not automatically applied to every application.
+
 ## Onboard A Namespace
 
 Before deployment, identify the application's owner, callers, dependencies,
@@ -177,3 +182,5 @@ work. Preserve the default-deny baseline; use ALE-32's recovery procedure. An
 emergency exception needs an owner, a specific caller/destination/protocol/port,
 approval, an expiry/removal plan and verification. Do not delete default-deny,
 disable SELinux or introduce cluster-wide unrestricted egress as a diagnostic.
+
+[qualification]: https://linear.app/lexedwards/issue/ALE-30
