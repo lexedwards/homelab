@@ -112,8 +112,9 @@ initialization. Then:
 
 - follow [Lifecycle And Operations](lifecycle-and-operations.md) for declarative
   user-data composition, separate network-data, native modules and lifecycle order;
-- upload provider-rendered user-data and native network-data through a
-  snippets-enabled datastore, verifying accepted format/encoding;
+- upload provider-rendered user-data through a snippets-enabled datastore; use
+  separate native network-data or Proxmox-generated DHCP data. Verify accepted
+  format/encoding, and validate cloud-config parts rather than MIME envelopes;
 - add provider SSH only because `source_raw` requires node-side file upload;
 - create a non-root administrator with validated SSH public keys;
 - disable password login and root SSH login;

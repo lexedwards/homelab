@@ -19,10 +19,12 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   into a shell when a supported declarative path exists.
 - Keep only imperative steps addressing a demonstrated native gap, with one
   bounded purpose. Do not move a mixed installer into another data channel.
-- Sequence repository/key availability, file ownership, package installation,
-  required kernel reboot, prerequisites and daemon activation explicitly. Installing
-  a kernel does not make its modules available in the running kernel. Failed
-  installation must not enable an unsafe start or enrollment.
+- Write repository policy and systemd start conditions before package installation;
+  package scripts may otherwise start daemons with default configuration. Use
+  `write_files` with `defer: true` for files needing package-created users/groups.
+  Then activate only after configuration/enrollment and any required kernel reboot.
+  Installing a kernel does not load its modules; failed installation must not
+  enable an unsafe start or enrollment.
 - Use DHCP and upstream reservations/DNS for stable addressing. Verify effective
   network rendering on the target OS, not just YAML syntax. Where a renderer drops
   required settings, use its supported native configuration instead of post-boot

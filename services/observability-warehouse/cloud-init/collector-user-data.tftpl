@@ -1,52 +1,47 @@
 #cloud-config
 hostname: telemetry-collector
-manage_etc_hosts: true
-ssh_pwauth: false
-disable_root: true
 
-users:
-  - name: ${cloud_user}
-    lock_passwd: true
-    shell: /bin/bash
-    ssh_authorized_keys: ${cloud_ssh_public_keys}
-    sudo: ALL=(ALL) NOPASSWD:ALL
-
-package_update: true
 packages:
   - ca-certificates
   - curl
   - qemu-guest-agent
+  - [alloy, "${alloy_version}"]
 
 write_files:
-  - path: /var/lib/cloud/instance/install-alloy.sh
-    permissions: "0700"
+  - path: /etc/apt/preferences.d/alloy
     owner: root:root
-    encoding: b64
-    content: ${alloy_installer_base64}
-  - path: /var/lib/cloud/instance/alloy/config.alloy
-    permissions: "0600"
+    permissions: "0644"
+    content: |
+      Package: alloy
+      Pin: version ${alloy_version}
+      Pin-Priority: 1001
+  - path: /etc/systemd/system/alloy.service.d/observability.conf
     owner: root:root
-    encoding: b64
-    content: ${alloy_config_base64}
-  - path: /var/lib/cloud/instance/alloy/copilot.alloy
-    permissions: "0600"
+    permissions: "0644"
+    content: |
+      [Unit]
+      ConditionPathExists=/etc/alloy/copilot.alloy
+
+      [Service]
+      ExecStartPre=/usr/bin/alloy validate --stability.level=experimental /etc/alloy
+  - path: /etc/alloy/config.alloy
+    owner: root:alloy
+    permissions: "0640"
+    defer: true
+    content: ${jsonencode(alloy_config)}
+  - path: /etc/alloy/copilot.alloy
+    owner: root:alloy
+    permissions: "0640"
+    defer: true
+    content: ${jsonencode(copilot_alloy_config)}
+  - path: /etc/default/alloy
     owner: root:root
-    encoding: b64
-    content: ${copilot_alloy_config_base64}
-  - path: /var/lib/cloud/instance/alloy-default
-    permissions: "0600"
-    owner: root:root
-    encoding: b64
-    content: ${alloy_environment_base64}
+    permissions: "0644"
+    defer: true
+    content: ${jsonencode(alloy_environment)}
 
 runcmd:
-  - [bash, /var/lib/cloud/instance/install-alloy.sh, "${alloy_version}"]
-  - [bash, -c, "rm -f /etc/alloy/*.alloy"]
-  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/alloy/config.alloy, /etc/alloy/config.alloy]
-  - [install, -o, root, -g, alloy, -m, "0640", /var/lib/cloud/instance/alloy/copilot.alloy, /etc/alloy/copilot.alloy]
-  - [install, -o, root, -g, root, -m, "0644", /var/lib/cloud/instance/alloy-default, "${alloy_environment_path}"]
-  - [bash, -c, "set -a; . ${alloy_environment_path}; set +a; alloy validate --stability.level=experimental /etc/alloy"]
+  - [systemctl, daemon-reload]
   - [systemctl, enable, --now, qemu-guest-agent]
-  - [systemctl, enable, alloy]
-  - [systemctl, restart, alloy]
-  - [bash, -c, "for attempt in $(seq 1 30); do curl --fail --silent http://127.0.0.1:12345/-/ready && exit 0; sleep 2; done; exit 1"]
+  - [systemctl, enable, --now, alloy]
+  - [bash, -ec, "for attempt in $(seq 1 30); do if curl --fail --silent http://127.0.0.1:12345/-/ready; then exit 0; fi; sleep 2; done; exit 1"]
