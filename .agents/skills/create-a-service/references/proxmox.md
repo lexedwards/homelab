@@ -13,7 +13,8 @@ implementation reference.
 3. Read `services/observability-warehouse/` for snippet upload, cross-node clone,
    address discovery and protection. Its collector/Grafana `cloud-init.tf` and
    templates demonstrate native APT, deferred writes and provider-composed MIME;
-   the warehouse still has legacy credential inputs that must not be copied.
+   the warehouse declares Compose with credential-gated activation and no secret
+   values in first-boot data. Its OpenBao enrollment remains a separate boundary.
    Its full-control VM resource is not the default for every new clone.
    `services/kubernetes/cloud-init.tf` demonstrates the Rocky/RKE2 alternative:
    native distribution packages and signed `yum_repos`, with a bounded explicit

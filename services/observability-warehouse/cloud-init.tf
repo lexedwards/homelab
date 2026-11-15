@@ -39,3 +39,14 @@ data "cloudinit_config" "grafana_guest" {
     content      = "#cloud-config\n${yamlencode(merge(local.grafana_guest_baseline, yamldecode(local.grafana_guest_configs[each.key])))}"
   }
 }
+
+data "cloudinit_config" "warehouse" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "warehouse-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content      = local.cloud_init_user_data
+  }
+}
