@@ -1,11 +1,17 @@
 #cloud-config
 disable_root: true
 ssh_pwauth: false
+ssh_deletekeys: true
+ssh_genkeytypes: [rsa, ecdsa, ed25519]
+
+groups:
+  - incus-admin
 
 users:
   - name: ${jsonencode(admin_username)}
     groups:
       - sudo
+      - incus-admin
     shell: /bin/bash
     lock_passwd: true
     sudo: "ALL=(ALL) NOPASSWD:ALL"
@@ -63,14 +69,20 @@ packages:
   - ufw
 
 runcmd:
-  - [sh, -c, 'mac_suffix=$(tr -d ":\n" < /sys/class/net/${parent_interface}/address | tail -c 4); hostnamectl set-hostname "${hostname_prefix}-$${mac_suffix}"']
-  - [sh, -c, 'rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && systemctl restart ssh']
-  - [sh, -c, 'ip link set dev br0 type bridge vlan_filtering 1 vlan_default_pvid 0 && bridge vlan add dev br0 vid ${management_vlan_id} self && bridge vlan add dev ${parent_interface} vid 1-4094']
-  - [sh, -c, 'incus admin init --preseed < /etc/incus/preseed.yaml']
-  - [usermod, -aG, incus-admin, ${jsonencode(admin_username)}]
-  - [ufw, default, deny, incoming]
-  - [ufw, default, allow, outgoing]
-  - [ufw, default, deny, routed]
-  - [ufw, allow, in, "on", br0.${management_vlan_id}, from, ${management_subnet}]
-  - [ufw, deny, in, "on", br0]
-  - [ufw, --force, enable]
+  - - bash
+    - -euo
+    - pipefail
+    - -c
+    - |
+      mac_suffix=$(tr -d ":\n" < /sys/class/net/${parent_interface}/address | tail -c 4)
+      hostnamectl set-hostname "${hostname_prefix}-$${mac_suffix}"
+      ip link set dev br0 type bridge vlan_filtering 1 vlan_default_pvid 0
+      bridge vlan add dev br0 vid ${management_vlan_id} self
+      bridge vlan add dev ${parent_interface} vid 1-4094
+      incus admin init --preseed < /etc/incus/preseed.yaml
+      ufw default deny incoming
+      ufw default allow outgoing
+      ufw default deny routed
+      ufw allow in on br0.${management_vlan_id} from ${management_subnet}
+      ufw deny in on br0
+      ufw --force enable

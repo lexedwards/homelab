@@ -44,12 +44,26 @@ It does not continuously manage the host after the first boot.
    make host-seed
    ```
 
-   This creates `meta-data`, `network-config`, and `user-data` under
-   `cloud-init/rendered/`. It validates `user-data` against the Ubuntu 26.04
+   This creates `meta-data`, `network-config`, and provider-composed MIME
+   `user-data` under `cloud-init/rendered/`. A protected `cloud-config.yaml`
+   sidecar contains the same cloud-config part for inspection and validation;
+   it is not an additional NoCloud input. The workflow validates that part
+   against the Ubuntu 26.04
    [cloud-config schema](https://github.com/canonical/cloud-init/blob/ubuntu/resolute-26.1.x/cloudinit/config/schemas/schema-cloud-config-v1.json)
    and `network-config` against the matching
    [network schema](https://github.com/canonical/cloud-init/blob/ubuntu/resolute-26.1.x/cloudinit/config/schemas/schema-network-config-v2.json).
    It does not connect to the Raspberry Pi or change a running host.
+
+   Native cloud-init creates the administrator and `incus-admin` membership,
+   removes image SSH host keys and generates fresh RSA, ECDSA and Ed25519 keys.
+   No later command deletes keys or restarts SSH to replace its identity. Keep
+   generated private keys in the host, never in OpenTofu or the rendered seed.
+
+   MAC-derived hostname setup, the first-boot bridge VLAN application, Incus
+   preseed and UFW setup remain explicit, fail-fast commands. Persistent networkd
+   drop-ins retain the VLAN policy; first-boot commands apply it without restarting
+   interfaces. They are not an in-place maintenance or service-host recovery
+   procedure.
 
 4. Create the boot image.
 

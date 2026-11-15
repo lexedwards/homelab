@@ -9,7 +9,8 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
 
 - Use the pinned [HashiCorp cloudinit provider][cloudinit] to compose user-data.
   Prefer native fields such as `apt`, `yum_repos`, `packages`, `write_files`,
-  `mounts` and `power_state` over scripts that recreate their behavior. Use
+  `mounts`, SSH host-key generation and `power_state` over scripts that recreate
+  their behavior. Declare account/group membership instead of late `usermod`. Use
   `yamlencode` or simple YAML templates; keep network-data separate where required.
 - The provider assembles MIME; it does not validate cloud-init module semantics.
   Verify target support for MIME, encoding/compression and module ordering.
