@@ -18,7 +18,7 @@ service boundaries and interactions appear in the container views.
 flowchart LR
     operator["Operator / contributor"]
     users["Household / remote users"]
-    devices["Home devices / media clients"]
+    devices["Home devices / media clients<br/>Includes Zigbee IoT devices"]
     lab["Homelab system<br/>Automation, media, remote access and shared infrastructure"]
     certificates["Cloudflare / Let's Encrypt<br/>External certificate dependencies"]
     tailnet["Tailscale<br/>External coordination"]
@@ -44,16 +44,23 @@ flowchart LR
     subgraph lab["Homelab boundary"]
         dns["Technitium DNS<br/>Name resolution / shared zones<br/>Existing server recorded"]
         bao["OpenBao<br/>Secrets API / integrated Raft datastore<br/>Initialized service recorded"]
-        kuma["Uptime Kuma<br/>Availability monitoring / local app data<br/>Defined; monitor inventory unverified"]
+        kuma["Uptime Kuma<br/>Manual health/readiness monitors<br/>Operator-confirmed; target list unverified"]
         tailscale["Tailscale agent<br/>Remote internet egress<br/>Defined"]
         qnetd["corosync-qnetd<br/>External quorum vote<br/>Defined; enrollment unverified"]
         proxmox["Proxmox cluster management<br/>Operator-managed"]
         k8s["RKE2 API, etcd and workload runtime<br/>Deployment evidence recorded"]
-        nfs["TrueNAS NFS service<br/>Operator-managed; layout unverified"]
+        nfs["TrueNAS mass storage<br/>NFS / SMB shares<br/>Operator-confirmed; layout unverified"]
         rustfs["RustFS object datastore<br/>Operator-managed; placement unverified"]
-        apps["Home Assistant / Jellyfin / Roon / workstation<br/>Operator-confirmed; integrations unverified"]
-        proxy["Nginx reverse proxy<br/>ACME / TLS termination<br/>Operator-confirmed; routes unverified"]
+        ha["Home Assistant<br/>Zigbee home automation<br/>Operator-confirmed"]
+        jellyfin["Jellyfin<br/>Media service<br/>Operator-confirmed"]
+        roon["Roon<br/>Music service<br/>Operator-confirmed"]
+        workstation["Arch Linux workstation<br/>Other integrations unverified"]
+        httpapps["Other HTTP-only web services<br/>Full roster unverified"]
+        monitored["Monitored services<br/>Health-check / readiness endpoints<br/>Individual targets unverified"]
+        proxy["Nginx reverse proxy<br/>ACME / TLS termination<br/>Jellyfin, Home Assistant and other HTTP services"]
+        crowdsec["CrowdSec<br/>Additional firewall protection<br/>Installed alongside Nginx"]
     end
+    zigbee["Zigbee IoT devices"]
     upstream["Upstream resolvers"]
     certs["Cloudflare / Let's Encrypt"]
     coordination["Tailscale coordination"]
@@ -66,12 +73,22 @@ flowchart LR
     k8s -->|"Enabled workload-secret delivery"| bao
     k8s -->|"Enabled persistent-volume access"| nfs
     k8s -.->|"Off-node etcd snapshot upload"| rustfs
+    jellyfin -->|"Reads media"| nfs
+    roon -->|"Reads music"| nfs
+    ha <-->|"Zigbee communication"| zigbee
+    proxy -->|"Forwards HTTP"| jellyfin
+    proxy -->|"Forwards HTTP"| ha
+    proxy -->|"Forwards HTTP"| httpapps
+    crowdsec -->|"Additional firewall protection"| proxy
+    kuma -->|"Polls health/readiness"| monitored
 ```
 
-Application backends, proxy routes, and monitoring targets remain unverified, so
-their connections are omitted. Kubernetes is grouped here for readability; its
-API server and etcd datastore are shown separately below. Both views stay at the
-C4 container level.
+TrueNAS supplies Jellyfin media and Roon music; their share protocols remain
+unverified. The proxy's remaining route list and Kuma's individual targets still
+need documenting. CrowdSec is installed on the proxy as additional protection
+alongside the strict UniFi Dream Machine firewall; enforcement details remain
+unverified. Kubernetes is grouped here for readability; its API server and etcd
+datastore are shown separately below. Both views stay at the C4 container level.
 
 ### Kubernetes and observability applications
 
@@ -135,7 +152,7 @@ flowchart TB
             cw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
             collector["Collector VM<br/>Alloy<br/>Defined default placement"]
             grafana["Visualization VM<br/>Grafana<br/>Defined default placement"]
-            ha["Home Assistant<br/>Operator-confirmed; guest type unverified"]
+            ha["Home Assistant / Zigbee integration<br/>Operator-confirmed; guest type unverified"]
             workstation["Arch Linux workstation<br/>GPU passthrough<br/>Operator-confirmed"]
         end
         subgraph store["store — physical Proxmox host"]
@@ -146,15 +163,19 @@ flowchart TB
             roon["Roon<br/>Operator-confirmed; guest type unverified"]
         end
         subgraph unknown["Placement unverified"]
-            storage["TrueNAS / NFS / RustFS<br/>Operator-owned storage dependencies<br/>NFS tied to store failure domain in runbooks"]
-            proxy["Nginx Service Proxy<br/>Operator-confirmed"]
+            storage["TrueNAS mass storage / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Store failure domain recorded in runbooks"]
+            rustfs["RustFS object storage<br/>Operator-owned; placement unverified"]
+            backupnfs["Observability NFS backup destination<br/>Backend unverified"]
+            proxy["Nginx Service Proxy + CrowdSec<br/>Colocation operator-confirmed"]
         end
         subgraph network["Logical network boundaries — operator-managed UniFi"]
+            firewall["UniFi Dream Machine<br/>Strict operator-managed firewall"]
             iot["IoT subnet"]
             service["Service subnet"]
             trusted["Trusted subnet"]
             management["Management / cluster connectivity<br/>Exact logical topology unverified"]
         end
+        zigbee["Zigbee IoT devices<br/>Radio / coordinator details unverified"]
     end
     ha -.->|"Confirmed membership"| iot
     jellyfin -.->|"Confirmed membership"| service
@@ -163,13 +184,24 @@ flowchart TB
     cp -->|"Cluster management"| sw
     cw -->|"Enabled NFS consumption"| storage
     sw -->|"Enabled NFS consumption"| storage
-    warehouse -->|"Object storage / NFS destination"| storage
+    jellyfin -->|"Media shares"| storage
+    roon -->|"Music shares"| storage
+    warehouse -->|"Object storage"| rustfs
+    warehouse -->|"NFS backup destination"| backupnfs
+    ha <-->|"Zigbee"| zigbee
+    proxy -->|"Proxied HTTP"| ha
+    proxy -->|"Proxied HTTP"| jellyfin
 ```
 
 Management, application, and storage paths require operator-owned network policy.
 The worker runbook defines dual-network attachment, but no numeric network IDs or
 address ranges belong here. Do not infer the deployment of Cilium exposure pools
 or the subnet of other guests from this simplified view.
+
+CrowdSec runs with the proxy and supplements the Dream Machine firewall. Its
+enforcement integration and the full proxy route list remain unverified. Zigbee
+connects Home Assistant to devices separately from its logical IoT subnet
+membership; coordinator hardware and placement still need documenting.
 
 ## Maintaining these views
 

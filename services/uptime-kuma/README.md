@@ -7,6 +7,10 @@ the [Micro Node].
 The root manages the instance and a separate data volume. It does not manage the
 Incus host, application settings, monitors, or ongoing Uptime Kuma upgrades.
 
+Uptime Kuma polls health-check and readiness endpoints across the homelab.
+Monitors are configured manually because no suitable automation is currently in
+use. The complete target list remains in operator-managed application settings.
+
 ## Dependencies
 
 - A prepared [Micro Node] with its `default` directory pool and unmanaged `br0`

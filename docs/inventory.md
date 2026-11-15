@@ -25,7 +25,7 @@ remains unknown; there is no confirmed list of defined-but-not-deployed services
 | Proxmox QDevice | [proxmox-qdevice](../services/proxmox-qdevice/README.md) | Incus instance on `micro-node` | Defined; cluster enrollment is operator-managed. Current vote/health not rechecked. |
 | Image Catalogue | [image-catalogue](../services/image-catalogue/README.md) | Proxmox VM templates on `store` | Defined; templates supply images for provisioning VMs and do not run applications. |
 | Technitium DNS | [technitium-dns](../services/technitium-dns/README.md) | Incus instance on `micro-node` | Existing server/adoption recorded; completed imports and current health require their own evidence. Shared zones belong here; service records belong to their service roots. |
-| Uptime Kuma | [uptime-kuma](../services/uptime-kuma/README.md) | Docker application in an Incus instance on `micro-node` | Defined; monitors and application settings remain operator-managed. |
+| Uptime Kuma | [uptime-kuma](../services/uptime-kuma/README.md) | Docker application in an Incus instance on `micro-node` | Operator-confirmed polling of service health-check/readiness endpoints across the homelab. Monitors are configured manually; no suitable automation is currently in use. Individual targets remain unverified. |
 | Tailscale Exit Node | [tailscale-exit-node](../services/tailscale-exit-node/README.md) | Incus instance on `micro-node` | Defined; enrollment, route approval, and tailnet policy remain operator-managed. |
 | OpenBao | [openbao](../services/openbao/README.md) | Native service in an Incus instance on `micro-node` | Initialized service recorded in its README and ALE-41. Single server; initialization and unseal remain operator-managed. |
 | Kubernetes | [infrastructure root](../services/kubernetes/README.md), separate [API runtime root](../services/kubernetes/runtime/README.md) | Control-plane VM on `compute`; optional worker VM on each Proxmox host | Deployment/worker/backup evidence recorded in [lifecycle runbooks](../services/kubernetes/LIFECYCLE.md). Opt-in layer declarations do not establish rollout. Restore remains unproven. |
@@ -39,18 +39,20 @@ has separate state so an unavailable API does not prevent VM recovery.
 ## Operator-managed applications
 
 The following roles and placements were operator-confirmed during ALE-47.
-Application packaging, data locations, backups, and recovery qualification remain
-unverified unless noted in future service guidance.
+Application packaging, exact data locations, backups, and recovery qualification
+remain unverified except for the storage dependencies noted below.
 
 | Service | Role | Placement | Logical subnet |
 | --- | --- | --- | --- |
-| Service Proxy | Nginx reverse proxy; ACME certificates and TLS termination | Unverified | Unverified |
-| Home Assistant | Home automation | `compute`; guest type unverified | IoT |
-| Media Server | Jellyfin | `store`; guest type unverified | Service |
-| Roon | Music service with local device discovery | `store`; guest type unverified | Trusted; needed for discovery of devices such as wireless DACs |
+| Service Proxy | Nginx reverse proxy; ACME certificates and TLS termination for Jellyfin, Home Assistant, and other HTTP-only web services. CrowdSec is installed alongside Nginx for additional firewall protection. | Host unverified; CrowdSec is on the proxy | Unverified |
+| Home Assistant | Home automation; communicates with IoT devices over Zigbee | `compute`; guest type unverified | IoT |
+| Media Server | Jellyfin; media stored on TrueNAS | `store`; guest type unverified | Service |
+| Roon | Music service with local device discovery; music stored on TrueNAS | `store`; guest type unverified | Trusted; needed for discovery of devices such as wireless DACs |
 | Remote Workstation | Arch-based Linux with GPU passthrough | `compute`; guest details unverified | Unverified |
 
-Proxy routes to individual applications remain unverified.
+Jellyfin and Home Assistant use the reverse proxy. The remaining HTTP-service
+roster and exact routes need documenting. CrowdSec supplements the strict UniFi
+Dream Machine firewall; its enforcement integration remains unverified.
 
 ## Operator-managed infrastructure
 
@@ -58,9 +60,9 @@ Proxy routes to individual applications remain unverified.
 | --- | --- | --- |
 | `compute` and `store` Proxmox hosts | [Host](../hosts/compute/README.md) [roots](../hosts/store/README.md) configure providers but manage no resources. Service roots manage selected guests. | Host installation, cluster configuration, storage layout, host backup and recovery. |
 | `micro-node` | [Host seed](../hosts/micro-node/README.md) prepares Ubuntu and Incus; it is not continuous host management. | Current host health and off-host recovery coverage. |
-| TrueNAS / NFS | [NFS runbook](../services/kubernetes/NFS.md) and [storage ADR](adrs/005-kubernetes-nfs-persistence.md) associate persistent storage with the `store` failure domain. Observability also requires an NFS destination. | Guest/host arrangement, whether consumers share a backend, snapshot/replication policy, independent backup and tested recovery. |
+| TrueNAS | Operator-confirmed mass storage exposing NFS and SMB shares. Backs Kubernetes workloads using NFS, Jellyfin media, and Roon music. The [NFS runbook](../services/kubernetes/NFS.md) and [storage ADR](adrs/005-kubernetes-nfs-persistence.md) associate persistent storage with the `store` failure domain. Observability also requires an NFS destination. | Guest/host arrangement, share layout, Jellyfin/Roon share protocols, whether observability uses the same backend, snapshot/replication policy, independent backup and tested recovery. |
 | RustFS | [Observability](../services/observability-warehouse/README.md) and [Kubernetes backups](../services/kubernetes/BACKUP.md) consume operator-owned object storage. The [restore lab](../services/kubernetes/restore-lab/README.md) records an OpenBao KMS dependency. | Exact placement, TrueNAS relationship, encryption/recovery dependency details, and independent durability. |
-| UniFi | Root README lists a Dream Machine, aggregation switch, PoE switch, and access point. DHCP reservations, routing, and firewall rules are operator-owned. | Exact model variants, logical topology, policy between subnets, management recovery, and upstream internet equipment. |
+| UniFi | Dream Machine with a strict operator-managed firewall, plus the switches and access point listed in the root README. DHCP reservations and routing are operator-owned. CrowdSec on the reverse proxy adds another layer of protection. | Exact model variants, logical topology, policy rules between subnets, management recovery, and upstream internet equipment. |
 | APC UPS | Root README records power protection. | Protected equipment, power dependencies, shutdown coordination, and restart order. |
 | Recovery custody | [Backup runbook](../services/kubernetes/BACKUP.md) and [custody ADR](adrs/007-kubernetes-recovery-custody.md) require recovery material independent of Kubernetes. | Complete coverage for every service and independently tested retrieval. Never document secret values or sensitive artifact locations. |
 

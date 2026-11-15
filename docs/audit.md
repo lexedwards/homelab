@@ -7,6 +7,13 @@ and remaining work are recorded below. Repository sources and existing runbooks
 were inspected; no infrastructure was contacted. Operator input
 confirmed the application roles, hosts, and subnets recorded in the inventory.
 
+Operator clarification on 2026-11-15 confirmed TrueNAS's NFS/SMB role and its
+Kubernetes, Jellyfin, and Roon consumers; manual Kuma health/readiness monitoring;
+Home Assistant's Zigbee connections; and the Nginx routes and colocated CrowdSec
+protection. These relationships are included in the inventory and architecture.
+Exact share protocols for Jellyfin/Roon, monitor targets, additional proxy routes,
+and CrowdSec enforcement details remain unverified.
+
 | Area | Coverage in this slice | Finding / disposition |
 | --- | --- | --- |
 | Root overview | Reviewed and updated | Removed retired placeholders, filled application descriptions, updated Kubernetes summary, added navigation. |
@@ -36,8 +43,8 @@ confirmed the application roles, hosts, and subnets recorded in the inventory.
 ## Agreed deferrals and external work
 
 - The operator agreed to leave unknown unmanaged inventory/placement unverified
-  for now. TrueNAS/RustFS/NFS details, UniFi policy, UPS coverage, proxy routes and
-  application backup/recovery details need confirmation before stronger claims.
+  for now. Storage placement and recovery, UniFi rules, UPS coverage, additional
+  proxy routes, and application backup/recovery details still need confirmation.
 - Kubernetes restore qualification remains ALE-55's
   work. Documenting its limitation does not require rerunning a failed experiment.
 - Component/code-level architecture views, live discovery, infrastructure rollout,

@@ -92,7 +92,9 @@ cluster.
 
 [Uptime Kuma](services/uptime-kuma/README.md) runs in an Incus instance on
 `micro-node`. It monitors service availability and hosts the homelab's
-lightweight status page outside the Proxmox cluster.
+lightweight status page outside the Proxmox cluster. It polls health-check and
+readiness endpoints across the homelab. Monitors are configured manually; no
+suitable automation is currently in use.
 
 ### Tailscale Exit Node
 
@@ -108,9 +110,10 @@ service-owned DNS. Initialization and unseal remain operator-managed.
 
 ### Networked Storage
 
-TrueNAS-backed NFS provides persistent storage for Kubernetes and a backup
-destination for observability. RustFS provides object storage for telemetry and
-Kubernetes snapshots. These are operator-managed dependencies; exact placement
+TrueNAS is the mass-storage system. It exposes NFS and SMB shares, providing
+persistent storage for Kubernetes workloads that use NFS, Jellyfin's media, and
+Roon's music. Observability also requires an NFS backup destination. RustFS
+provides object storage for telemetry and Kubernetes snapshots. Exact placement
 and recovery coverage remain [unverified](docs/inventory.md#operator-managed-infrastructure).
 
 ### Kubernetes
@@ -123,21 +126,27 @@ evidence and limitations; snapshot restoration remains unproven.
 ### Service Proxy
 
 Internal Nginx reverse proxy for ACME certificate management and TLS termination.
-Placement and configuration ownership are not yet documented.
+It fronts Jellyfin, Home Assistant, and other HTTP-only services such as web apps.
+CrowdSec is installed alongside Nginx for additional firewall protection,
+supplementing the strict firewall on the UniFi Dream Machine. Proxy placement and
+the CrowdSec enforcement configuration still need documenting.
 
 ### Home Assistant
 
 [Home Assistant](https://www.home-assistant.io/installation/) is hosted on
-`compute` in the IoT subnet and is operator-managed.
+`compute` in the IoT subnet and connects to IoT devices over Zigbee. It is
+operator-managed.
 
 ### Media Server
 
-Jellyfin is hosted on `store` in the Service subnet and is operator-managed.
+Jellyfin is hosted on `store` in the Service subnet, with its media on TrueNAS.
+It is operator-managed.
 
 ### Roon
 
 [Roon](https://roon.app/en/) is hosted on `store` in the Trusted subnet to support
-local device discovery, including wireless DACs. It is operator-managed.
+local device discovery, including wireless DACs. Its music is stored on TrueNAS.
+It is operator-managed.
 
 ### Remote Workstation
 

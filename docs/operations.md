@@ -22,12 +22,16 @@ Use the service's runbook and obtain approval for the exact operation first.
 | Workloads using NFS | Worker connectivity and TrueNAS-backed data | Retain policy protects against automatic volume deletion. Storage loss requires separate backup protection. |
 | Workloads using mounted secrets | OpenBao, enabled provider and auth integration for fresh retrieval | Do not assume cached files prove OpenBao availability or delete useful mounts to test an outage. |
 | Observability | Collector → warehouse backends; Grafana → warehouse queries; backends → RustFS | Verify that backups actually reach the NFS destination. Grafana's local database needs separate protection. |
-| Operator-managed applications | Confirmed host and logical subnet; other dependencies unverified | Packaging, data ownership, backups, certificate routing, and tested recovery need operator confirmation. |
+| Jellyfin and Roon | TrueNAS supplies media and music respectively. Jellyfin also uses the Nginx proxy for proxied access. | Restore and verify the required shares before checking playback. Share protocols, application metadata, and tested recovery remain unverified. |
+| Home Assistant | Zigbee communication with IoT devices; Nginx for proxied HTTP access | Zigbee hardware, configuration custody, and recovery remain unverified. |
+| Service Proxy | Nginx fronts Jellyfin, Home Assistant, and other HTTP-only web services; CrowdSec runs alongside it for additional firewall protection. | Preserve the strict Dream Machine firewall and proxy-side protection. Exact CrowdSec enforcement and proxy recovery remain unverified. |
+| Uptime Kuma | Access to the monitored services' health-check/readiness endpoints | Monitors are configured manually. Preserve application settings and review targets after a service change. |
+| Other operator-managed applications | Confirmed host and logical subnet; other dependencies unverified | Packaging, data ownership, backups, certificate routing, and tested recovery need operator confirmation. |
 
-Do not infer which applications use the proxy, which targets Kuma monitors, or
-which producers export telemetry from an intended role alone. RustFS/OpenBao KMS
-coupling is mentioned in restore documentation; validate the recovery dependency
-before proposing an order that requires one to restore the other.
+The complete proxy route list, individual Kuma targets, and telemetry producer
+inventory still need documenting. RustFS/OpenBao KMS coupling is mentioned in
+restore documentation; validate the recovery dependency before proposing an
+order that requires one to restore the other.
 
 ## Failure impact
 
@@ -37,7 +41,9 @@ before proposing an order that requires one to restore the other.
 | `compute` loss | Removes the sole defined control plane, compute worker, default collector/Grafana placement, Home Assistant, and workstation. Workloads surviving on `store` may keep serving requests while scheduling and cluster management are unavailable. |
 | `store` loss | Removes its worker, default warehouse placement, Jellyfin and Roon. Existing Kubernetes runbooks associate TrueNAS-backed data loss with this host failure; do not assume storage independence. |
 | DNS or upstream network loss | Can block new connections, bootstrap, administration, upstream access, and certificate renewal. IP-only or cached success does not qualify recovery. |
-| RustFS / TrueNAS loss | Affects the relevant object/NFS consumers and recovery artifacts. Exact shared physical failure domains remain unverified. |
+| TrueNAS loss | Disrupts NFS-backed Kubernetes volumes and access to Jellyfin media and Roon music. NFS/SMB clients lose their relevant shares. Exact shared physical failure domains remain unverified. |
+| RustFS loss | Affects telemetry object storage and Kubernetes snapshot availability. Its placement and relationship to TrueNAS remain unverified. |
+| Service Proxy loss | Interrupts proxied access to Jellyfin, Home Assistant, and other configured HTTP services. CrowdSec's colocated protection is also unavailable; the Dream Machine firewall remains a separate layer. Direct backend access depends on operator-owned network policy. |
 | Power loss | UPS coverage, orderly shutdown, and automatic restart remain unverified. |
 
 These expectations come from the documented dependencies. No new host-loss
