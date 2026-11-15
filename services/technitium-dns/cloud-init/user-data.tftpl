@@ -1,9 +1,60 @@
 #cloud-config
+users:
+  - default
+  - name: dns-server
+    system: true
+    no_create_home: true
+    shell: /usr/sbin/nologin
+
+apt:
+  preserve_sources_list: true
+  sources:
+    microsoft:
+      source: deb [signed-by=$KEY_FILE] https://packages.microsoft.com/debian/13/prod trixie main
+      key: ${jsonencode(signing_key)}
+
 package_update: true
 packages:
   - ca-certificates
   - curl
+  - systemd-resolved
+  - [aspnetcore-runtime-10.0, "${dotnet_version}"]
+
+write_files:
+  - path: /etc/apt/preferences.d/technitium-dotnet
+    owner: root:root
+    permissions: "0644"
+    content: |
+      Package: aspnetcore-runtime-10.0 dotnet-host dotnet-hostfxr-10.0 dotnet-runtime-10.0 dotnet-runtime-deps-10.0
+      Pin: version ${dotnet_version}
+      Pin-Priority: 1001
+  - path: /usr/local/lib/technitium/install-archive.sh
+    owner: root:root
+    permissions: "0700"
+    content: ${jsonencode(install_archive)}
+  - path: /etc/systemd/system/dns.service
+    owner: root:root
+    permissions: "0644"
+    content: ${jsonencode(service_unit)}
+  - path: /etc/systemd/resolved.conf.d/technitium.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Resolve]
+      DNSStubListener=no
+  - path: /etc/tmpfiles.d/technitium-resolver.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      L+ /etc/resolv.conf - - - - /run/systemd/resolve/resolv.conf
 
 runcmd:
-  - "curl -fsSL https://download.technitium.com/dns/install.sh | bash"
-  - [systemctl, enable, --now, dns]
+  - - sh
+    - -ec
+    - |
+      systemd-tmpfiles --create /etc/tmpfiles.d/technitium-resolver.conf
+      systemctl daemon-reload
+      systemctl enable systemd-resolved
+      systemctl restart systemd-resolved
+      /bin/sh /usr/local/lib/technitium/install-archive.sh "${technitium_version}" "${technitium_sha256}"
+      systemctl enable --now dns

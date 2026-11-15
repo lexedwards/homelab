@@ -32,6 +32,9 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   network rendering on the target OS, not just YAML syntax. Where a renderer drops
   required settings, use its supported native configuration instead of post-boot
   profile repair, interface restarts, invented MACs or static-IP workarounds.
+  For DNS services, preserve upstream guest resolution independently of the daemon;
+  declare listener conflicts and resolver-file ownership rather than copying an
+  installer's loopback resolver rewrite.
 
 Changing cloud-init does not update an existing guest. Keep first boot, controlled
 maintenance and replacement separate; never reprovision initialized data.

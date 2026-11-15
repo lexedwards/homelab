@@ -29,6 +29,30 @@ data "incus_network" "br0" {
   }
 }
 
+locals {
+  technitium_version = "15.6.2"
+  technitium_sha256  = "51f2d4ebaf156a85035e820afde5e1d428f1920a37d7f0c65203fb1766917e08"
+  dotnet_version     = "10.0.15-1"
+}
+
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "technitium-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content = templatefile("${path.module}/cloud-init/user-data.tftpl", {
+      signing_key        = file("${path.module}/config/microsoft-signing-key.asc")
+      service_unit       = file("${path.module}/config/dns.service")
+      install_archive    = file("${path.module}/scripts/install-archive.sh")
+      technitium_version = local.technitium_version
+      technitium_sha256  = local.technitium_sha256
+      dotnet_version     = local.dotnet_version
+    })
+  }
+}
+
 resource "incus_instance" "technitium_dns" {
   name     = "technitium-dns"
   image    = var.incus_image
@@ -38,7 +62,7 @@ resource "incus_instance" "technitium_dns" {
 
   config = {
     "boot.autostart"       = "true"
-    "cloud-init.user-data" = trimspace(templatefile("${path.module}/cloud-init/user-data.tftpl", {}))
+    "cloud-init.user-data" = data.cloudinit_config.user_data.rendered
     "limits.cpu"           = "1"
     "limits.memory"        = "512MiB"
     "raw.apparmor"         = "signal (send),"

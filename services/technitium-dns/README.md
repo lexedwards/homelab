@@ -17,6 +17,8 @@ upgrades remain operator-managed.
 - A prepared [Micro Node] with its `default` directory pool and unmanaged `br0`
   bridge, and a trusted Incus remote on the management workstation
 - DHCP, routing, and initial DNS on the service VLAN
+- For fresh instances, a reviewed Debian 13 cloud image and access to Debian,
+  Microsoft's package repository, and Technitium's versioned download archive
 - OpenTofu 1.9 or newer, `make`, and `yamllint`; tested with OpenTofu 1.13.1
 - DNS query connectivity from approved clients; administration access only from
   trusted clients, using the protected connection record
@@ -122,17 +124,65 @@ eight optional `web_service_*` attributes are omitted and have no provider
 defaults; they stay operator-managed. Other settings outside this subset are
 not implicitly adopted. No STIG compliance or new hardening policy is enabled.
 
-The unchanged instance uses 1 vCPU and 512 MiB of memory, no Incus profile, and
+The instance definition uses 1 vCPU and 512 MiB of memory, no Incus profile, and
 `br0`. Its AppArmor rule permits .NET thread-management signals to avoid a
-repeated `SIGTRAP` loop. Cloud-init runs Technitium's unpinned installation
-script and needs distribution repositories and `download.technitium.com`. This change
-does not rerun it, pin a fresh-install release, or authorize replacement.
+repeated `SIGTRAP` loop. Nesting retains the Debian 13/systemd compatibility
+exception documented in the service-authoring Incus reference; it does not make
+the guest privileged.
 
 The NIC device and guest interface are both explicitly named `eth0`, preserving
 the imported interface configuration. Debian 13 is the default for a new
 instance, not evidence of an imported guest's operating system. Set the private
 `incus_image` input to its actual original image reference before import; do not
 relabel an existing guest with the default image.
+
+### Fresh Bootstrap And Maintenance
+
+The pinned HashiCorp cloudinit provider composes plain MIME user-data. Native
+cloud-init creates the service account, installs the ASP.NET runtime from
+Microsoft's signed Debian 13 repository, and writes the unit and resolver policy.
+`main.tf` owns the application version/checksum and runtime package version;
+APT preferences pin the runtime and its .NET dependencies to that release.
+The reviewed [Microsoft repository key] is scoped with `signed-by`; its fingerprint
+is `AA86F75E427A19DD33346403EE4D7792F748182B`.
+
+`scripts/install-archive.sh` only downloads the versioned Technitium archive,
+checks its pinned SHA-256 from the [versioned archive], extracts root-owned
+software, and runs the native ICU check. It does not run a remote script,
+manage users, edit DNS settings, issue credentials or activate the daemon.
+The checksum matches the publisher's HTTPS
+`.sha256` file; it is not an independently signed release attestation.
+Before updating, review that file, the archive contents, runtime compatibility
+and upstream release notes together. Never fetch a checksum during first boot
+as a substitute for the reviewed pin.
+
+The tracked `config/dns.service` retains the upstream service sandbox and binding
+capability. Native systemd directory declarations create writable configuration
+and log paths for `dns-server`; software remains separate under
+`/opt/technitium/dns`. The final cloud-init block fails fast before enabling DNS
+if resolver setup, archive verification or the ICU check fails. The helper
+refuses an existing application binary and is not an upgrade command. A partial
+extraction needs inspection, not a blind first-boot rerun or deletion of `/etc/dns`.
+
+Unlike the vendor installer, bootstrap retains DHCP-provided upstream resolution:
+systemd-resolved stays enabled, its stub listener is disabled to free the DNS
+listener, and a native tmpfiles rule links `/etc/resolv.conf` to its upstream
+resolver file. This avoids a guest dependency on its own DNS daemon and does not
+rewrite NetworkManager profiles or install static nameservers. Fresh-image DHCP,
+the effective resolver file and DNS listeners still require target acceptance.
+
+Bootstrap does not supply application passwords/tokens or change upstream initial
+authentication/listener defaults. Keep a fresh instance's management interface
+isolated until an operator establishes protected administrator access and a
+verified secure API path. API-token enrollment and existing-server adoption remain
+separate procedures below; cloud-init completion is not proof of either.
+
+These declarations do not reconfigure existing guests. For controlled maintenance,
+reuse the reviewed versions/configuration above, back up application data and
+state, authorize downtime, and review any resolver or service-unit adoption
+separately. Do not restart or replace the current resolver merely to adopt new
+bootstrap metadata. Verify service health and representative UDP/TCP answers
+after an authorized change; local checks do not establish deployed acceptance.
 
 ## Adopt Existing Server Settings
 
@@ -484,3 +534,5 @@ Changing `cloud-init.user-data` does not rerun it on an existing instance.
 [Micro Node]: ../../hosts/micro-node/README.md
 [Observability Warehouse]: ../observability-warehouse/README.md
 [ownership decision]: ../../docs/adrs/001-technitium-state-ownership.md
+[Microsoft repository key]: https://packages.microsoft.com/keys/microsoft-2025.asc
+[versioned archive]: https://download.technitium.com/dns/archive/
