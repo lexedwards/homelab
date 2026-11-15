@@ -68,9 +68,10 @@ online operations; a private VLAN alone does not encrypt the admin token.
    ```
 
    Initialization downloads providers and updates their lock file. Validation
-   checks formatting, OpenTofu, cloud-init YAML, and plan-only tests with
-   **both providers mocked**. It does not contact Incus or Technitium and does
-   not prove live import safety or a no-change plan. The test inputs are synthetic.
+   checks formatting, OpenTofu configuration, and cloud-init YAML lint. It does
+   not contact Incus or Technitium, render guest configuration, or prove live
+   import safety or a no-change plan. Variable and lifecycle validation enforce
+   their declared constraints during authorized plans and applies.
 
 3. Enroll an admin-level API token through the existing administration interface
    when online access is authorized. Supply it through a private environment or

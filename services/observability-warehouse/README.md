@@ -195,8 +195,9 @@ Omitted/null comments remain server-managed; explicit `""` clears them.
 Removing a record entry or destroying this service deletes its record, not the
 shared zone or other services' records. Guest deletion alone does not remove
 independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
-The offline tests target DNS records with mocked providers. They do not
-exercise VM provisioning or establish full-root production convergence.
+Local validation checks OpenTofu configuration, YAML lint, shell syntax and
+native Alloy configuration. It does not exercise VM provisioning, publish DNS
+records or establish full-root production convergence.
 Use the [DNS recovery guidance] for application/state backup and recovery.
 
 ## Node Placement

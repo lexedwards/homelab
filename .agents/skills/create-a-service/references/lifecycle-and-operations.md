@@ -1,81 +1,91 @@
 # Lifecycle And Operations
 
-Read this reference when a service installs software, handles credentials,
-stores durable data, uses Docker Compose, or needs operational documentation.
+Read with the main skill before choosing bootstrap, secrets or maintenance logic.
 
-## Configuration And Credentials
+## Initial Environment
 
-Before choosing tracked values, local inputs, or defaults, read and apply
+Cloud-init owns the unattended, non-secret baseline: networking, users, SSH keys,
+repositories, dependencies, static configuration and systemd units/timers/drop-ins.
+
+- Use the pinned [HashiCorp cloudinit provider][cloudinit] to compose user-data.
+  Prefer native fields such as `apt`, `yum_repos`, `packages`, `write_files`,
+  `mounts` and `power_state` over scripts that recreate their behavior. Use
+  `yamlencode` or simple YAML templates; keep network-data separate where required.
+- The provider assembles MIME; it does not validate cloud-init module semantics.
+  Verify target support for MIME, encoding/compression and module ordering.
+  Keep vendor-data only for a genuinely shared, supported image baseline.
+- Prefer distribution packages or pinned, verified vendor repositories. Preserve
+  package pins and key/checksum provenance. Do not pipe a mutable remote installer
+  into a shell when a supported declarative path exists.
+- Keep only imperative steps addressing a demonstrated native gap, with one
+  bounded purpose. Do not move a mixed installer into another data channel.
+- Sequence repository/key availability, file ownership, package installation,
+  required kernel reboot, prerequisites and daemon activation explicitly. Installing
+  a kernel does not make its modules available in the running kernel. Failed
+  installation must not enable an unsafe start or enrollment.
+- Use DHCP and upstream reservations/DNS for stable addressing. Verify effective
+  network rendering on the target OS, not just YAML syntax. Where a renderer drops
+  required settings, use its supported native configuration instead of post-boot
+  profile repair, interface restarts, invented MACs or static-IP workarounds.
+
+Changing cloud-init does not update an existing guest. Keep first boot, controlled
+maintenance and replacement separate; never reprovision initialized data.
+
+## Secret Handling
+
+OpenBao is the secret provider. Secrets must never enter Git, OpenTofu state/plans,
+cloud-init, argv, logs or tracker evidence. Sensitivity markings only redact display.
+For input classification, read and apply
 [Configuration Values](../../principle-configuration-values/SKILL.md).
-A saved plan may be inspected only during an explicitly requested plan or apply
-review; never quote its protected values.
 
-Keep application credentials out of OpenTofu state and first-boot data. Prefer
-post-deployment enrollment with a root-owned credential file. If first boot
-cannot work without a secret, explain its state exposure and obtain the user's
-decision before implementing it. Mark every unavoidable credential variable and
-output as sensitive where OpenTofu supports it; sensitivity redacts normal
-output but does not encrypt state.
+- VM/LXC consumers connect directly using simple Bash and native CLIs/APIs. Use
+  systemd units, timers, protected environment/credential files and drop-ins for
+  execution and activation. Keep files least-privileged and disable secret logging.
+- Kubernetes consumers use cluster integration such as CSI, not per-pod bootstrap
+  scripts. Runtime readers must not administer their own authorization.
+- Establish initial machine trust separately. AppRole SecretIDs and response-
+  wrapping tokens are credentials, not public bootstrap data. Do not grant access
+  merely because a guest knows a role name or is on a private subnet.
+- Keep recovery access independent of the service/failure domain it recovers.
+  OpenBao's own TLS renewal and recovery must not depend on fetching from sealed
+  OpenBao. Reload is not restart: certificate SIGHUP preserves unsealed operation;
+  a process restart requires operator unseal under the current policy.
 
-## Provision Software
+## Privileged Procedures And Maintenance
 
-### Native
+Use small service-local Bash procedures with explicit inputs and native commands.
+Consider Ansible only where repeated orchestration demonstrably warrants it; do
+not add a framework solely to wrap commands. Keep supported declarative API
+configuration in its OpenTofu owner; separate credential issuance/value enrollment.
 
-- Prefer a distribution package or pinned, verified vendor repository.
-- Install and enable one clear systemd unit.
-- Make repository setup, package names, package versions, administrator groups,
-  filesystem paths, and service environment files agree with the selected OS.
-- Harden listeners and authentication to the stated audience. Do not broaden
-  access for setup convenience.
-- Avoid piping a remote script into a shell. If no practical alternative exists,
-  review its source and transport and document that it is unpinned.
+- Document invocation, prerequisites, privilege, side effects, completion checks
+  and failure/retry behavior. Preserve identity and refuse unsafe overwrites.
+- Make OpenBao initialization, recovery-material custody, scoped access setup and
+  root-token revocation separate stages. Initialize only uninitialized storage;
+  uncertain output custody is a stop condition, not permission to initialize again.
+  Verify scoped access before revoking initial root access. Preserve manual unseal.
+- Reuse authoritative version/configuration inputs between fresh bootstrap and
+  maintenance; do not create independent definitions. A helper's compatibility
+  limits remain distinct from the desired version.
+- Use native controllers, agents and systemd timers for recurring work. Readiness
+  checks must be bounded and must distinguish waiting for enrollment from failure.
+  Do not hide guest maintenance in OpenTofu remote-execution provisioners.
 
-### Docker Compose
+## Runtime And Data
 
-- Use a declarative `compose.yaml`; never document an imperative `docker run`
-  lifecycle.
-- Pin images to the narrowest maintainable policy and document mutable tags.
-- Drop capabilities, use `no-new-privileges`, bound log growth, and publish only
-  required ports where supported.
-- Use Compose commands for upgrades, restarts, status, logs, and troubleshooting.
-- Follow the selected platform reference for runtime placement and startup.
+Prefer native packages and systemd services. When Docker is justified, use a
+declarative Compose file managed by systemd, not `docker run`. Pin images under an
+explicit update policy; drop unnecessary capabilities, use `no-new-privileges`,
+bound log growth and publish only required ports where supported.
 
-## Prove Readiness
+Separate replaceable software/configuration from durable data. Document deletion,
+replacement, migration, backup ownership and restore limitations for every durable
+path and identity. Protection, RAID and replication are not application-consistent
+backups. State backup and application backup have different recovery roles.
 
-- Use a deterministic local check when possible.
-- Bound retries and elapsed time.
-- Fail provisioning when a required daemon, device, or local endpoint is not
-  ready and the selected platform supports that enforcement.
-- Do not wait on credentials or enrollment that the operator performs later.
-- Do not create unbounded OpenTofu waits or remote-execution provisioners.
+The service README owns applicable dependencies, exposure, state/data ownership,
+validation, readiness, enrollment, upgrade and recovery commands. Keep examples
+generic and follow repository documentation privacy. Record actual acceptance and
+remaining live checks in the tracker, not transient handoff documents.
 
-## Handle Data And Replacement
-
-- Separate replaceable binaries and configuration from irreplaceable data where
-  the storage design supports it.
-- Record what destroy and replacement do to every persistent path, disk, volume,
-  and identity.
-- Explain downtime, local data loss, enrollment loss, and separately managed
-  data behavior.
-- State that changing cloud-init updates tracked first-boot input but does not
-  rerun it on an existing guest.
-- Require tested backups in another fault domain for important data. Protection,
-  lifecycle rules, RAID, replication, and live filesystem copies are not
-  application-consistent backups.
-
-## Document Operations
-
-The service README should cover only applicable concerns:
-
-- purpose, scope, architecture, target host, and placement reason;
-- dependencies, image or template source, and local configuration;
-- ports, callers, outbound dependencies, and security boundaries;
-- validation and saved-plan review;
-- persistence, backup ownership, replacement, and restore expectations;
-- upgrades, import, status, logs, and troubleshooting; and
-- operator-managed credentials, enrollment, firewall policy, backups, and
-  restore tests.
-
-Keep commands generic and use semantic placeholders. Recommend upstream DHCP
-reservations or DNS for stable discovery without recording the reservation. Use
-systemd commands for native services and Compose commands for Compose workloads.
+[cloudinit]: https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs

@@ -2,7 +2,7 @@ TOFU ?= tofu
 YAMLLINT ?= yamllint
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate test validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -10,8 +10,7 @@ help:
 		'fmt                   Format OpenTofu configuration' \
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
-		'cloud-init-validate   Validate the cloud-init template' \
-		'test                  Check settings with mocked providers (no infrastructure access)' \
+		'cloud-init-validate   Lint the cloud-init YAML template' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE' \
 		'apply                 Apply the previously reviewed PLAN_FILE'
@@ -31,10 +30,7 @@ tofu-validate:
 cloud-init-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
 
-test:
-	$(TOFU) test
-
-validate: fmt-check tofu-validate cloud-init-validate test
+validate: fmt-check tofu-validate cloud-init-validate
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

@@ -11,12 +11,12 @@ checksum-verified `proxmox_virtual_environment_download_file` in the service roo
 or use a separately established LXC catalogue. Never pass a VM template ID to
 an LXC resource.
 
-Proxmox LXC initialization does not provide the raw cloud-init user-data pattern
-used by the VM baseline. Use LXC only for an infrastructure-only guest, a
-reviewed prebuilt template or appliance, or an explicitly agreed configuration-
-management path. Do not hide `pct exec`, `remote-exec`, or SSH scripts in
-OpenTofu to imitate cloud-init. If repeatable first-boot provisioning is
-required and no mechanism exists, use a VM or ask the user.
+Proxmox LXC initialization does not provide the VM baseline's raw cloud-init
+user-data path. For an application guest, demonstrate the selected template's
+cloud-init integration or choose a VM. A prebuilt appliance or alternative
+bootstrap requires an explicit platform decision, not an assumed exception.
+Do not hide `pct exec`, `remote-exec`, or SSH scripts in OpenTofu to imitate
+cloud-init. Infrastructure remains OpenTofu-owned.
 
 ## LXC Gate
 

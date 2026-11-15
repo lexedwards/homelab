@@ -218,7 +218,7 @@ endpoint input file. The preparation helpers only support offline comparison and
 render checks. **Do not apply their exports**, even when complete: use the
 managed declarations and reviewed plan above.
 
-Use Python 3 and PyYAML, already required by `make validate`. Create a private JSON
+These optional helpers require Python 3, PyYAML and Helm. Create a private JSON
 file outside Git, owned by the current operator with mode `0600` or `0400`.
 Symlink inputs are rejected. Do not include credentials, JWTs, private keys or
 secret values. Unknown and duplicate JSON fields are rejected.

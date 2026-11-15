@@ -62,9 +62,8 @@ make init
 make validate
 ```
 
-Validation runs format/OpenTofu checks, YAML template linting, installer and
-deploy-hook syntax checks, mocked provider plans, rendered cloud-init assertions
-and readiness unit tests. It does not contact infrastructure, issue certificates,
+Validation runs format/OpenTofu checks, YAML template linting, and installer and
+deploy-hook syntax checks. It does not contact infrastructure, issue certificates,
 start OpenBao or prove guest systemd/cgroup behavior. The existing service has
 passed authenticated HTTPS access and real certificate renewal/reload checks;
 local validation does not repeat those runtime checks.

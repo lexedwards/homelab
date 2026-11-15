@@ -1,240 +1,131 @@
 ---
 name: create-a-service
-description: Creates or changes an OpenTofu-managed homelab service under services/. Enforces service-local deployment ownership and repository-level shared modules. Use for service placement, a Micro Node Incus instance, or a Proxmox VM, LXC, or appliance on compute or store. For an existing service, inspect its provider and placement before selecting a platform branch; never infer the platform from cloud-init, user-data, a package manager, systemd, Docker, or the services/ path alone.
+description: Creates or changes homelab services with OpenTofu-owned infrastructure, native cloud-init bootstrap, and service-local lifecycle ownership. Use for service placement or changes on Micro Node Incus or Proxmox compute/store. Classify existing services from their tracked provider and placement before loading platform guidance.
 ---
 
 # Create A Service
 
-Create the smallest complete service root that fits the workload, its data, and
-its host. Keep host bootstrap, image curation, guest infrastructure, application
-provisioning, and operator-managed configuration at explicit lifecycle
-boundaries.
+Deliver one complete service change, including its validation and operating
+guidance. Existing examples are implementation evidence, not permission to copy
+obsolete provisioning, credentials or environment values.
 
-## Core Workflow
+## Trace And Establish
 
-Choose the path before implementation:
+1. Read the repository README and the service's `README.md`, `main.tf` and
+   `versions.tf`. For a new service, read the host documentation instead.
+2. Establish purpose, exposure, dependencies, resources, durable data, credentials
+   and readiness. Ask only for missing decisions that affect safety or lifecycle.
+3. Read and apply [Configuration Values](../principle-configuration-values/SKILL.md)
+   before authoring inputs, defaults or examples, and
+   [Lifecycle And Operations](references/lifecycle-and-operations.md) for bootstrap,
+   secret handling, maintenance and recovery.
+4. Trace module sources, file/state reads and script imports against the ownership
+   rules below before choosing an implementation.
 
-`TRACE -> ESTABLISH -> CLASSIFY -> CHOOSE BOUNDARY -> IMPLEMENT -> VERIFY`
-
-Acceptance gates guard the transitions between stages. Pass each gate where it
-appears before continuing; do not defer all acceptance checks until the end.
-
-- **Trace:** locate the service and read current tracked evidence.
-- **Establish:** define the workload, exposure, data, credentials, and readiness.
-- **Classify:** preserve proven placement or choose a host from workload needs.
-- **Choose boundary:** select the least-privileged viable guest and provisioning
-  model.
-- **Implement:** follow the selected platform reference and current repository
-  conventions.
-- **Verify:** validate locally without contacting infrastructure unless the user
-  explicitly requests that operation.
-
-## Core Principles
-
-- Use OpenTofu. Use Terraform terminology only for ecosystem filenames such as
-  `terraform.tfvars`.
-- Read current tracked files before changing or judging a service. Do not inspect
-  ignored local configuration, state, saved plans, or rendered cloud-init to
-  discover deployment values. A saved plan may be inspected only for an
-  explicitly requested plan or apply review under the freshness gate below.
-- Before classifying configuration values, read and apply
-  [Configuration Values](../principle-configuration-values/SKILL.md) for commit
-  safety, local input channels, defaults, and example-file conventions.
-- Prefer a native package and one systemd service. Use Docker Compose only when
-  a container runtime is justified; never use an imperative `docker run`
-  lifecycle.
-- Add privilege, devices, mounts, kernel settings, and security exceptions only
-  for stated workload requirements or verified platform compatibility needs.
-- Use DHCP by default and keep stable addressing in upstream DHCP and DNS.
-- Do not invent exposure, persistence, authentication, migration, high
-  availability, or backup requirements.
-- Never plan or apply infrastructure unless the user explicitly asks for that
-  operation. Apply only a saved plan generated from the current configuration,
-  inspected with `tofu show` in the current workflow, and unchanged since review.
+Read tracked evidence only. Do not inspect ignored tfvars, state, saved plans,
+credential files or rendered deployment artifacts to discover local values.
+Saved-plan review is limited to an explicitly authorized infrastructure operation.
 
 ## Enforce Service Ownership
 
 **deployments, modules, resources etc. DO NOT mix across the services/ boundary**
 
-- Each `services/<name>/` owns only that service's deployments, resources, state
-  and lifecycle. Do not create, adopt or manage another service's resources there.
-- Private modules, templates, scripts and tests stay inside their owning service.
-  Never import another service's implementation or read its tfvars/state files.
-  Reading tracked sibling code as a reference is not permission to depend on it.
-- Put reusable implementation in repository-level `modules/` (with its shared
-  tools/tests), not in a service directory. Shared modules must not import service
-  implementation or deployment state. Their instantiated resources belong to
-  the caller; shared code is not a shared production deployment.
-- Integrate services only through explicit published interfaces: APIs or narrowly
-  exported non-secret outputs supplied to the consumer. Reuse the producer's
-  output, not a duplicate endpoint or access to its whole state. Credentials remain
-  separately protected. Multiple roots inside one service may share that service's
-  documented metadata/state contract without crossing a service boundary.
+- Each `services/<name>/` owns its deployments, resources, state and lifecycle.
+  Private templates, modules and scripts stay within that service. Never import
+  another service's implementation, tfvars or state.
+- Put cross-service reusable implementation in repository-level `modules/`.
+  Keep modules small, with straightforward inputs; do not build a provisioning
+  framework. Their resources belong to the caller, not a shared deployment.
+- Integrate through APIs or published non-secret outputs supplied to consumers.
+  Do not duplicate endpoints or grant access to another service's whole state.
+  Multiple roots within one service may use its documented metadata/state contract.
+- Machine infrastructure is always declared in OpenTofu. Scripts and configuration
+  management must not become alternative infrastructure or API-resource owners.
 
-Before implementation, trace module sources, file/state reads and script/test
-imports. Fail the boundary gate on a cross-service implementation dependency;
-extract shared code or define an explicit interface before continuing.
-
-## Trace
-
-For an existing service, read its `README.md`, `main.tf`, and `versions.tf`
-before loading platform guidance. Record its provider, host, guest type, and
-existing lifecycle boundaries without assuming they should change. For a new
-service, read the repository README and host documentation, but defer placement
-until the workload is established.
-
-## Establish The Service
-
-Infer what the repository and upstream documentation already establish. Ask
-only when a missing answer changes safety, public behavior, or lifecycle:
-
-- What does the service do, and what is the authoritative installation method?
-- Which ports, protocols, callers, and outbound dependencies are required?
-- What CPU, memory, disk, acceleration, device, or kernel resources are needed?
-- Which data is replaceable, which is durable, and what must survive replacement?
-- Which credentials or enrollment steps remain operator-managed?
-- What local, deterministic readiness check proves the service is usable?
-
-Read [Lifecycle And Operations](references/lifecycle-and-operations.md) when the
-service installs software, handles credentials, stores durable data, uses
-Compose, or needs an operator runbook.
-
-**Workload gate:** purpose, exposure, resources, data ownership, and readiness
-are sufficient to implement safely. Only external operations such as credential
-enrollment, firewall policy, backup execution, and restore testing may remain
-operator-managed.
+Extract shared code or establish an explicit interface before introducing a
+cross-service dependency.
 
 ## Classify Placement
 
-Preserve an existing service's proven platform unless the request changes its
-placement or workload constraints make it invalid. For a new or deliberately
-relocated service, compare the established workload with current host roles:
+Preserve existing placement unless the request changes it or demonstrated
+workload constraints invalidate it. Cloud-init, Docker, systemd, package managers
+and the `services/` path do not identify a platform.
 
-- Prefer Micro Node Incus for suitable lightweight services that must remain
-  independent of the main Proxmox platform.
-- Prefer Proxmox `compute` for general or CPU-bound work and workloads coupled
-  to its local devices.
-- Prefer Proxmox `store` for persisted-data-intensive and storage-coupled work.
+For new or relocated services:
 
-For a new or relocated service, or a change to host resources, confirm the
-chosen host has the required capacity, networking, storage, image, available
-guest ID, and devices. During a normal offline task, use tracked evidence or ask
-the user for missing inventory and stop before implementation. Offer a read-only
-infrastructure query only with explicit authorization. A provisional placement
-may be recorded but does not pass the placement gate.
+- Prefer Micro Node Incus for suitable lightweight services requiring independence
+  from Proxmox, `compute` for general/CPU/device-coupled workloads, and `store` for
+  persisted-data-intensive or storage-coupled workloads.
+- Confirm affected capacity, bridge, storage, image/template, guest ID and devices
+  from tracked evidence or operator input. Request authorization before querying
+  infrastructure. Do not turn provisional placement into an implemented assumption.
+- Ask when viable choices materially change failure isolation or data lifecycle.
 
-If more than one placement remains viable and the trade-off changes failure
-isolation or data lifecycle, ask the user to choose.
+Load only the established platform branch:
 
-| Evidence | Classification | Read next |
-| --- | --- | --- |
-| `incus_instance`, the Incus provider, or explicit `micro-node` placement | Micro Node Incus | [Incus](references/incus.md) |
-| `bpg/proxmox`, `proxmox_cloned_vm`, a `proxmox_virtual_environment_*` resource, or explicit `compute`/`store` placement | Proxmox | [Proxmox](references/proxmox.md) |
+| Tracked evidence | Read and apply |
+| --- | --- |
+| `incus_instance`, Incus provider or Micro Node placement | [Incus](references/incus.md) |
+| `bpg/proxmox` or Proxmox resources/placement | [Proxmox](references/proxmox.md), then its selected VM/LXC reference |
 
-Cloud-init, user-data, package managers, systemd, Docker, VM, container, and the
-`services/` directory are not sufficient platform evidence. If the request,
-tracked files, and workload-based host comparison do not establish placement,
-ask one concise question. Do not load a platform branch speculatively.
+Prefer Debian 13 only where a reviewed image exists and the workload supports it.
+Otherwise use a reviewed compatible OS or resolve image curation first. Require
+evidence for privilege, kernel, device and confinement exceptions; do not invent
+exposure, persistence, migration, HA or backup requirements.
 
-**Placement gate:** the target platform and host are supported by explicit
-request, existing placement, or a workload-based decision against current host
-roles, and all host prerequisites affected by the change are confirmed.
+## Implement
 
-## Choose The Boundary
+Start with `Makefile`, `README.md`, `main.tf`, `variables.tf`, `versions.tf` and
+`terraform.tfvars.example` in the owning service. Add cloud-init, configuration
+and private modules only as needed.
 
-Follow the classified platform rather than choosing from all guest types at
-once:
+- Follow the selected platform reference and the lifecycle ownership rules.
+- Use pinned provider constraints and verify unfamiliar arguments against their
+  schema. Generate lock files with `tofu init`; never hand-write them.
+- Use kebab-case service names and snake_case OpenTofu labels. Mark discovered
+  addresses as sensitive outputs.
+- Keep declarations, examples, commands and documentation aligned. Review the
+  root overview and affected diagrams when relationships change.
+- With each slice, review this entire skill and all references: replace stale
+  instructions, remove conflicts and repetition, check links/examples, and keep
+  each rule in one authoritative location. Do not merely append corrections.
 
-- **Micro Node Incus:** use an Incus container and follow
-  [Incus](references/incus.md), including the Debian 13 nesting requirement for
-  the current host.
-- **Proxmox:** establish `compute` or `store`, then choose a VM, unprivileged
-  LXC, or reviewed appliance using [Proxmox](references/proxmox.md).
-- **Proxmox VM:** read [Proxmox VM](references/proxmox-vm.md).
-- **Proxmox LXC:** read [Proxmox LXC](references/proxmox-lxc.md). If repeatable
-  application provisioning has no established mechanism, choose a VM or ask the
-  user instead of hiding remote execution in OpenTofu.
+## Verify Locally
 
-Prefer Debian 13 only when the selected platform has a reviewed source for it
-and the workload supports it. Otherwise choose an existing reviewed compatible
-image or stop for an image-curation decision. The operating-system choice must
-agree with package names, repository setup, service paths, and image metadata.
+1. Run relevant formatting, syntax, lint and native configuration/schema checks.
+   Initialize isolated provider directories when needed, then run `make validate`.
+2. Keep OpenTofu tests only for meaningful dynamic transformations/parsing not
+   adequately checked by variable validation, lifecycle conditions or native tools.
+   Do not add Python tests or static/intention tests, or replace them with custom
+   assertion scripts. Operational health/readiness commands remain distinct.
+3. Run `python3 -B scripts/check-service-boundaries.py` from the repository root.
+   It covers literal local OpenTofu paths only; review dynamic references and
+   script imports manually.
+4. Run `git diff --check` and inspect every intended changed/new file, including
+   untracked files, for secrets and unapproved deployment values. Do not inspect
+   ignored runtime artifacts.
 
-**Boundary gate:** the selected guest supports the required isolation,
-provisioning, devices, persistence, and future lifecycle without unexplained
-privilege exceptions.
+Distinguish YAML lint, rendered cloud-config schema validity, effective target
+renderer/native-consumer behavior and deployed acceptance. In particular,
+schema-valid network-data may be ignored by a target renderer. Report unperformed
+checks rather than inferring runtime success from local validation.
 
-## Implement A Complete Slice
+Walk through affected fresh-bootstrap, unsupported-renderer, credential-gated and
+existing-initialized-service paths. Preserve working network behavior and stop at
+the proper enrollment/reboot boundary; never rerun first boot to repair useful data.
 
-Start from the common root and add branch-specific files only when needed:
+## Authorized Operations
 
-```text
-services/<service-name>/
-|-- Makefile
-|-- README.md
-|-- main.tf
-|-- terraform.tfvars.example
-|-- variables.tf
-`-- versions.tf
-```
+Do not plan/apply, initialize, issue credentials, restart or replace services
+without authorization. Proceed within an approved bounded operation; ask again
+only when mutation, disruption or data-loss scope materially changes.
 
-- Generate `.terraform.lock.hcl` with `tofu init`; never hand-write it.
-- Use current provider and OpenTofu constraints from the selected repository
-  references. Validate unfamiliar provider arguments against the pinned schema.
-- Use kebab case for external service names and snake case for OpenTofu labels.
-- Add `.yamllint`, `cloud-init/`, and `config/` only when the selected branch
-  needs them.
-- When authoring variables and `terraform.tfvars.example`, read and apply
-  [Configuration Values](../principle-configuration-values/SKILL.md).
-- Mark discovered addresses as sensitive outputs where supported.
+Use canonical `main` and existing production state for persistent operations;
+worktrees are for development and local validation, not competing deployment state.
+Generate a fresh saved plan, inspect it with `tofu show`, and apply only that
+unchanged plan/configuration. A supplied plan with unproven provenance/freshness
+needs explicit confirmation. Keep protected values out of published evidence.
 
-**Security gate:** the authored configuration contains no secrets or unapproved
-deployment-specific values, and every elevated capability has a documented
-need.
-
-**Lifecycle gate:** readiness is bounded and local where possible; replacement,
-durable data, enrollment, upgrades, backups, and operator responsibilities are
-documented.
-
-## Verify
-
-Run the narrowest relevant checks from the service root, then broaden to the
-complete local validation workflow:
-
-1. Run `tofu fmt`.
-2. Run `tofu init` when provider initialization or lock-file generation is
-   needed.
-3. Run `make validate`, including OpenTofu format and validation plus every
-   authored YAML, cloud-init, and service-configuration check.
-4. Run `git diff --check` from the repository root.
-   Review the root overview and affected diagrams alongside service changes.
-   Run `python3 scripts/check-service-boundaries.py` and
-   `python3 -B -m unittest discover -s tests -p 'test_service_boundaries.py'` there
-   too. The checker covers literal local OpenTofu references only; manually
-   review dynamic references and script/test imports against the ownership gate.
-5. Use `git status --short --untracked-files=all` to identify every intended
-   changed or new file. Inspect all of those files, including untracked files,
-   for whitespace errors, secrets, and unapproved deployment-specific values.
-   Do not inspect ignored runtime or local configuration files.
-
-Do not run `make plan`, `tofu show`, or `make apply` by default. For an explicit
-plan or apply request:
-
-1. Generate the saved plan from the current configuration.
-2. Inspect that plan with `tofu show` in the current workflow without repeating
-   secrets or deployment locators in the response.
-3. Apply only if no configuration changed after plan generation and review.
-
-If the user supplies a pre-existing plan whose provenance or freshness cannot
-be proven, obtain explicit confirmation before applying it.
-
-**Done gate:** placement is evidence-based, all applicable gates pass, relevant
-checks succeed, and any deliberate validation gap or operator action is stated.
-
-Report only the fields that apply:
-
-```text
-Implemented: [service behavior or lifecycle change]
-Verified: [checks and acceptance evidence]
-Remaining: [operator action, validation gap, or residual risk]
-```
+Keep active issue status and operational evidence in the tracker. Report
+implementation, local verification, deployed acceptance and outstanding operator
+actions separately; a merged PR alone does not prove pending runtime criteria.

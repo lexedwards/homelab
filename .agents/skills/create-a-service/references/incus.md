@@ -1,27 +1,24 @@
 # Micro Node Incus
 
-Read this reference only after the main skill's placement gate classifies the
+Read this reference only after the main skill classifies the
 service for the Micro Node and Incus.
 
 ## Read Current Evidence
 
 1. Read `hosts/micro-node/README.md` for the host/service boundary, trusted
    client workflow, `default` storage pool, and unmanaged `br0` bridge.
-2. Read `services/hello-world/` for the smallest native systemd baseline.
-3. Compare current Incus roots: `services/proxmox-qdevice/`,
-   `services/tailscale-exit-node/`, `services/technitium-dns/`, and
-   `services/uptime-kuma/`; read `services/openbao/` for the verified Debian 13
-   nesting requirement and native service/cgroup checks.
-4. Use specialized examples only for their matching concern:
+2. Read `services/hello-world/` for a small Incus baseline and
+   `services/openbao/` for Debian 13 nesting and native service/cgroup checks.
+3. Use specialized examples only for their matching concern:
    `proxmox-qdevice` for authoritative SSH keys, `tailscale-exit-node` for TUN
    and forwarding, and `uptime-kuma` only for custom-volume persistence and
    replacement. Do not copy Uptime Kuma's Docker startup, hardening, or upgrade
    lifecycle.
-5. Use provider and OpenTofu constraints common to current roots. Do not guess
+4. Use provider and OpenTofu constraints common to current roots. Do not guess
    newer versions.
 
-If examples conflict, preserve the unified skill's security rules, then follow
-the current majority pattern. Never copy an environment value.
+Follow the lifecycle reference over conflicting legacy examples. Never copy an
+environment value or assume an older installer is the recommended bootstrap.
 
 ## Incus Acceptance Gates
 
@@ -58,16 +55,13 @@ the current majority pattern. Never copy an environment value.
 
 ### Provisioning Gate
 
-- Add `.yamllint` and `cloud-init/user-data.tftpl` to the common service root.
-- Add `cloud-init/network-config.tftpl` only for explicit guest network behavior.
-- Pass tracked cloud-init through Incus configuration and wait for completion.
-- For native software, install the package and enable systemd through cloud-init.
+- Follow [Lifecycle And Operations](lifecycle-and-operations.md) for declarative
+  cloud-init composition, package installation, secret handling and maintenance.
+- Pass rendered user-data and separate network-data through the supported Incus
+  configuration keys; verify format/encoding support and wait for cloud-init.
 - No conforming tracked Incus Compose example currently exists. For justified
-  Docker Compose, install the runtime through the selected package source, write
-  the declarative Compose file through cloud-init, apply the hardening in
-  [Lifecycle And Operations](lifecycle-and-operations.md), and manage startup
-  and upgrades through a dedicated systemd unit that invokes Compose. Add
-  Docker-specific syscall interception only when proven necessary.
+  Docker Compose, follow the lifecycle reference and manage it through a dedicated
+  systemd unit. Add Docker-specific syscall interception only when proven necessary.
 - Use a bounded creation-time `exec` check when readiness can be tested locally
   and deterministically.
 

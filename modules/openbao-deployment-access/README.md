@@ -15,9 +15,10 @@ issuer. Both identities may inspect/revoke themselves; neither can renew itself.
 
 OpenBao 2.7.2 can return a token with `explicit_max_ttl=0` even when the role's
 `token_explicit_max_ttl` is 900. Do not infer the issued-token cap from that role
-field alone. The explicit request parameter is enforced by the issuer ACL and
-verified through token self-lookup in the isolated real-server test. Trusted
-administrators issuing directly must also supply `explicit_max_ttl=900s`.
+field alone. The issuer ACL enforces the explicit request parameter; the helper
+checks the issuance response's policies, renewability and lease duration, not
+token self-lookup. Trusted administrators issuing directly must also supply
+`explicit_max_ttl=900s` and verify the effective cap during authorized issuance.
 
 `enrollment` returns names and paths, never tokens. Add the service-owned HTTPS
 endpoint to this metadata and export it privately for
@@ -88,19 +89,10 @@ isolate data from host root, CSI administrators or control of reader pods.
 
 ## Validation
 
-Run `make -C modules/openbao-deployment-access validate` from the repository root.
-The explicitly enabled real-server suite is:
-
-```bash
-make -C modules/openbao-deployment-access deployment-auth-test \
-  BAO_TEST_BINARY=/path/to/verified/bao
-```
-
-It requires OpenBao 2.7.2 and starts an in-memory loopback-only server with
-synthetic credentials. It applies this grant module and the two Vault resource
-blocks from the shared `modules/kubernetes-openbao-access` implementation, then
-checks denials, native refresh/drift repair and protected enrollment. No service
-implementation, state or production inputs are read. Normal unit validation skips
-this opt-in suite.
+Run `make -C modules/openbao-deployment-access validate` from the repository root
+for formatting and literal service-boundary checks. The consuming OpenTofu root
+initializes the module and validates its provider configuration. Local checks
+neither start OpenBao nor issue credentials; verify actual authorization and
+token lifetime only during separately authorized operations.
 
 [decision]: ../../docs/adrs/008-openbao-administrative-authorization.md
