@@ -475,8 +475,8 @@ incus exec <remote-name>:technitium-dns -- systemctl status dns --no-pager
 incus exec <remote-name>:technitium-dns -- journalctl -u dns --no-pager
 ```
 
-If clients cannot resolve names, confirm DHCP, VLAN policy, and UDP/TCP port
-`53`. For API errors, confirm the authorized secure path, certificate trust,
+If clients cannot resolve names, confirm DHCP, VLAN policy, and the configured
+DNS query paths. For API errors, confirm the authorized secure path, certificate trust,
 admin token, and explicit endpoint; do not enable bypasses or reset listeners.
 Changing `cloud-init.user-data` does not rerun it on an existing instance.
 

@@ -256,13 +256,14 @@ selectors and hostname spread. Apply only under runtime-test authorization; prov
 both Intel/AMD execution and pod/HTTP connectivity, not just Ready status. Without
 verified eligibility isolated pods must remain Pending; missing handlers must
 fail sandbox creation, never fall back to runc. Delete the example namespace
-afterwards. Record evidence in ALE-29, not a permanent migration-test harness.
+afterwards. Retain sanitized qualification results and keep raw evidence private.
 
-Root-filesystem examples are not production NFS or workload-secret qualification.
-TrueNAS export/permissions, CSI/Retain, OpenBao workload auth/reviewer lifecycle,
-application reload and socket/MCS limits still need approved qualification. A VMM
-label alone does not establish complete socket separation. Never weaken SELinux
-or introduce a custom Kata build to hide failure.
+Root-filesystem examples cover only ephemeral volumes. The separate
+[NFS](NFS.md) and [mounted-secret](SECRETS.md) guides record their real-backend
+qualification and remaining limits. New runtime versions still need volume and
+application-reload checks. Socket/MCS separation remains a residual limit;
+a VMM label alone does not establish complete socket separation. Never weaken
+SELinux or introduce a custom Kata build to hide failure.
 
 ## Maintenance And Replacement
 

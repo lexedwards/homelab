@@ -7,7 +7,7 @@ Live health and firewall configuration are outside the scope of these views.
 The diagram labels distinguish the available evidence:
 
 - Defined: declared in repository configuration; live deployment is unverified.
-- Recorded: operating documentation or linked issues report deployment or
+- Recorded: operating documentation reports deployment or
   qualification. Current health has not been rechecked.
 - Operator-confirmed: the operator supplied the role or placement. Packaging and
   recovery still need their own evidence.
@@ -163,6 +163,7 @@ flowchart TB
             workstation["Arch Linux workstation<br/>GPU passthrough<br/>Operator-confirmed"]
         end
         subgraph store["store — physical Proxmox host"]
+            storage["TrueNAS VM / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Placement recorded"]
             sw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
             warehouse["Warehouse VM / Docker Compose<br/>Mimir, Loki, Tempo<br/>Defined default placement"]
             images["Image Catalogue<br/>Defined VM templates; not applications"]
@@ -170,7 +171,6 @@ flowchart TB
             roon["Roon<br/>Operator-confirmed; guest type unverified"]
         end
         subgraph unknown["Placement unverified"]
-            storage["TrueNAS mass storage / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Store failure domain recorded in runbooks"]
             rustfs["RustFS object storage<br/>Operator-owned; placement unverified"]
             backupnfs["Observability NFS backup destination<br/>Backend unverified"]
             proxy["Nginx Service Proxy + CrowdSec<br/>Colocation operator-confirmed"]
@@ -210,22 +210,7 @@ membership. Coordinator hardware and placement still need documenting.
 
 ## Maintaining these views
 
-Edit Mermaid fences in this file; GitHub renders them in place. No public diagram
-renderer or hosted documentation service is required. For a local render, run
-this from the repository root with Node.js/npm and the Mermaid CLI's supported
-browser dependencies available:
-
-```bash
-mkdir -p /tmp/opencode/homelab-diagrams
-npm exec --yes --package=@mermaid-js/mermaid-cli@12.2.0 -- \
-  mmdc -i docs/architecture.md -o /tmp/opencode/homelab-diagrams/architecture.md
-```
-
-The first run needs network access to download tooling and its browser. Rendering
-runs locally and writes temporary output outside Git. Keep the source in this
-file and do not send topology to a public renderer.
-
-Update affected views alongside infrastructure changes, using the root overview
-and service documentation. Review names, ownership, placement, status,
-and dependency meaning across views. Rendering checks syntax. Architecture
-accuracy needs review, and service health needs live checks.
+Edit the Mermaid source alongside relevant infrastructure changes; GitHub renders
+the diagrams in place. Review the rendered views, links, and privacy before merging.
+Keep names, ownership, placement, status, and dependencies consistent with the root
+overview and service documentation. Current service health requires live checks.

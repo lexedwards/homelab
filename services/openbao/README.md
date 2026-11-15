@@ -65,8 +65,9 @@ make validate
 Validation runs format/OpenTofu checks, YAML template linting, installer and
 deploy-hook syntax checks, mocked provider plans, rendered cloud-init assertions
 and readiness unit tests. It does not contact infrastructure, issue certificates,
-start OpenBao or prove guest systemd/cgroup behavior. Operational acceptance and
-rollout history remain in [ALE-41][ale-41], separate from local validation.
+start OpenBao or prove guest systemd/cgroup behavior. The existing service has
+passed authenticated HTTPS access and real certificate renewal/reload checks;
+local validation does not repeat those runtime checks.
 
 OpenBao 2.7.2 is installed from the upstream ARM64 DEB. The version and SHA-256
 are kept together in `main.tf`. Before changing either, verify the release
@@ -220,7 +221,7 @@ roles belong with the owning service, like its DNS records. Shared secret-engine
 mounts and authentication backends are platform-owned. Every object has one
 OpenTofu owner; do not create a second writer in a central root.
 
-This initial hosting slice does not configure the OpenBao API through OpenTofu.
+This hosting root does not configure the OpenBao API through OpenTofu.
 API configuration requires initialization/unseal and a separate scoped identity.
 The Kubernetes service's separate API runtime root owns its optional native Kubernetes-auth platform and
 consumes this root's published `api_endpoint` output, never this service's state.
@@ -335,4 +336,3 @@ using the matching old binary and snapshot.
 [Micro Node]: ../../hosts/micro-node/README.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
 [deployment-access]: ../../modules/openbao-deployment-access/README.md
-[ale-41]: https://linear.app/lexedwards/issue/ALE-41/enable-native-https-for-openbao-using-cloudflare-dns-01

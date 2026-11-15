@@ -29,8 +29,10 @@ Classify each value before choosing its input channel:
 
 Do not promote ignored or untracked values into repository conventions. Preserve
 useful architecture already established in tracked files rather than treating
-every hostname-like string or identifier as secret. Loopback addresses are fine
-for in-guest readiness checks.
+every hostname-like string or identifier as secret. Read the
+[documentation privacy rule](../../../README.md) before writing prose, diagrams,
+or examples. Loopback literals may be used in readiness implementation, but
+documentation must use private-input placeholders.
 
 Never disclose secrets. Never commit state, saved plans, rendered first-boot data,
 populated local tfvars, credential files, or environment files containing protected

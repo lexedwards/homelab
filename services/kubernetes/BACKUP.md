@@ -1,8 +1,8 @@
 # Off-node etcd Backups
 
 The [isolated restore lab](restore-lab/README.md) contains an experimental
-scratch-VM procedure, not a qualified recovery path. Its ALE-32 experiment failed;
-the operator accepted unproven recovery and deferred a smaller proof to ALE-55.
+scratch-VM procedure, not a qualified recovery path. The restore experiment failed;
+the operator accepted unproven recovery and deferred a smaller proof.
 The failed VM was removed. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade,
 outage and recovery-decision gates; do not assume a backup guarantees rollback.
 

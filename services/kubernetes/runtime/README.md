@@ -5,8 +5,8 @@ parent VM/provisioning state. Kubernetes or OpenBao API outages therefore do not
 prevent planning VM recovery in the parent root. See [the decision][decision] and
 [mounted-secret operations][secrets] for ownership, inputs and apply phases.
 
-All persisted operations run from canonical
-`/home/alex/sourcecode/homelab/services/kubernetes/runtime` on `main`. This root has
+All persisted operations run from the canonical checkout's
+`services/kubernetes/runtime` directory on `main`. This root has
 its own protected `terraform.tfstate`; preserve the existing parent Kubernetes
 and sibling OpenBao states. Nothing is migrated or split out of those states:
 the earlier API rollout was paused before creating any managed runtime objects.
@@ -32,7 +32,7 @@ or refresh this root's auth resources; authorization remains administrative.
 Optional `recovery_custody` similarly defines only two fingerprint-addressed
 recovery records and their separate bounded writer/issuer, after checking the
 initialized cluster UID. It grants no workload read access and populates nothing.
-See [backup custody and host operations](../BACKUP.md); daily native backups do
+See [backup custody and host operations](../BACKUP.md); six-hour native backups do
 not depend on this API-managed authorization stage being available.
 
 Reusable implementations live in repository-level `modules/`; this root imports
@@ -69,5 +69,5 @@ This changes cluster DNS configuration, not upstream DNS records, firewall rules
 guest resolvers or OpenBao ownership. Disabling the input is destruction-guarded;
 review rollback explicitly rather than deleting the config out of band.
 
-[decision]: ../../../docs/adrs/006-kubernetes-runtime-state-boundary.md
+[decision]: ../../../docs/adrs/010-kubernetes-runtime-state-boundary.md
 [secrets]: ../SECRETS.md

@@ -127,11 +127,12 @@ service-owned DNS. Initialization and unseal remain operator-managed.
 
 TrueNAS is the mass-storage system. It exposes NFS and SMB shares, providing
 persistent storage for Kubernetes workloads that use NFS, Jellyfin's media, and
-Roon's music. Observability also requires an NFS backup destination. RustFS
-provides object storage for telemetry and Kubernetes snapshots. Exact placement,
-share layout, and recovery coverage remain unverified. The share protocols used
-by Jellyfin and Roon, and the backend of observability's NFS destination, also need
-confirming.
+Roon's music. TrueNAS runs as an operator-managed VM on `store`, as recorded in
+[NFS qualification](services/kubernetes/NFS.md). Observability also requires an
+NFS backup destination. RustFS provides object storage for telemetry and Kubernetes
+snapshots; its placement remains unverified. Storage share layouts, independent
+backup/recovery coverage, Jellyfin/Roon share protocols, and the backend of
+observability's NFS destination still need confirming.
 
 ### Kubernetes
 
@@ -203,4 +204,3 @@ UPS coverage and shutdown/restart coordination remain unverified.
 and links to the relevant runbooks. Host READMEs cover host preparation; service
 READMEs own service procedures; module READMEs describe shared implementation
 contracts. [Architecture decision records](docs/adrs/) preserve design rationale.
-Deployment evidence and review records stay in the linked issues and PRs.

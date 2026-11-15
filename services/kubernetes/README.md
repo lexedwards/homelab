@@ -6,8 +6,7 @@ worker on each physical host. [Worker enrollment and runtime operations][workers
 are separate from first-boot provisioning. VLAN service pools, application policy
 and NFS storage retain their explicit rollout boundaries. OpenBao workload-secret
 delivery has a separately enabled [API runtime root](runtime/README.md) alongside it.
-Implementation context and qualification gates
-remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
+Durable rationale is in the [ADRs][adrs].
 
 [Workload network policy](NETWORK-POLICY.md) provides an explicitly scoped
 namespace baseline, synthetic examples and bounded direct-peer checks. It is not
@@ -29,8 +28,13 @@ APIs are unavailable. It preserves bootstrap and keeps actual values
 and credentials outside state/plans. Offline tools remain inspection helpers,
 not competing live owners. Enabling the layer requires separate reviewed applies.
 
-**Validation is local evidence, not deployment evidence.** First-boot and restart
-acceptance is recorded separately in ALE-28.
+Local validation does not contact infrastructure. The deployed server passed
+DHCP-only first boot, healthy single-member etcd, control-plane scheduling
+restriction, and initialized-datastore guest reboot checks.
+The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
+[exposure](SERVICE-EXPOSURE.md), [NFS](NFS.md), and [secret](SECRETS.md) guides
+describe their qualification results and limits. Recorded results do not replace
+fresh health checks before maintenance.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
 workflow, protected recovery-custody boundary and six-hour timer. They do not
@@ -225,8 +229,8 @@ Before accepting bootstrap, separately inspect actual single-member etcd
 membership using the installed RKE2 version's documented etcd administration
 procedure, and run the authorized untolerated-workload scheduling rejection
 check. A Ready API or one static etcd pod is not membership evidence. Record those
-results against the reviewed revision; do not mark ALE-28 complete based solely
-on local tests or this checker.
+results against the reviewed revision. Local tests and this checker alone do not
+establish bootstrap acceptance.
 
 ## Ownership and network boundary
 
@@ -244,8 +248,10 @@ selects kube-proxy replacement, VXLAN, Kubernetes IPAM and host-namespace-only
 socket load balancing for later Kata compatibility. The single server gets an
 explicit control-plane NoSchedule taint while critical components can tolerate it.
 Managed ingress options are disabled; no competing CNI, kube-proxy or application
-ingress controller is installed. This slice creates no LoadBalancer pools or L2
-announcement policy and does not attach ordinary pods directly to LAN VLANs.
+ingress controller is installed. Default bootstrap creates no LoadBalancer pools
+or L2 announcement policy. The separately enabled [service-exposure](SERVICE-EXPOSURE.md)
+outputs manage that runtime configuration without changing first-boot bytes.
+Ordinary pods are not attached directly to LAN VLANs.
 
 Keep VM infrastructure and workload lifecycle separate: this root authors the
 minimum bootstrap configuration; subsequent platform manifests are a separately
@@ -257,7 +263,7 @@ reviewed operating procedure instead of assuming snippet upload updated the gues
 | Dependency | Required path |
 | --- | --- |
 | Administrators | SSH and Kubernetes API through the stable private identity |
-| Future workers/servers | API and supervisor/registration listeners |
+| Workers and additional servers | API and supervisor/registration listeners |
 | Node/CNI communication | RKE2/Cilium documented node paths, including kubelet and VXLAN where needed |
 | Additional etcd servers later | Server-only etcd peer/client listeners; not public/workload access |
 | First-boot outbound | Approved DNS/NTP, distribution/Rancher HTTPS package repos and release/container registries |
@@ -265,8 +271,8 @@ reviewed operating procedure instead of assuming snippet upload updated the gues
 Use existing routing/firewall ownership; do not expose these management ports to
 untrusted clients. Resolve exact listener values from protected configuration.
 First-boot failure must not be repaired by disabling firewall
-or SELinux globally. Service exposure/policy and cross-worker verification are
-later slices.
+or SELinux globally. Use the linked policy/exposure procedures for their separate
+rollout and cross-worker checks.
 
 ## Credentials, data and recovery
 
@@ -276,8 +282,10 @@ plus an independently accessible Proton Pass recovery copy. Do not print it in
 normal outputs, paste it into tickets, supply it as an OpenTofu variable or rely
 on an in-cluster controller. Retain the token material associated with retained
 snapshots; the newest token is not assumed sufficient for every recovery point.
-OpenBao HTTPS delivery precedes real secret enrollment. This root does not yet
-configure OpenBao, snapshots, RustFS credentials, NFS or alerts.
+OpenBao HTTPS delivery precedes real secret enrollment. The separate API runtime
+root owns OpenBao workload authorization. NFS and service-exposure outputs have
+their own native deployment procedures; off-node snapshots use the separately
+installed backup workflow. Alert delivery remains undecided.
 
 Irreplaceable control-plane data, bootstrap/certificate material and the token
 live on the VM OS disk. VM protection prevents ordinary destroy, not storage
@@ -291,9 +299,9 @@ corresponding RKE2 recovery material.
 The backup policy is six-hour snapshots retained fourteen days
 in a dedicated off-node bucket, verified TLS and independent credential custody.
 Approximately four hours is a planning recovery target, not an SLA or tested
-restore duration. Off-node backup and scheduled execution evidence is recorded
-in ALE-32, but the isolated restore experiment failed. The operator accepted
-unproven recovery and deferred a smaller lab to ALE-55. Do not call this server
+restore duration. Off-node backup and scheduled execution were verified, but the
+isolated restore experiment failed. The operator accepted unproven recovery and
+deferred a smaller lab. Do not call this server
 restore-qualified or assume a snapshot is a proven rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 
@@ -304,20 +312,17 @@ stop/recovery decisions and post-maintenance checks. Documentation is not runtim
 authorization or evidence that an upgrade/outage exercise passed.
 
 Expect API/scheduling/reconciliation downtime for a single-server restart or
-`compute` outage. Enablement persists across boot, but actual restart/rejoin must
-still be verified against this implementation without reconstructing etcd.
+`compute` outage. The initialized server passed guest-reboot checks; repeat
+identity/health checks after future maintenance without reconstructing etcd.
 Initial bootstrap failure may recreate only reviewed newly owned resources;
 after useful data exists, use an authorized isolated restore, not VM deletion,
 `cluster-reset` against production or an unreviewed package downgrade.
 
 ### Recovering an earlier failed first boot
 
-Changing the cloud-init snippet does not repair an existing guest. Plan recovery
-separately from merging these changes, preserving the VM, its current MAC/lease
-and canonical state. The NIC MAC is computed by the provider, not configured by
-this root; still reject an unexpected MAC change or VM replacement in the next
-reviewed plan. Remove any old `control_plane.mac_address` and
-`control_plane.ipv4_address` entries from local inputs; neither is consumed.
+Changing the cloud-init snippet does not repair an existing guest. Review recovery
+separately, preserving the VM, its current MAC/lease and canonical state. Proxmox
+allocates the MAC; reject an unexpected identity change or VM replacement.
 
 Adding or changing custom network-data can propose VM replacement through the
 provider's cloud-init lifecycle. It does not update an existing guest's active
@@ -327,14 +332,13 @@ an initialized datastore without explicit approval for downtime and deletion of
 the current guest data.
 
 For a failure before RKE2 installation, first confirm there is no useful etcd
-data and that RKE2 is stopped. An authorized in-place recovery must update the
-installer, preflight and rendered RKE2/Cilium configuration together, removing
-the old helper and its identity files only after their callers are removed.
+data and that RKE2 is stopped. An authorized in-place recovery must keep the
+installer, preflight and rendered RKE2/Cilium configuration consistent.
 The installer remains first-boot-only: do not rerun cloud-init or use it to
 upgrade an initialized datastore. Inspect installation success, explicitly
 authorize the kernel reboot, then qualify API/DNS/Cilium, etcd membership,
 scheduling isolation and restart/rejoin. Neither a successful apply nor these
-local tests establish that the existing failed guest has recovered.
+local tests establish that a failed guest has recovered.
 
 ### HA expansion
 

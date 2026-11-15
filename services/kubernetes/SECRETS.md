@@ -13,7 +13,13 @@ the owning service. Populate actual values through a protected enrollment
 workflow that does not persist them in Git, OpenTofu state, saved plans or logs.
 The offline `prepare-secret-auth.py` and `prepare-secrets-csi.py` tools remain
 useful for inspection/render checks, **not as a second live configuration owner**.
-Production qualification remains in ALE-49.
+Qualification passed real-endpoint ordinary/Kata delivery on both workers,
+non-root read-only access, rotation with actual application reload,
+authorization denial/expiry, consumer/provider recreation, and a drained worker
+reboot. Scoped synthetic endpoint unavailability preserved existing files while
+fresh mounts failed; the same fresh pods recovered after the endpoint was restored.
+An earlier network-denial attempt was inconclusive. Actual OpenBao seal and real
+backend network-outage behavior remain unproven.
 
 ## Declarative deployment
 
@@ -58,9 +64,10 @@ No persisted apply runs from a feature worktree.
 
 The API-compatible `hashicorp/vault` provider manages OpenBao's native Kubernetes
 auth method, not a different authentication protocol. The pinned provider schema
-was checked; real OpenBao compatibility and authorization still need runtime
-qualification. Child-token creation and TLS bypass are disabled. Give the setup
-identity only the required auth-method/role/policy configuration permissions;
+and deployed qualification path have been checked; new versions or consuming
+services need their own runtime qualification. Child-token creation and TLS bypass
+are disabled. Give the setup identity only the required auth-method/role/policy
+configuration permissions;
 it does not need application-value read/write access for these resources.
 
 An enabled platform apply manages the guarded host prerequisite, capability
@@ -318,9 +325,9 @@ issued-token lifecycle without removing the shared mount or ClusterRole.
 `platform/secrets-csi.yaml.tftpl` is a blueprint, **not an installable manifest**.
 It selects Secrets Store CSI Driver **1.6.2**, OpenBao chart **0.30.7** with only
 provider **2.0.3**, and digest-pinned driver, registrar, liveness and provider
-images. The qualification application image is pinned too. Versions retain the
-earlier synthetic compatibility baseline; this is not production acceptance or
-a claim that every selected version is the latest release.
+images. The qualification application image is pinned too. These are the versions
+used by the completed qualification. New releases need their own review and
+compatibility checks.
 
 Chart archives are not stored in Git. With the platform enabled, normal runtime
 planning downloads both pinned HTTPS release URLs from the blueprint annotations
@@ -512,4 +519,4 @@ disposition. Preserve the existing NFS witness claim and shared platform objects
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
 [deployment-credentials]: ../../modules/openbao-deployment-access/README.md#protected-credential-operations
-[runtime-state]: ../../docs/adrs/006-kubernetes-runtime-state-boundary.md
+[runtime-state]: ../../docs/adrs/010-kubernetes-runtime-state-boundary.md

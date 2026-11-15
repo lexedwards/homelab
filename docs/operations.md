@@ -35,8 +35,10 @@ Check each affected consumer's data and credential requirements:
   targets after a service change.
 
 The [restore lab](../services/kubernetes/restore-lab/README.md#recovery-inputs)
-records RustFS's OpenBao KMS dependency. Resolve key availability before choosing
-an order that requires one service to restore the other. The exact shared storage
+records RustFS's OpenBao KMS dependency. Encrypted snapshot retrieval currently
+requires the functioning external KMS. Independent OpenBao/key recovery remains
+deferred. Resolve key availability before choosing an order that requires one
+service to restore the other. The exact shared storage
 layout, encryption recovery arrangements, and application backup coverage remain
 unverified.
 
@@ -46,7 +48,7 @@ unverified.
 | --- | --- |
 | `micro-node` loss | Removes its hosted services, including local DNS, OpenBao, monitoring, exit-node access, and the external quorum voter if deployed. Proxmox/data hosts surviving does not preserve these functions. Quorum outcome depends on the remaining votes. |
 | `compute` loss | Removes the sole defined control plane, compute worker, default collector/Grafana placement, Home Assistant, and workstation. Workloads surviving on `store` may keep serving requests while scheduling and cluster management are unavailable. |
-| `store` loss | Removes its worker, default warehouse placement, Jellyfin and Roon. Existing Kubernetes runbooks associate TrueNAS-backed data loss with this host failure; do not assume storage independence. |
+| `store` loss | Removes its worker, default warehouse placement, Jellyfin, Roon, and the TrueNAS VM. Its NFS-backed workloads and media consumers lose storage access. |
 | DNS or upstream network loss | Can block new connections, bootstrap, administration, upstream access, and certificate renewal. IP-only or cached success does not qualify recovery. |
 | TrueNAS loss | Disrupts NFS-backed Kubernetes volumes and access to Jellyfin media and Roon music. NFS/SMB clients lose their relevant shares. Exact shared physical failure domains remain unverified. |
 | RustFS loss | Affects telemetry object storage and Kubernetes snapshot availability. Its placement and relationship to TrueNAS remain unverified. |
@@ -86,8 +88,7 @@ Keep connection values and raw evidence private.
 
 - [Kubernetes lifecycle](../services/kubernetes/LIFECYCLE.md): recorded worker
   maintenance and off-node backup evidence; upgrades and host-loss procedures are
-  unrehearsed. Isolated restoration failed and remains unproven; ALE-55 owns the
-  follow-up.
+  unrehearsed. Isolated restoration failed and remains unproven.
 - [Kubernetes backups](../services/kubernetes/BACKUP.md), [restore lab](../services/kubernetes/restore-lab/README.md),
   [NFS](../services/kubernetes/NFS.md), and [mounted secrets](../services/kubernetes/SECRETS.md).
 - [OpenBao](../services/openbao/README.md): initialized-service protection,

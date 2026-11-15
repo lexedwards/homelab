@@ -2,7 +2,15 @@
 
 This integration uses the existing external TrueNAS server and stock NFS CSI
 4.13.6. It does not create datasets/exports, enforce a server quota or apply
-Kubernetes resources through OpenTofu. ALE-48 owns real-backend qualification.
+Kubernetes resources through OpenTofu.
+
+The backend is the existing TrueNAS VM on `store`. Qualification passed
+ordinary/Kata read/write tests on both workers, consumer recreation, drained
+worker reboot/remount, guarded Retain rebinding, and post-interruption witness
+integrity. Measured outage duration, unaffected peer-worker service, and full NAS
+restart/grace behavior remain unqualified. The operator accepted those limits.
+The recovered witness claim and data were deliberately retained with consumers
+stopped; cleanup needs its own approval.
 
 ## Ownership And Access
 
@@ -182,7 +190,8 @@ Loss of store/TrueNAS makes these volumes unavailable. There is no storage HA,
 per-PVC quota, database-consistency proof or independent application-data backup
 in this integration. CSI snapshot controllers/classes are disabled; etcd snapshots
 do not contain NFS file contents. The operator owns TrueNAS quota/snapshots and
-separately approved application-consistent backups; ALE-32 owns cluster recovery.
+separately approved application-consistent backups. Use the
+[cluster lifecycle runbooks](LIFECYCLE.md) for control-plane recovery boundaries.
 
 Troubleshoot API/CSI readiness and PV/PVC events first, then driver registration,
 actual mount path/options, export reachability, root mapping and UID/GID/mode,
