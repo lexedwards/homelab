@@ -15,6 +15,9 @@ implementation reference.
    templates demonstrate native APT, deferred writes and provider-composed MIME;
    the warehouse still has legacy credential inputs that must not be copied.
    Its full-control VM resource is not the default for every new clone.
+   `services/kubernetes/cloud-init.tf` demonstrates the Rocky/RKE2 alternative:
+   native distribution packages and signed `yum_repos`, with a bounded explicit
+   install command preserving RKE2 repository exclusions and reboot/token gates.
 4. Inspect the schema of the provider version pinned by current roots before
    using an argument not present in those examples.
 

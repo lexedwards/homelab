@@ -139,6 +139,12 @@ layout. Revalidate this mapping if the image or PCI/NIC layout changes. Workers
 use separate primary network-data and a native secondary NetworkManager profile;
 see the worker runbook for the renderer limitation and required reboot boundary.
 
+The pinned HashiCorp cloudinit provider composes plain MIME user-data; network-data
+stays separate. `cloud-init/node-baseline.yaml.tftpl` is shared by the server,
+workers and isolated restore lab. It declares distribution packages, signed EL10
+repositories, the reviewed Rancher key, module/sysctl files and tmpfiles rules.
+Role templates retain identity, SSH, RKE2 configuration and activation gates.
+
 Cloud-init creates the approved non-root administrator, replaces that user's
 authorized-key file with the reviewed operator keys, disables root/password SSH
 and installs/enables the QEMU guest agent. It writes the API identity,
@@ -146,21 +152,28 @@ internal CIDRs, server taint and managed-Cilium configuration before
 starting the cluster. No Kubernetes token, kubeconfig or private certificate is
 supplied to OpenTofu/cloud-init; initial RKE2 startup generates them in the guest.
 
-The root-only installer:
+Native cloud-init installs the distribution kernel/module prerequisites, audit
+and SELinux tooling; workers also receive NFS client tools. The remaining
+root-only first-boot procedure:
 
 1. Requires Rocky 10 amd64 and SELinux enforcing; refuses an existing etcd data
    directory rather than treating first boot as an upgrade/restore tool.
-2. Installs the distribution kernel/module prerequisites and exact RKE2
-   server/common/SELinux version-release packages from persistent EL10 repos.
-3. Downloads the Rancher signing key over HTTPS and checks a pinned SHA-256 before
-   import; both package and repository signature checks remain enabled. The key's
+2. Checks that the declared prerequisites are installed, then installs exact RKE2
+   server/common/SELinux version-release packages, overriding only the two native
+   repositories' RKE2 exclusions for that command. Cloud-init's package module
+   cannot supply those repository-specific overrides; keeping this bounded command
+   avoids weakening the persistent update policy.
+3. Uses the reviewed key from `config/rancher-signing-key.asc`; both package and
+   repository signature checks remain enabled. The key's
    reviewed primary fingerprint is `C8CFF216455126E9B9C918BE925EA29AE257814A`.
-   Its pinned digest was obtained from the HTTPS publisher; this is not an
-   independent release-signature verification. A key rotation fails closed and
-   needs an explicit reviewed digest update.
-4. Writes persistent module-loading and forwarding settings, disables guest swap,
-   preserves SELinux labels and excludes Cilium interfaces from NetworkManager
-   management. It does not load newly installed modules into the template's old
+   SHA-256 is `7d2415f7fc532c365c8874bfad966566daaa0d04a9a5ba14d1db6080a9c12629`,
+   matching the previously pinned HTTPS publisher download. This is not an
+   independent release attestation. Repository key rotation fails closed and needs
+   a reviewed key-file update, not a new download trusted during boot.
+4. Disables guest swap, applies declared directory/file permissions with native
+   systemd-tmpfiles and preserves SELinux labels. Module-loading, forwarding and
+   NetworkManager exclusions are declared before installation, not written by the
+   procedure. It does not load newly installed modules into the template's old
    running kernel, or disable SELinux or the guest firewall.
 5. Enables the RKE2 server and creates an installation marker only on success.
    The systemd unit requires that marker. Cloud-init then reboots the guest into
@@ -170,7 +183,7 @@ The root-only installer:
    failed sysctl causes startup to fail rather than continuing without it.
 
 The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
-installer command clears those two repository exclusions while selecting exact
+first-boot command clears those two repository exclusions while selecting exact
 versions. This is not an upgrade procedure: use the later reviewed server-first
 upgrade workflow, and never rerun first-boot provisioning against useful etcd data.
 OS kernel updates remain distinct and can require planned guest reboots.

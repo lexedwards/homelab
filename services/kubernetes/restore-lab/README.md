@@ -17,7 +17,10 @@ production control plane.
 
 Provision prerequisites with `fenced = false` only while the VM has no recovery
 data. The unique `k8s-restore-` hostname must not match any production node.
-The reviewed first-boot installer uses signed, pinned RKE2/SELinux RPMs, disables
+Provider-composed user-data uses the service's shared native node baseline for
+distribution dependencies, signed repositories and static files. The lab retains
+its independently pinned restore version and separate service fence.
+The reviewed first-boot procedure uses signed, pinned RKE2/SELinux RPMs, disables
 the server service and preloads the checksum-pinned core image archive. Its
 systemd condition also prevents startup until the restore runner creates the
 runtime fence marker. Check cloud-init completion and the prepared marker through

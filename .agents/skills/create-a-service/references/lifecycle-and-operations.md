@@ -18,7 +18,8 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   package pins and key/checksum provenance. Do not pipe a mutable remote installer
   into a shell when a supported declarative path exists.
 - Keep only imperative steps addressing a demonstrated native gap, with one
-  bounded purpose. Do not move a mixed installer into another data channel.
+  bounded purpose. Do not move a mixed installer into another data channel or
+  weaken repository update exclusions just to fit the native package module.
 - Write repository policy and systemd start conditions before package installation;
   package scripts may otherwise start daemons with default configuration. Use
   deferred writes only when package-created users/groups exist by that stage.

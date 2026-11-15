@@ -41,6 +41,7 @@ test:
 	$(TOFU) test
 
 yaml-validate:
+	$(YAMLLINT) cloud-init/node-baseline.yaml.tftpl
 	$(YAMLLINT) cloud-init/user-data.tftpl
 	$(YAMLLINT) cloud-init/network-data.yaml
 	$(YAMLLINT) cloud-init/worker-user-data.tftpl

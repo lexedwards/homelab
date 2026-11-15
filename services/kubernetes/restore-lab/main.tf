@@ -12,6 +12,10 @@ provider "proxmox" {
 }
 
 locals {
+  node_baseline = yamldecode(templatefile("${path.module}/../cloud-init/node-baseline.yaml.tftpl", {
+    rke2_minor  = "1.36"
+    signing_key = file("${path.module}/../config/rancher-signing-key.asc")
+  }))
   user_data = templatefile("${path.module}/user-data.tftpl", {
     name                        = var.lab.name
     cloud_user                  = var.lab.cloud_user
@@ -24,13 +28,26 @@ locals {
   })
 }
 
+data "cloudinit_config" "bootstrap" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "kubernetes-restore-lab.yaml"
+    content_type = "text/cloud-config"
+    content = "#cloud-config\n${yamlencode(merge(local.node_baseline, yamldecode(local.user_data), {
+      write_files = concat(local.node_baseline.write_files, yamldecode(local.user_data).write_files)
+    }))}"
+  }
+}
+
 resource "proxmox_virtual_environment_file" "bootstrap" {
   node_name    = var.host.node
   datastore_id = var.host.snippet_datastore_id
   content_type = "snippets"
   source_raw {
     file_name = "${var.lab.name}-cloud-config.yaml"
-    data      = local.user_data
+    data      = data.cloudinit_config.bootstrap.rendered
   }
   lifecycle {
     ignore_changes = [source_raw[0].data]

@@ -1,0 +1,58 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - python3
+  - iproute
+  - qemu-guest-agent
+  - kernel
+  - kernel-core
+  - kernel-modules
+  - kernel-modules-extra
+  - audit
+  - policycoreutils-python-utils
+
+yum_repos:
+  rancher-rke2-common-stable:
+    name: Rancher RKE2 Common (stable)
+    baseurl: https://rpm.rancher.io/rke2/stable/common/centos/10/noarch
+    enabled: true
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2
+    excludepkgs: rke2*
+  rancher-rke2-${rke2_minor}-stable:
+    name: Rancher RKE2 ${rke2_minor} (stable)
+    baseurl: https://rpm.rancher.io/rke2/stable/${rke2_minor}/centos/10/x86_64
+    enabled: true
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2
+    excludepkgs: rke2*
+
+write_files:
+  - path: /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2
+    owner: root:root
+    permissions: "0644"
+    content: ${jsonencode(signing_key)}
+  - path: /etc/modules-load.d/kubernetes.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      overlay
+      br_netfilter
+      nf_conntrack
+  - path: /etc/sysctl.d/90-kubernetes.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      net.ipv4.ip_forward=1
+      net.bridge.bridge-nf-call-iptables=1
+      net.bridge.bridge-nf-call-ip6tables=1
+  - path: /etc/tmpfiles.d/kubernetes-rke2.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      d /etc/rancher/rke2             0700 root root - -
+      z /etc/rancher/rke2/config.yaml 0600 root root - -
