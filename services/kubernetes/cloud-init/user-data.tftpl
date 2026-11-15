@@ -12,14 +12,6 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys: ${jsonencode(public_keys)}
 
-package_update: true
-packages:
-  - ca-certificates
-  - curl
-  - python3
-  - iproute
-  - qemu-guest-agent
-
 write_files:
   - path: /usr/local/sbin/install-kubernetes-server
     owner: root:root

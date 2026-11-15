@@ -102,7 +102,7 @@ resource "proxmox_virtual_environment_file" "control_plane" {
   datastore_id = local.compute.snippet_datastore_id
   content_type = "snippets"
   source_raw {
-    data      = local.cloud_init
+    data      = data.cloudinit_config.control_plane.rendered
     file_name = "kubernetes-control-plane-cloud-config.yaml"
   }
 }

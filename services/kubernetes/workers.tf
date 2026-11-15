@@ -31,7 +31,7 @@ resource "proxmox_virtual_environment_file" "worker" {
   datastore_id = var.proxmox_nodes[each.key].snippet_datastore_id
   content_type = "snippets"
   source_raw {
-    data      = local.worker_cloud_init[each.key]
+    data      = data.cloudinit_config.worker[each.key].rendered
     file_name = "kubernetes-worker-cloud-config.yaml"
   }
 }
