@@ -6,7 +6,10 @@ service for the Micro Node and Incus.
 ## Read Current Evidence
 
 1. Read `hosts/micro-node/README.md` for the host/service boundary, trusted
-   client workflow, `default` storage pool, and unmanaged `br0` bridge.
+   client workflow, `default` storage pool, and unmanaged `br0` bridge. Its NoCloud
+   seed uses provider-composed MIME with a YAML validation sidecar; only the three
+   documented NoCloud files go on the boot partition. Never rerun host bootstrap
+   to maintain a populated Incus host.
 2. Read `services/hello-world/` for a small Incus baseline and `services/openbao/`
    for Debian 13 nesting, TLS-gated activation, a bounded verified-package helper
    and native tmpfiles ownership. Its initialization/unseal are separate operations.

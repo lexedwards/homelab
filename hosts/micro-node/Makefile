@@ -34,8 +34,8 @@ host-render:
 	$(TOFU) apply -auto-approve
 
 host-validate: host-render
-	$(YAMLLINT) cloud-init/rendered
-	$(CHECK_JSONSCHEMA) --force-filetype yaml --schemafile "$(CLOUD_CONFIG_SCHEMA)" cloud-init/rendered/user-data
+	$(YAMLLINT) cloud-init/rendered/meta-data cloud-init/rendered/network-config cloud-init/rendered/cloud-config.yaml
+	$(CHECK_JSONSCHEMA) --force-filetype yaml --schemafile "$(CLOUD_CONFIG_SCHEMA)" cloud-init/rendered/cloud-config.yaml
 	$(CHECK_JSONSCHEMA) --force-filetype yaml --schemafile "$(NETWORK_CONFIG_SCHEMA)" cloud-init/rendered/network-config
 
 host-seed: host-validate

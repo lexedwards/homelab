@@ -2,6 +2,15 @@ locals {
   management_address = split("/", var.management_address_cidr)[0]
   management_prefix  = split("/", var.management_address_cidr)[1]
   management_subnet  = "${cidrhost(var.management_address_cidr, 0)}/${local.management_prefix}"
+  user_data = templatefile("${path.module}/cloud-init/user-data.tftpl", {
+    admin_authorized_keys = var.admin_authorized_keys
+    admin_username        = var.admin_username
+    hostname_prefix       = var.hostname_prefix
+    management_address    = local.management_address
+    management_subnet     = local.management_subnet
+    management_vlan_id    = var.management_vlan_id
+    parent_interface      = var.parent_interface
+  })
 
   cloud_init_seed = {
     "meta-data" = "instance-id: ${jsonencode(var.instance_id)}\n"
@@ -12,20 +21,24 @@ locals {
       management_vlan_id      = var.management_vlan_id
       parent_interface        = var.parent_interface
     })
-    "user-data" = templatefile("${path.module}/cloud-init/user-data.tftpl", {
-      admin_authorized_keys = var.admin_authorized_keys
-      admin_username        = var.admin_username
-      hostname_prefix       = var.hostname_prefix
-      management_address    = local.management_address
-      management_subnet     = local.management_subnet
-      management_vlan_id    = var.management_vlan_id
-      parent_interface      = var.parent_interface
-    })
+    "user-data"         = data.cloudinit_config.user_data.rendered
+    "cloud-config.yaml" = local.user_data
+  }
+}
+
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "micro-node-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content      = local.user_data
   }
 }
 
 resource "local_sensitive_file" "cloud_init_seed" {
-  for_each = toset(["meta-data", "network-config", "user-data"])
+  for_each = toset(["meta-data", "network-config", "user-data", "cloud-config.yaml"])
 
   content              = local.cloud_init_seed[each.key]
   filename             = "${path.module}/cloud-init/rendered/${each.key}"
