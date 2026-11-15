@@ -1,29 +1,29 @@
 # Service and infrastructure inventory
 
-This is the canonical logical inventory for the architecture views. It is not
-live discovery. Reconcile it when placement, ownership, or deployment changes.
+The architecture views use this logical inventory. It draws on repository sources
+and operator input; no live discovery was performed. Update it when placement,
+ownership, or deployment changes.
 
 ## Reading status
 
-- **Defined:** tracked infrastructure declares the resource. This alone does not
-  establish deployment or health.
-- **Recorded:** existing operating documentation or linked issue evidence reports
-  deployment or qualification. This change has not rechecked the live service.
-- **Operator-confirmed:** the operator supplied its current role or placement
-  during ALE-47. Repository ownership and recovery testing are not implied.
-- **Unverified:** a dependency is referenced, but the relevant facts are unknown.
+- Defined: tracked infrastructure declares the resource. Its deployment and
+  health require separate evidence.
+- Recorded: existing operating documentation or linked issue evidence reports
+  deployment or qualification. Live status has not been rechecked.
+- Operator-confirmed: the operator supplied its current role or placement during
+  ALE-47. Repository ownership and recovery testing require separate confirmation.
+- Unverified: a dependency is referenced, but the relevant facts are unknown.
 
-Ownership and status are separate: operator-managed does not mean absent, and
-repository-managed does not mean deployed. No new live checks were performed for
-this inventory. There is no confirmed defined-but-not-deployed service list yet;
-do not interpret **Defined** as proof of non-deployment either.
+Ownership identifies who manages a service. Deployment status needs its own
+evidence, regardless of the owner. The live status of services labelled Defined
+remains unknown; there is no confirmed list of defined-but-not-deployed services.
 
 ## Repository-managed services
 
 | Service | Definition and state owner | Placement in definitions | Evidence and limits |
 | --- | --- | --- | --- |
 | Proxmox QDevice | [proxmox-qdevice](../services/proxmox-qdevice/README.md) | Incus instance on `micro-node` | Defined; cluster enrollment is operator-managed. Current vote/health not rechecked. |
-| Image Catalogue | [image-catalogue](../services/image-catalogue/README.md) | Proxmox VM templates on `store` | Defined; templates are provisioning inputs, not running applications. |
+| Image Catalogue | [image-catalogue](../services/image-catalogue/README.md) | Proxmox VM templates on `store` | Defined; templates supply images for provisioning VMs and do not run applications. |
 | Technitium DNS | [technitium-dns](../services/technitium-dns/README.md) | Incus instance on `micro-node` | Existing server/adoption recorded; completed imports and current health require their own evidence. Shared zones belong here; service records belong to their service roots. |
 | Uptime Kuma | [uptime-kuma](../services/uptime-kuma/README.md) | Docker application in an Incus instance on `micro-node` | Defined; monitors and application settings remain operator-managed. |
 | Tailscale Exit Node | [tailscale-exit-node](../services/tailscale-exit-node/README.md) | Incus instance on `micro-node` | Defined; enrollment, route approval, and tailnet policy remain operator-managed. |
@@ -32,8 +32,8 @@ do not interpret **Defined** as proof of non-deployment either.
 | Observability Warehouse | [observability-warehouse](../services/observability-warehouse/README.md) | Alloy collector and Grafana VMs on `compute`; Mimir/Loki/Tempo warehouse VM on `store` by default | Defined placement; actual local-input overrides and current health not rechecked. RustFS and NFS are external to this root. |
 | Hello World | [hello-world](../services/hello-world/README.md) | Incus instance on `micro-node` | Defined demonstration service; deployment status and continued use unverified. |
 
-Each service owns its deployment state. Shared implementation under `modules/`
-does not acquire ownership of callers' deployments. The Kubernetes API runtime
+Each service owns its deployment state, including resources created through
+shared implementation under `modules/`. The Kubernetes API runtime
 has separate state so an unavailable API does not prevent VM recovery.
 
 ## Operator-managed applications
@@ -50,7 +50,7 @@ unverified unless noted in future service guidance.
 | Roon | Music service with local device discovery | `store`; guest type unverified | Trusted; needed for discovery of devices such as wireless DACs |
 | Remote Workstation | Arch-based Linux with GPU passthrough | `compute`; guest details unverified | Unverified |
 
-No proxy route to a particular application is implied by this inventory.
+Proxy routes to individual applications remain unverified.
 
 ## Operator-managed infrastructure
 
@@ -64,18 +64,18 @@ No proxy route to a particular application is implied by this inventory.
 | APC UPS | Root README records power protection. | Protected equipment, power dependencies, shutdown coordination, and restart order. |
 | Recovery custody | [Backup runbook](../services/kubernetes/BACKUP.md) and [custody ADR](adrs/007-kubernetes-recovery-custody.md) require recovery material independent of Kubernetes. | Complete coverage for every service and independently tested retrieval. Never document secret values or sensitive artifact locations. |
 
-Unverified inventory is intentionally deferred for operator confirmation. It is
-not permission to discover live systems or change these dependencies.
+The operator has deferred confirmation of unknown inventory details. Live
+discovery and changes to these dependencies require separate approval.
 
 ## External systems
 
-- **Cloudflare and Let's Encrypt:** the OpenBao runbook records public DNS-01
+- Cloudflare and Let's Encrypt: the OpenBao runbook records public DNS-01
   certificate issuance. Proxy certificate-provider details are unverified; do not
   assume it uses the same integration.
-- **Tailscale:** external coordination and operator-owned tailnet policy support
+- Tailscale: external coordination and operator-owned tailnet policy support
   remote clients. The exit-node root does not manage the control plane.
-- **Upstream resolvers, time services, package repositories, image and release
-  registries:** provisioning and renewal depend on approved upstream services.
+- Upstream resolvers, time services, package repositories, image and release
+  registries: provisioning and renewal depend on approved upstream services.
   Exact configured providers remain private or unverified.
-- **Internet connectivity:** needed for relevant external integrations; provider,
+- Internet connectivity: needed for relevant external integrations; provider,
   physical equipment, and recovery arrangements remain unverified.

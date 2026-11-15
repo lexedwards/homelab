@@ -6,7 +6,7 @@ Infrastructure definitions and operating guidance for the homelab. Start with th
 
 Documentation uses logical service and subnet names. Addresses, port numbers,
 private DNS names, network identifiers, credentials, and raw operational evidence
-belong in protected operator records, not this repository's documentation.
+belong only in protected operator records.
 
 <!--toc:start-->
 - [Homelab Infrastructure and Services](#homelab-infrastructure-and-services)
@@ -153,10 +153,9 @@ Grafana runs in a separate visualization VM.
 
 ## Network
 
-UniFi provides the network platform. The IoT, Service, and Trusted subnets are
-logical boundaries, not a claim about their firewall rules. Routing, DHCP,
-reservations, and firewall policy remain operator-managed; see the
-[deployment/network view](docs/architecture.md#deployment-and-network).
+UniFi provides the network platform, including the logical IoT, Service, and
+Trusted subnets. The operator manages routing, DHCP, reservations, and firewall
+policy. See the [deployment/network view](docs/architecture.md#deployment-and-network).
 
 - Unifi Dream Machine
 - Unifi USW Aggregation

@@ -1,8 +1,8 @@
 # Documentation guide
 
 Use these documents to understand the homelab without needing its private
-connection details. They describe intended configuration and recorded evidence,
-not a live inventory or permission to operate infrastructure.
+connection details. They describe intended configuration and recorded evidence.
+Live inventory checks and infrastructure operations require separate approval.
 
 | Question | Start here |
 | --- | --- |
@@ -16,12 +16,12 @@ not a live inventory or permission to operate infrastructure.
 ## Authoritative homes
 
 - The [root README](../README.md) introduces the lab and its services.
-- The inventory owns logical names, management ownership, placement, and evidence
-  status. Diagrams are selected views of those facts, not separate inventories.
+- The inventory records logical names, management ownership, placement, and
+  evidence status. Diagrams use those facts.
 - `hosts/` documents host preparation. `services/` documents each service's
   prerequisites, configuration, state, and operating procedures. A host directory
   does not imply that OpenTofu manages that host.
-- `modules/` documents shared implementation contracts, not service deployment.
+- `modules/` documents shared implementation contracts. Service roots own deployment.
 - ADRs preserve decisions and rationale; current operating instructions belong
   with the service. Linear issues retain deployment evidence and outstanding work.
 

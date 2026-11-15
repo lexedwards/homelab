@@ -18,8 +18,8 @@ worker on each Proxmox host. The control plane is not highly available.
 | Server-first upgrade and bounded host-loss exercises | Procedures below are unrehearsed, not runtime acceptance evidence. |
 | Three-server expansion | Future design only; no extra server or HA frontend is deployed by this runbook. |
 
-ALE-32 closes at the operator-approved documentation gate, not on a claim that
-the unrehearsed procedures passed. Current evidence and decisions remain in
+ALE-32 closes when the operator approves the documentation. Unrehearsed procedures
+remain unverified. Current evidence and decisions remain in
 [ALE-32][issue]; the restore follow-up is [ALE-55][restore-follow-up]. The loose
 four-hour restore target is not a demonstrated recovery time or an SLA.
 

@@ -303,8 +303,8 @@ Rendering grants no live-change authority. Before deployment:
    fresh token can authenticate again without replacing reviewer credentials.
 6. Verify file rotation separately from actual application reload, distinct
    existing/new-consumer behavior during an approved OpenBao failure, and fresh
-   mounts after approved provider/worker maintenance. These remain runtime gates,
-   not claims established by rendering.
+   mounts after approved provider/worker maintenance. Record runtime evidence for
+   each check; rendering alone cannot verify these behaviors.
 
 On an outage, existing files may remain readable while refresh or new mounts fail.
 Do not promise immediate erasure or revocation of mounted content. Preserve useful

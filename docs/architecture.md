@@ -1,14 +1,13 @@
 # Architecture views
 
-These reviewed Mermaid views describe logical relationships, not live health or
-firewall configuration. The [inventory](inventory.md) owns names, placement, and
-evidence status. **Defined**, **recorded**, **operator-confirmed**, and
-**unverified** have the meanings given there. No view proves deployment.
+These Mermaid views describe logical relationships. The [inventory](inventory.md)
+records names, placement, and evidence status, and defines the labels Defined,
+Recorded, Operator-confirmed, and Unverified. Consult it for deployment evidence.
+Live health and firewall configuration are outside the scope of these views.
 
 The lab boundary includes operator-managed services as well as repository-managed
-ones. C4 containers below mean runnable applications or datastores, not Docker
-containers, VMs, Incus instances, or physical machines. The deployment view maps
-those applications onto infrastructure separately.
+ones. C4 containers mean runnable applications or datastores. The deployment view
+maps them onto Docker containers, VMs, Incus instances, and physical machines.
 
 ## System context
 
@@ -36,9 +35,8 @@ flowchart LR
 
 ### Shared infrastructure and consumers
 
-Arrows name interactions rather than implying that every service needs every
-other service. Solid arrows show service interactions; dotted arrows identify
-provisioning, renewal, or backup paths. Enabled Kubernetes integrations and their
+Solid arrows show service interactions; dotted arrows identify provisioning,
+renewal, or backup paths. Enabled Kubernetes integrations and their
 current qualification must be checked against service evidence.
 
 ```mermaid
@@ -70,10 +68,10 @@ flowchart LR
     k8s -.->|"Off-node etcd snapshot upload"| rustfs
 ```
 
-The application, proxy, and monitoring nodes are deliberately not connected to
-invented backends or monitors. Kubernetes is grouped here for readability; its
-API server and etcd datastore are shown separately below. This is not a C4
-component-level model.
+Application backends, proxy routes, and monitoring targets remain unverified, so
+their connections are omitted. Kubernetes is grouped here for readability; its
+API server and etcd datastore are shown separately below. Both views stay at the
+C4 container level.
 
 ### Kubernetes and observability applications
 
@@ -113,17 +111,17 @@ flowchart LR
     tempo -->|"Stores durable blocks"| rustfs
 ```
 
-Observability relationships reflect its definitions, not a newly verified
-deployment. Kubernetes telemetry export to Alloy is not assumed. RustFS is not a
-backup for Grafana's local database or a substitute for NFS data backups.
+Observability relationships follow its definitions; deployment has not been
+rechecked. Kubernetes telemetry export to Alloy remains unverified. Grafana's
+local database and NFS data need their own backups.
 
 ## Deployment and network
 
-Nesting represents placement, not network reachability. Kubernetes and
-observability placements below follow definitions; confirmed operator-managed
-placements are labelled separately. Dashed links associate applications with
-logical subnets, not routes or firewall allowances. Unknowns stay outside host
-and subnet groups rather than acquiring guessed placement.
+Nesting shows placement. Kubernetes and observability placements follow their
+definitions; confirmed operator-managed placements are labelled separately.
+Dashed links show logical subnet membership. Network reachability, routes, and
+firewall allowances require separate verification. Services with unknown placement
+stay outside host and subnet groups.
 
 ```mermaid
 flowchart TB
@@ -178,9 +176,9 @@ or the subnet of other guests from this simplified view.
 Edit Mermaid fences in this file; GitHub renders them in place. No public diagram
 renderer or hosted documentation service is required. For a local syntax/render
 check, use the pinned Mermaid CLI command in [contributor guidance](contributing.md#documentation-checks).
-Generated output is temporary and is not a second source of truth.
+Keep generated output temporary; maintain the source in this file.
 
 The change author updates the inventory and affected views alongside relevant
 infrastructure changes. The reviewer checks names, ownership, placement, status,
-and dependency meaning across views. Successful rendering is not semantic drift
-detection or evidence that a service is running.
+and dependency meaning across views. Rendering checks syntax. Architecture
+accuracy needs review, and service health needs live checks.

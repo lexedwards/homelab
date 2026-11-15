@@ -2,9 +2,9 @@
 
 ## Review record
 
-ALE-47 first slice, reviewed 2026-11-14. This records actual coverage and remaining
-work; it is not a claim that the full overhaul is complete. Repository sources and
-existing runbooks were inspected; no infrastructure was contacted. Operator input
+ALE-47 first slice, reviewed 2026-11-14. The full overhaul remains open; coverage
+and remaining work are recorded below. Repository sources and existing runbooks
+were inspected; no infrastructure was contacted. Operator input
 confirmed the application roles, hosts, and subnets recorded in the inventory.
 
 | Area | Coverage in this slice | Finding / disposition |
@@ -16,7 +16,7 @@ confirmed the application roles, hosts, and subnets recorded in the inventory.
 | ADRs | Relevant ownership, topology, NFS, runtime-state and recovery-custody decisions consulted | Linked rationale; did not rewrite history. Duplicate `006` numbering and stale links/status need a complete pass. |
 | Module documentation | Located; not fully reviewed | OpenBao integration contracts need a full documentation pass alongside their callers. |
 | Contributor/agent guidance | Existing service/configuration skills inspected for navigation | Added onboarding, ownership, privacy and documentation-review guidance. Existing skills remain authoritative for their workflows. |
-| Architecture | New logical context, container and deployment/network views | Mermaid is the chosen source format. Consistency is review-owned, not derived from infrastructure or a custom model generator. |
+| Architecture | New logical context, container and deployment/network views | Mermaid is the chosen source format. Reviewers keep the views consistent; there is no infrastructure-derived or custom model generator. |
 | Unmanaged infrastructure | Repository references and operator input only | Unknown placement, policy, backup and recovery details are labelled unverified; confirmation deferred at operator request. |
 
 ## Required remaining work for ALE-47
@@ -27,7 +27,7 @@ confirmed the application roles, hosts, and subnets recorded in the inventory.
 - Reconcile recorded deployment and qualification claims against linked issues.
   Do not turn missing evidence into a deployed or non-deployed assertion.
 - Complete remaining onboarding, operating, and recovery guidance where evidence
-  supports it; identify evidence gaps rather than inventing procedures.
+  supports it. Record evidence gaps where procedures cannot yet be written.
 - Add repeatable link/privacy checks and practical automated Mermaid validation.
   Include checks in the documented review workflow and report their limits.
 - Review the rendered views and privacy coverage, including private locators or
@@ -35,12 +35,10 @@ confirmed the application roles, hosts, and subnets recorded in the inventory.
 
 ## Agreed deferrals and external work
 
-- **Operator-agreed:** unknown unmanaged inventory/placement remains unverified
+- The operator agreed to leave unknown unmanaged inventory/placement unverified
   for now. TrueNAS/RustFS/NFS details, UniFi policy, UPS coverage, proxy routes and
   application backup/recovery details need confirmation before stronger claims.
-- **Existing service scope:** Kubernetes restore qualification remains ALE-55's
+- Kubernetes restore qualification remains ALE-55's
   work. Documenting its limitation does not require rerunning a failed experiment.
 - Component/code-level architecture views, live discovery, infrastructure rollout,
   and recovery exercises are outside this documentation change.
-
-The required work above is not silently deferred or completed by this slice.

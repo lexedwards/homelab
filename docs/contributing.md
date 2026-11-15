@@ -15,12 +15,13 @@
    Mocked tests are not evidence of deployment, restart safety, or recovery.
 5. Request separate authorization before any online plan, apply, import, probe,
    restart, or recovery exercise. Persistent operations use the canonical checkout
-   and established state, not a second deployment owner in a worktree.
+   and established state. Keep feature worktrees out of production deployment.
 
 For service changes, follow the repository's [service skill](../.agents/skills/create-a-service/SKILL.md)
 and [configuration-value rules](../.agents/skills/principle-configuration-values/SKILL.md).
 Use repository-level modules for shared implementation. Integrations consume
-published interfaces, not another service's private state or files.
+published interfaces. Keep another service's private state and files outside the
+integration.
 
 ## Documentation ownership and review
 
@@ -62,12 +63,14 @@ npm exec --yes --package=@mermaid-js/mermaid-cli@12.2.0 -- \
   mmdc -i docs/architecture.md -o /tmp/opencode/ale-47-diagrams/architecture.md
 ```
 
-The first run downloads tooling and its browser; it is not offline preparation.
+The first run needs network access to download tooling and its browser.
 Rendering runs locally, does not contact infrastructure, and writes temporary
 Markdown and diagram files outside Git. Do not use a public renderer for topology.
-The pinned renderer validates syntax, not deployment or semantic accuracy.
+The pinned renderer validates syntax. Deployment status and architecture accuracy
+need separate checks.
 
 Check changed relative links and headings, inspect every rendered view for
 readability, and review Markdown/diagrams for connection details. The first slice
 does not yet provide automated repository-wide link/privacy checks or CI rendering;
-those remain explicit work in the [audit](audit.md), not automatic drift detection.
+those remain explicit work in the [audit](audit.md). Semantic accuracy will still
+need review after those checks are added.
