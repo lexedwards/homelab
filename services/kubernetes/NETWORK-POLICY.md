@@ -5,8 +5,8 @@ namespace. A separate policy allows only the declared DNS query listeners on
 CoreDNS pods in `kube-system`. It does not change Cilium, node networking, VLAN routing, system
 namespaces, existing applications or admission policy. No Layer 7 rule is added.
 
-[ALE-30][qualification] records the completed ordinary/Kata ingress, egress, DNS,
-peer/listener, cross-namespace, and VLAN-facing backend matrix. Synthetic test
+Qualification passed the ordinary/Kata ingress, egress, DNS, peer/listener,
+cross-namespace, and VLAN-facing backend matrix. Synthetic test
 resources were removed after qualification. New namespaces still need explicit
 onboarding; the baseline is not automatically applied to every application.
 
@@ -155,7 +155,8 @@ restore unrelated HTTP egress. For TCP DNS fallback, retain a real DNS-over-TCP 
 when qualifying the deployed resolver path; the manifest's port list alone is
 configuration evidence, not that runtime check.
 
-ALE-31 supplies actual VLAN-facing Services. After that exposure is available,
+The [service-exposure guide](SERVICE-EXPOSURE.md) supplies VLAN-facing Services.
+After that exposure is available,
 repeat direct-peer policy probes between the selected service backends while
 retaining their Service/pool placement. Do not claim VLAN placement isolation
 from this ClusterIP/Pod-IP phase or relax pod policy for advertisements.
@@ -166,7 +167,7 @@ Verify both namespaces still contain only owned fixtures, no PVCs/useful data an
 no unrelated objects. Delete those namespaces with normal bounded deletion and
 wait for their pods and Kata sandbox processes to exit. Do not force-delete or
 change runtime labels to hide stuck cleanup. Check API/Cilium/node health and
-retain sanitized results in ALE-30; keep raw evidence private.
+retain sanitized results; keep raw evidence private.
 
 ## Troubleshooting And Emergency Changes
 
@@ -178,9 +179,8 @@ path. Only after internal paths pass, investigate Service endpoints, VLAN addres
 L2 announcements and upstream routing/firewall state.
 
 During API loss, existing forwarding is not proof that new policies or scheduling
-work. Preserve the default-deny baseline; use ALE-32's recovery procedure. An
+work. Preserve the default-deny baseline; use the
+[lifecycle recovery procedure](LIFECYCLE.md#outage-and-host-maintenance-runbooks). An
 emergency exception needs an owner, a specific caller/destination/protocol/port,
 approval, an expiry/removal plan and verification. Do not delete default-deny,
 disable SELinux or introduce cluster-wide unrestricted egress as a diagnostic.
-
-[qualification]: https://linear.app/lexedwards/issue/ALE-30

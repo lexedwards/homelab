@@ -13,8 +13,8 @@ the owning service. Populate actual values through a protected enrollment
 workflow that does not persist them in Git, OpenTofu state, saved plans or logs.
 The offline `prepare-secret-auth.py` and `prepare-secrets-csi.py` tools remain
 useful for inspection/render checks, **not as a second live configuration owner**.
-[ALE-49][qualification] records real-endpoint ordinary/Kata delivery on both
-workers, non-root read-only access, rotation with actual application reload,
+Qualification passed real-endpoint ordinary/Kata delivery on both workers,
+non-root read-only access, rotation with actual application reload,
 authorization denial/expiry, consumer/provider recreation, and a drained worker
 reboot. Scoped synthetic endpoint unavailability preserved existing files while
 fresh mounts failed; the same fresh pods recovered after the endpoint was restored.
@@ -326,7 +326,7 @@ issued-token lifecycle without removing the shared mount or ClusterRole.
 It selects Secrets Store CSI Driver **1.6.2**, OpenBao chart **0.30.7** with only
 provider **2.0.3**, and digest-pinned driver, registrar, liveness and provider
 images. The qualification application image is pinned too. These are the versions
-used by the recorded ALE-49 qualification. New releases need their own review and
+used by the completed qualification. New releases need their own review and
 compatibility checks.
 
 Chart archives are not stored in Git. With the platform enabled, normal runtime
@@ -520,4 +520,3 @@ disposition. Preserve the existing NFS witness claim and shared platform objects
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
 [deployment-credentials]: ../../modules/openbao-deployment-access/README.md#protected-credential-operations
 [runtime-state]: ../../docs/adrs/010-kubernetes-runtime-state-boundary.md
-[qualification]: https://linear.app/lexedwards/issue/ALE-49

@@ -7,7 +7,7 @@ Live health and firewall configuration are outside the scope of these views.
 The diagram labels distinguish the available evidence:
 
 - Defined: declared in repository configuration; live deployment is unverified.
-- Recorded: operating documentation or linked issues report deployment or
+- Recorded: operating documentation reports deployment or
   qualification. Current health has not been rechecked.
 - Operator-confirmed: the operator supplied the role or placement. Packaging and
   recovery still need their own evidence.
@@ -163,7 +163,7 @@ flowchart TB
             workstation["Arch Linux workstation<br/>GPU passthrough<br/>Operator-confirmed"]
         end
         subgraph store["store — physical Proxmox host"]
-            storage["TrueNAS VM / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Placement recorded in ALE-48"]
+            storage["TrueNAS VM / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Placement recorded"]
             sw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
             warehouse["Warehouse VM / Docker Compose<br/>Mimir, Loki, Tempo<br/>Defined default placement"]
             images["Image Catalogue<br/>Defined VM templates; not applications"]
@@ -210,44 +210,7 @@ membership. Coordinator hardware and placement still need documenting.
 
 ## Maintaining these views
 
-Edit Mermaid fences in this file; GitHub renders them in place. Local checks use
-Python 3.11 or newer, Git, and the pinned Markdown parser. Rendering also needs
-Node.js 24, npm, and the Mermaid CLI's supported browser dependencies.
-
-From the repository root, prepare an isolated Python environment:
-
-```bash
-python3 -m venv /tmp/opencode/homelab-docs-venv
-/tmp/opencode/homelab-docs-venv/bin/python -m pip install -r scripts/requirements-docs.txt
-make docs-test docs-check PYTHON=/tmp/opencode/homelab-docs-venv/bin/python
-make docs-render PYTHON=/tmp/opencode/homelab-docs-venv/bin/python
-```
-
-Setup downloads Python dependencies. `docs-check` then runs offline: it parses
-tracked and non-ignored new Markdown/Mermaid files, checks local links, images and
-heading fragments, rejects duplicate ADR numbers, and scans prose, code examples
-and diagrams for common numeric
-connection details and credential patterns. It rejects symlinked documentation
-and local links outside the repository. Ignored files and external URLs are not
-checked. Undefined Markdown reference labels can remain plain text under the
-parser's rules, so review link labels too.
-
-`docs-render` repeats those checks, then renders every Mermaid view with CLI
-12.2.0. The first run downloads npm tooling and its browser. Rendering stays local;
-temporary source and SVG files are removed after the check. Exit zero means the
-requested checks passed; failures report file/line and category without printing
-matched values or renderer output. Run the pinned CLI locally on a reviewed,
-privacy-checked view if detailed renderer diagnostics are needed.
-
-The Documentation workflow runs these checks on pull requests and `main`. No
-infrastructure access or deployment credentials are required. CI uses the hosted
-runner's installed Chrome with sandboxing enabled; local rendering uses Puppeteer's
-managed browser by default. A synthetic diagram checks browser startup without
-logging topology. Private DNS names,
-artifact locations, obfuscated credentials, live placement, and dependency meaning
-still require review; pattern checks cannot establish their correctness or safety.
-
-Update affected views alongside infrastructure changes, using the root overview
-and service documentation. Review names, ownership, placement, status,
-and dependency meaning across views. Rendering checks syntax. Architecture
-accuracy needs review, and service health needs live checks.
+Edit the Mermaid source alongside relevant infrastructure changes; GitHub renders
+the diagrams in place. Review the rendered views, links, and privacy before merging.
+Keep names, ownership, placement, status, and dependencies consistent with the root
+overview and service documentation. Current service health requires live checks.

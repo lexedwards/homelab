@@ -12,16 +12,15 @@ worker on each Proxmox host. The control plane is not highly available.
 
 | Area | Recorded position |
 | --- | --- |
-| Backups | Native off-node upload, independent credential custody, freshness/failure reporting and a natural six-hour timer run verified in ALE-32. |
-| Worker maintenance | Replacement and planned drained reboot evidence retained in ALE-29/ALE-32; do not repeat it merely to complete documentation. |
-| Isolated restore | Experiment failed; recovery remains unproven. Operator accepted the risk and deferred a smaller proof to ALE-55. The failed VM was removed. |
+| Backups | Native off-node upload, independent credential custody, freshness/failure reporting and a natural six-hour timer run verified. |
+| Worker maintenance | Replacement and planned drained reboot checks passed; do not repeat them merely to complete documentation. |
+| Isolated restore | Experiment failed; recovery remains unproven. Operator accepted the risk and deferred a smaller proof. The failed VM was removed. |
 | Server-first upgrade and bounded host-loss exercises | Procedures below are unrehearsed, not runtime acceptance evidence. |
 | Three-server expansion | Future design only; no extra server or HA frontend is deployed by this runbook. |
 
-ALE-32 closed at the operator-approved documentation boundary. Unrehearsed
-procedures remain unverified. Current evidence and decisions remain in
-[ALE-32][issue]; the restore follow-up is [ALE-55][restore-follow-up]. The loose
-four-hour restore target is not a demonstrated recovery time or an SLA.
+Unrehearsed procedures remain unverified. The loose four-hour restore target is
+a planning objective; restoration has not demonstrated that recovery time and
+there is no recovery-time SLA.
 
 ## Before any maintenance
 
@@ -146,8 +145,8 @@ owner; do not delete Helm release state or reinstall the cluster as a repair.
 An RPM downgrade or VM snapshot rollback is not a generic safe rollback after
 datastore changes. Review the release-specific rollback procedure and data-loss
 implications separately. Production `cluster-reset`, datastore restoration and
-VM replacement need new explicit authorization. ALE-55 means a working restore
-cannot currently be assumed. If etcd quorum/identity is unclear, preserve the
+VM replacement need new explicit authorization. Restoration remains unproven.
+If etcd quorum/identity is unclear, preserve the
 original server and escalate rather than initializing another cluster.
 
 ## Outage and host-maintenance runbooks
@@ -239,8 +238,6 @@ members without reviewing quorum and RKE2's supported member-removal procedure.
 Never use a cluster reset or downgrade as an implicit expansion rollback. Keep
 backups/custody current throughout; no additional HA deployment is authorized here.
 
-[issue]: https://linear.app/lexedwards/issue/ALE-32
-[restore-follow-up]: https://linear.app/lexedwards/issue/ALE-55
 [backup]: BACKUP.md
 [workers]: WORKERS.md
 [worker-maintenance]: WORKERS.md#maintenance-and-replacement

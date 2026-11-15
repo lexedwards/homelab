@@ -1,8 +1,8 @@
 # Isolated control-plane restore lab
 
-**Experimental, not restore-qualified.** The ALE-32 restore attempt failed with
+**Experimental, not restore-qualified.** The restore attempt failed with
 an unknown failed phase/cause. The operator accepted this risk and deferred a
-smaller proof to ALE-55; the failed VM was removed through a reviewed destroy
+smaller proof; the failed VM was removed through a reviewed destroy
 plan. The instructions below describe the experimental implementation, not a
 successful recovery or permission to replay it. See [lifecycle runbooks](../LIFECYCLE.md)
 for current maintenance and recovery limits.

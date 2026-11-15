@@ -36,9 +36,9 @@ Check each affected consumer's data and credential requirements:
 
 The [restore lab](../services/kubernetes/restore-lab/README.md#recovery-inputs)
 records RustFS's OpenBao KMS dependency. Encrypted snapshot retrieval currently
-requires the functioning external KMS. Independent OpenBao/key recovery is deferred
-to [ALE-50](https://linear.app/lexedwards/issue/ALE-50). Resolve key availability
-before choosing an order that requires one service to restore the other. The exact shared storage
+requires the functioning external KMS. Independent OpenBao/key recovery remains
+deferred. Resolve key availability before choosing an order that requires one
+service to restore the other. The exact shared storage
 layout, encryption recovery arrangements, and application backup coverage remain
 unverified.
 
@@ -88,8 +88,7 @@ Keep connection values and raw evidence private.
 
 - [Kubernetes lifecycle](../services/kubernetes/LIFECYCLE.md): recorded worker
   maintenance and off-node backup evidence; upgrades and host-loss procedures are
-  unrehearsed. Isolated restoration failed and remains unproven; ALE-55 owns the
-  follow-up.
+  unrehearsed. Isolated restoration failed and remains unproven.
 - [Kubernetes backups](../services/kubernetes/BACKUP.md), [restore lab](../services/kubernetes/restore-lab/README.md),
   [NFS](../services/kubernetes/NFS.md), and [mounted secrets](../services/kubernetes/SECRETS.md).
 - [OpenBao](../services/openbao/README.md): initialized-service protection,

@@ -3,8 +3,8 @@
 `service_exposure` renders native Cilium IPAM pools, per-interface L2 policies and
 the existing RKE2-owned HelmChartConfig. It defaults to `null`: no pools are
 rendered and existing bootstrap networking is unchanged. Rendering or merging
-these files does not deploy them. [ALE-31][qualification] records the deployed
-dual-pool configuration, ordinary/Kata client checks, explicit pool exhaustion,
+these files does not deploy them. Qualification passed the deployed dual-pool
+configuration, ordinary/Kata client checks, explicit pool exhaustion,
 backend relocation, and announcement transitions. Synthetic Services were removed;
 the platform pools and worker announcement policies remained enabled.
 
@@ -168,7 +168,8 @@ visible pool/Service evidence, not consume another pool. An unlabelled Service
 must also remain unallocated. Remove those claims before expanding to the full
 reviewed range. Do not shrink, overlap or exhaust a pool serving useful workloads.
 
-Repeat ALE-30's staged positive/negative direct-peer matrix on the actual
+Repeat the [network-policy guide's](NETWORK-POLICY.md#staged-matrix)
+staged positive/negative direct-peer matrix on the actual
 VLAN-facing Service backends; Service exposure must not bypass pod policy. Keep
 fresh tuple-matched native policy-drop evidence, DNS restoration and the expected
 external client rule separate. Do not use unrestricted ingress or delete
@@ -204,8 +205,9 @@ reservations and inter-VLAN access. Do not add static service addresses to nodes
 Lease acquisition/renewal depends on the API on the single control-plane VM.
 Moving backends to store before compute maintenance does **not** guarantee service
 reachability or failover during API loss. The stable API address must never
-depend on these workload pools/announcements. Outage qualification belongs to
-ALE-32; retain the default-deny boundary during recovery.
+depend on these workload pools/announcements. Use the
+[lifecycle runbooks](LIFECYCLE.md) for outage and recovery procedures; retain the
+default-deny boundary during recovery.
 
 Remove only owned test Services, policies and stateless namespaces after checking
 for unrelated content. Verify EndpointSlices, leases and Kata processes are gone,
@@ -214,5 +216,3 @@ for. Leave reviewed platform pools in place only if that deployment was approved
 Before removing a platform pool or L2 policy, inventory all consumers and plan
 their withdrawal. Setting `service_exposure = null` does not delete live objects
 or automatically restore the initialized server's persistent chart configuration.
-
-[qualification]: https://linear.app/lexedwards/issue/ALE-31

@@ -13,7 +13,3 @@ override.tf.json
 *_override.tf.json
 
 !terraform.tfvars.example
-
-# Local Python check artifacts
-__pycache__/
-*.py[cod]

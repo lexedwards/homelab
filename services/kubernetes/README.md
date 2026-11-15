@@ -6,8 +6,7 @@ worker on each physical host. [Worker enrollment and runtime operations][workers
 are separate from first-boot provisioning. VLAN service pools, application policy
 and NFS storage retain their explicit rollout boundaries. OpenBao workload-secret
 delivery has a separately enabled [API runtime root](runtime/README.md) alongside it.
-Implementation context and qualification gates
-remain in ALE-27–32; durable rationale is in the [ADRs][adrs].
+Durable rationale is in the [ADRs][adrs].
 
 [Workload network policy](NETWORK-POLICY.md) provides an explicitly scoped
 namespace baseline, synthetic examples and bounded direct-peer checks. It is not
@@ -29,12 +28,12 @@ APIs are unavailable. It preserves bootstrap and keeps actual values
 and credentials outside state/plans. Offline tools remain inspection helpers,
 not competing live owners. Enabling the layer requires separate reviewed applies.
 
-Local validation does not contact infrastructure. [ALE-28][control-plane-evidence]
-records the deployed server's DHCP-only first boot, healthy single-member etcd,
-control-plane scheduling restriction, and initialized-datastore guest reboot.
+Local validation does not contact infrastructure. The deployed server passed
+DHCP-only first boot, healthy single-member etcd, control-plane scheduling
+restriction, and initialized-datastore guest reboot checks.
 The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
 [exposure](SERVICE-EXPOSURE.md), [NFS](NFS.md), and [secret](SECRETS.md) guides
-link their own qualification evidence and limits. Recorded results do not replace
+describe their qualification results and limits. Recorded results do not replace
 fresh health checks before maintenance.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
@@ -230,8 +229,8 @@ Before accepting bootstrap, separately inspect actual single-member etcd
 membership using the installed RKE2 version's documented etcd administration
 procedure, and run the authorized untolerated-workload scheduling rejection
 check. A Ready API or one static etcd pod is not membership evidence. Record those
-results against the reviewed revision; do not mark ALE-28 complete based solely
-on local tests or this checker.
+results against the reviewed revision. Local tests and this checker alone do not
+establish bootstrap acceptance.
 
 ## Ownership and network boundary
 
@@ -300,9 +299,9 @@ corresponding RKE2 recovery material.
 The backup policy is six-hour snapshots retained fourteen days
 in a dedicated off-node bucket, verified TLS and independent credential custody.
 Approximately four hours is a planning recovery target, not an SLA or tested
-restore duration. Off-node backup and scheduled execution evidence is recorded
-in ALE-32, but the isolated restore experiment failed. The operator accepted
-unproven recovery and deferred a smaller lab to ALE-55. Do not call this server
+restore duration. Off-node backup and scheduled execution were verified, but the
+isolated restore experiment failed. The operator accepted unproven recovery and
+deferred a smaller lab. Do not call this server
 restore-qualified or assume a snapshot is a proven rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 
@@ -313,8 +312,8 @@ stop/recovery decisions and post-maintenance checks. Documentation is not runtim
 authorization or evidence that an upgrade/outage exercise passed.
 
 Expect API/scheduling/reconciliation downtime for a single-server restart or
-`compute` outage. The initialized server's guest reboot is recorded in ALE-28;
-repeat identity/health checks after future maintenance without reconstructing etcd.
+`compute` outage. The initialized server passed guest-reboot checks; repeat
+identity/health checks after future maintenance without reconstructing etcd.
 Initial bootstrap failure may recreate only reviewed newly owned resources;
 after useful data exists, use an authorized isolated restore, not VM deletion,
 `cluster-reset` against production or an unreviewed package downgrade.
@@ -359,5 +358,4 @@ cloud-init or modify image-catalogue state as a troubleshooting shortcut.
 
 [adrs]: ../../docs/adrs/
 [workers]: WORKERS.md
-[control-plane-evidence]: https://linear.app/lexedwards/issue/ALE-28
 [lifecycle]: LIFECYCLE.md

@@ -204,6 +204,3 @@ UPS coverage and shutdown/restart coordination remain unverified.
 and links to the relevant runbooks. Host READMEs cover host preparation; service
 READMEs own service procedures; module READMEs describe shared implementation
 contracts. [Architecture decision records](docs/adrs/) preserve design rationale.
-Deployment evidence and review records stay in the linked issues and PRs.
-For offline documentation checks and local diagram rendering, see
-[maintaining the architecture views](docs/architecture.md#maintaining-these-views).

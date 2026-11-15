@@ -256,7 +256,7 @@ selectors and hostname spread. Apply only under runtime-test authorization; prov
 both Intel/AMD execution and pod/HTTP connectivity, not just Ready status. Without
 verified eligibility isolated pods must remain Pending; missing handlers must
 fail sandbox creation, never fall back to runc. Delete the example namespace
-afterwards. Record evidence in ALE-29, not a permanent migration-test harness.
+afterwards. Retain sanitized qualification results and keep raw evidence private.
 
 Root-filesystem examples cover only ephemeral volumes. The separate
 [NFS](NFS.md) and [mounted-secret](SECRETS.md) guides record their real-backend
