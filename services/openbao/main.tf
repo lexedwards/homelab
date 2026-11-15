@@ -16,7 +16,8 @@ locals {
   user_data = templatefile("${path.module}/cloud-init/user-data.tftpl", {
     server_config              = local.server_config
     readiness                  = file("${path.module}/scripts/check-ready.py")
-    install                    = file("${path.module}/scripts/install.sh")
+    install_package            = file("${path.module}/scripts/install-package.sh")
+    tmpfiles_config            = file("${path.module}/config/tmpfiles.conf")
     deploy_certificate         = file("${path.module}/scripts/deploy-certificate.sh")
     certificate_expiry_service = file("${path.module}/config/certificate-expiry.service")
     certificate_expiry_timer   = file("${path.module}/config/certificate-expiry.timer")
@@ -24,6 +25,17 @@ locals {
     openbao_version            = local.openbao_version
     openbao_sha256             = local.openbao_sha256
   })
+}
+
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "openbao-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content      = local.user_data
+  }
 }
 
 data "incus_storage_pool" "default" {
@@ -70,7 +82,7 @@ resource "incus_instance" "openbao" {
 
   config = {
     "boot.autostart"       = "true"
-    "cloud-init.user-data" = local.user_data
+    "cloud-init.user-data" = data.cloudinit_config.user_data.rendered
     "limits.cpu"           = tostring(var.instance_cpu_count)
     "limits.memory"        = "${var.instance_memory_mib}MiB"
     "limits.memory.swap"   = "false"

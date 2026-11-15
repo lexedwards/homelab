@@ -9,10 +9,14 @@ packages:
   - python3-certbot-dns-cloudflare
 
 write_files:
-  - path: /usr/local/lib/openbao/install.sh
+  - path: /usr/local/lib/openbao/install-package.sh
     permissions: "0700"
     owner: root:root
-    content: ${jsonencode(install)}
+    content: ${jsonencode(install_package)}
+  - path: /etc/tmpfiles.d/homelab-openbao.conf
+    permissions: "0644"
+    owner: root:root
+    content: ${jsonencode(tmpfiles_config)}
   - path: /usr/local/lib/openbao/check-ready.py
     permissions: "0755"
     owner: root:root
@@ -51,4 +55,11 @@ write_files:
     content: ${jsonencode(certificate_expiry_timer)}
 
 runcmd:
-  - [sh, /usr/local/lib/openbao/install.sh, "${openbao_version}", "${openbao_sha256}"]
+  - - sh
+    - -ec
+    - |
+      /bin/sh /usr/local/lib/openbao/install-package.sh "${openbao_version}" "${openbao_sha256}"
+      systemd-tmpfiles --create /etc/tmpfiles.d/homelab-openbao.conf
+      systemctl daemon-reload
+      systemctl enable --now certbot.timer
+      systemctl enable --now openbao

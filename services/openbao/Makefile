@@ -10,7 +10,7 @@ help:
 		'fmt                   Format OpenTofu configuration' \
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
-		'cloud-init-validate   Lint the cloud-init template and check installer syntax' \
+		'cloud-init-validate   Lint YAML and check package helper/deploy-hook syntax' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE (requires authorization)' \
 		'apply                 Apply the previously reviewed PLAN_FILE (requires authorization)'
@@ -29,7 +29,7 @@ tofu-validate:
 
 cloud-init-validate:
 	$(YAMLLINT) cloud-init/user-data.tftpl
-	sh -n scripts/install.sh
+	sh -n scripts/install-package.sh
 	sh -n scripts/deploy-certificate.sh
 
 validate: fmt-check tofu-validate cloud-init-validate
