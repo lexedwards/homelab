@@ -16,7 +16,7 @@ Add images only after selecting current releases and verifying publisher checksu
 - A Proxmox bridge available to cloned VMs
 - OpenTofu 1.6 or newer and `make`
 - A least-privilege Proxmox API token and PAM user with SSH access
-- A local SSH agent with the PAM user's approved key loaded
+- The PAM user's approved SSH private key, stored outside the repository
 
 ## Quick Start
 
@@ -29,9 +29,21 @@ Add images only after selecting current releases and verifying publisher checksu
    Set the endpoint, PAM SSH username, VM datastore, cloud-init user, and real SSH
    public keys. Keep this deployment configuration readable only by its owner.
    Before online planning/applying, inject the least-privilege API token through
-   `PROXMOX_VE_API_TOKEN` and expose the approved local agent through `SSH_AUTH_SOCK`.
-   Load the PAM user's key into that agent outside OpenTofu. Do not put tokens or
-   private-key contents into tfvars; no API-token or private-key-path input is needed.
+   `PROXMOX_VE_API_TOKEN` and the key contents through the provider-native
+   `PROXMOX_VE_SSH_PRIVATE_KEY`. The provider explicitly disables agent use. Do not
+   put tokens or private-key contents into tfvars; no credential input is needed.
+
+   With tracing disabled, load the approved key for this shell without printing it:
+
+   ```bash
+   set +x
+   export PROXMOX_VE_SSH_PRIVATE_KEY="$(cat -- "${PROXMOX_SSH_KEY_FILE/#\~/$HOME}")"
+   ```
+
+   `PROXMOX_SSH_KEY_FILE` is a private operator-supplied path, not an OpenTofu or
+   provider input. Do not store key contents in shell startup files. An encrypted
+   private key needs a separately reviewed noninteractive mechanism; do not remove
+   its passphrase just to make a deployment run.
 
 2. Initialize and validate the root.
 
@@ -60,10 +72,11 @@ variable files are ignored by Git.
 
 Remove the former `proxmox_api_token` and `proxmox_ssh_private_key_file` assignments
 from local tfvars and their `TF_VAR_...` injection. The same API identity and SSH key
-can be supplied through the provider environment and local agent; no resource or
-state migration is needed. Supply both execution channels for each online plan
-and apply, including a saved-plan apply. Clear alternative provider password and
-private-key environment inputs so they do not create an unintended fallback.
+can be supplied through `PROXMOX_VE_API_TOKEN` and `PROXMOX_VE_SSH_PRIVATE_KEY`; no
+resource or state migration is needed. Supply both for each online plan and apply,
+including a saved-plan apply. Clear provider password inputs to avoid unintended
+fallback. After the operation, unset `PROXMOX_VE_SSH_PRIVATE_KEY` to remove the
+shell's exported copy; the key file remains under its existing protected custody.
 
 Removing inputs does not erase credentials from historical plans, state backups
 or local files, and does not rotate them. Review protected artifact custody and

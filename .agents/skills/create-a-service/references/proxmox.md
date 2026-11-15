@@ -56,11 +56,14 @@ unless the appliance supports them.
   `false`.
 - Supply the API token only through `PROXMOX_VE_API_TOKEN`; do not declare a
   token variable.
-- Add the provider SSH block only when node-side file upload requires it. Use
-  the local SSH agent and a required PAM username; never use password-based
-  Proxmox SSH authentication. Do not read private-key files into OpenTofu. These
-  execution credentials must be available for saved-plan apply as well as plan;
-  local validation does not prove API authorization or agent/key readiness.
+- Add the provider SSH block only when node-side file upload requires it. Require
+  a PAM username and an explicitly selected key-authentication mechanism. Catalogue
+  and warehouse disable agent use and consume `PROXMOX_VE_SSH_PRIVATE_KEY`; preserve
+  another root's established agent workflow unless its change is in scope. Never
+  start an agent implicitly or use password-based Proxmox SSH authentication.
+  Do not read private-key files into OpenTofu or persist their contents in startup
+  files. Execution credentials must be available for saved-plan apply as well as
+  plan; local validation/API refresh does not prove an actual SSH operation.
 
 ### Resource Gate
 

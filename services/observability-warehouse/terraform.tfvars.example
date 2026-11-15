@@ -5,7 +5,8 @@
 # Provider
 # -----------------------------------------------------------------------------
 
-# Authentication: inject PROXMOX_VE_API_TOKEN and use the local SSH agent.
+# Authentication: inject PROXMOX_VE_API_TOKEN and PROXMOX_VE_SSH_PRIVATE_KEY.
+# SSH agent use is disabled; never put private-key contents in this file.
 # Required
 # proxmox_endpoint     =
 # proxmox_ssh_username =
