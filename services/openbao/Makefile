@@ -2,7 +2,7 @@ TOFU ?= tofu
 YAMLLINT ?= yamllint
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate cloud-init-validate shell-validate validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -11,6 +11,7 @@ help:
 		'fmt-check             Check OpenTofu formatting' \
 		'tofu-validate         Validate OpenTofu without contacting infrastructure' \
 		'cloud-init-validate   Lint YAML and check package helper/deploy-hook syntax' \
+		'shell-validate        Check operator initialization procedure syntax (no API access)' \
 		'validate              Run all local validation' \
 		'plan                  Write an online plan to PLAN_FILE (requires authorization)' \
 		'apply                 Apply the previously reviewed PLAN_FILE (requires authorization)'
@@ -32,7 +33,10 @@ cloud-init-validate:
 	sh -n scripts/install-package.sh
 	sh -n scripts/deploy-certificate.sh
 
-validate: fmt-check tofu-validate cloud-init-validate
+shell-validate:
+	bash -n scripts/initialize.sh
+
+validate: fmt-check tofu-validate cloud-init-validate shell-validate
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"
