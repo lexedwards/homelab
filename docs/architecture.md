@@ -240,7 +240,10 @@ matched values or renderer output. Run the pinned CLI locally on a reviewed,
 privacy-checked view if detailed renderer diagnostics are needed.
 
 The Documentation workflow runs these checks on pull requests and `main`. No
-infrastructure access or deployment credentials are required. Private DNS names,
+infrastructure access or deployment credentials are required. CI uses the hosted
+runner's installed Chrome with sandboxing enabled; local rendering uses Puppeteer's
+managed browser by default. A synthetic diagram checks browser startup without
+logging topology. Private DNS names,
 artifact locations, obfuscated credentials, live placement, and dependency meaning
 still require review; pattern checks cannot establish their correctness or safety.
 
