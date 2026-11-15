@@ -5,7 +5,7 @@ ssh_pwauth: false
 disable_root: true
 
 users:
-  - name: ${cloud_user}
+  - name: ${jsonencode(cloud_user)}
     groups: [adm, sudo]
     lock_passwd: true
     shell: /bin/bash
@@ -18,6 +18,7 @@ packages:
   - curl
   - docker-compose
   - docker.io
+  - docker-cli
   - nfs-common
   - qemu-guest-agent
 
@@ -51,36 +52,13 @@ write_files:
     content: |
       AWS_ACCESS_KEY_ID=<rustfs-access-key>
       AWS_SECRET_ACCESS_KEY=<rustfs-secret-key>
-  - path: /var/lib/cloud/instance/object-storage.env
-    permissions: "0600"
-    owner: root:root
-    encoding: b64
-    content: ${object_storage_environment_base64}
   - path: /etc/systemd/system/observability-warehouse.service
     permissions: "0644"
     owner: root:root
-    content: |
-      [Unit]
-      Description=Grafana observability warehouse
-      Wants=network-online.target
-      After=network-online.target docker.service
-      Requires=docker.service
-      ConditionPathExists=/etc/observability-warehouse/object-storage.env
-
-      [Service]
-      Type=oneshot
-      RemainAfterExit=yes
-      WorkingDirectory=/opt/observability-warehouse
-      ExecStart=/usr/bin/docker compose --env-file /etc/observability-warehouse/object-storage.env up --detach --remove-orphans
-      ExecStop=/usr/bin/docker compose --env-file /etc/observability-warehouse/object-storage.env down
-      TimeoutStartSec=0
-      TimeoutStopSec=5min
-
-      [Install]
-      WantedBy=multi-user.target
+    content: ${jsonencode(service_unit)}
 
 runcmd:
   - [systemctl, enable, --now, docker]
   - [systemctl, enable, --now, qemu-guest-agent]
   - [systemctl, daemon-reload]
-  - [bash, -c, "if ${s3_credentials_configured}; then install -o root -g root -m 0600 /var/lib/cloud/instance/object-storage.env /etc/observability-warehouse/object-storage.env && rm -f /var/lib/cloud/instance/object-storage.env && systemctl enable --now observability-warehouse.service; else rm -f /var/lib/cloud/instance/object-storage.env && systemctl enable observability-warehouse.service; fi"]
+  - [systemctl, enable, --now, observability-warehouse.service]

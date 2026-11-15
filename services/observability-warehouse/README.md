@@ -37,7 +37,7 @@ data.
   hostname, and three existing buckets for Mimir, Loki, and Tempo.
 - An NFS export reachable from the warehouse VM.
 - OpenTofu 1.9 or newer, `make`, `yamllint`, and an Alloy binary matching the
-  configured package version.
+  configured package version, plus Docker Compose for daemon-free validation.
 - A least-privilege Proxmox API token and a PAM user with an SSH private key
   that can access every target node for uploading cloud-init snippets.
 - A `proxmox_nodes` entry for each target node. Each entry supplies the explicit
@@ -85,11 +85,39 @@ Network configuration remains Proxmox-generated DHCP data, separate from user-da
    native units and perform bounded local health checks. These are activation and
    native-gap steps, not package installers.
 
-This changes future first boots only. It does not upgrade initialized guests,
-rerun cloud-init or authorize VM replacement. Preserve existing configuration,
+These definitions apply to future first boots only. They do not upgrade initialized
+guests, rerun cloud-init or authorize VM replacement. Preserve existing configuration,
 credentials and application data during separately planned maintenance. The
-warehouse's legacy bootstrap and optional S3 credential inputs are unchanged in
-this slice; their secret-delivery migration remains separate work.
+same boundary applies to the warehouse bootstrap below.
+
+### Fresh warehouse bootstrap
+
+The warehouse also uses provider-composed MIME. Native cloud-init installs Docker,
+its CLI, Compose, NFS tools and the guest agent, mounts the NFS backup destination,
+and writes only non-secret application configuration and the tracked systemd unit.
+`make compose-validate` checks Compose structure without environment interpolation,
+credential-file resolution or a running daemon; it does not validate secret values.
+
+The unit is enabled but skips startup until
+`/etc/observability-warehouse/object-storage.env` is non-empty. Missing credentials
+are an enrollment wait, not completed application activation. The file must be
+root-owned and mode `0600`, with `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+obtained through protected OpenBao enrollment. File presence is not proof of valid
+credentials, S3 authorization or backend readiness. Compose startup has a ten-minute
+bound; inspect the failure before retrying rather than assuming a live service.
+
+The former `s3_access_key_id` and `s3_secret_access_key` OpenTofu inputs are removed.
+Remove them from protected tfvars and `TF_VAR_...` injection before planning; never
+substitute another cloud-init or resource attribute. First boot does not write an
+active credential file or stage secret values in the guest's cloud-init directory.
+Unattended retrieval still needs an explicit initial machine-trust handoff to
+OpenBao. That enrollment procedure remains separate; bootstrap does not invent one
+or grant access based on network location.
+
+If the former inputs were used, their values may remain in old state/plans,
+Proxmox snippets, guest cloud-init caches and VM/backups. Removing declarations
+does not erase those copies or rotate credentials. Plan rotation and protected
+artifact cleanup separately; no cleanup or live credential change is implied here.
 
 ## Quick Start
 
@@ -140,12 +168,10 @@ endpoint/trust input; never reuse this service's credentials or private state.
    cloud-user, and SSH-key values are shared. Define each target node once in
    `proxmox_nodes`; the provider generates its SSH mappings from that map. Set
    the API token, PAM SSH username, and private-key path using the same provider
-   contract as the image catalogue. Set `s3_access_key_id` and
-   `s3_secret_access_key` together to provision the root-owned credential file
-   and start the warehouse service on first boot. The ignored variable file
-   contains these credentials, the API token, and node addresses in plaintext
-   and must remain readable only by its owner; keep the private key outside this
-   repository.
+   contract as the image catalogue. Supply no RustFS credential values to
+   OpenTofu. Ignored provider inputs and node addresses still require protected
+   custody; keep the variable file readable only by its owner and the private key
+   outside this repository.
 
 2. Initialize, validate, and review a saved plan.
 
@@ -165,18 +191,17 @@ endpoint/trust input; never reuse this service's credentials or private state.
    tofu output -json grafana_ipv4_addresses
    ```
 
-4. In RustFS, create the configured Mimir, Loki, and Tempo buckets and grant one
-   service identity access only to those buckets. When both S3 credential
-   variables were assigned, verify the automatically started service:
+4. Confirm that the RustFS operator provides the configured Mimir, Loki and Tempo
+   buckets and a bucket-scoped service identity held in OpenBao. A fresh warehouse
+   remains stopped pending separately authorized protected credential enrollment.
+   Do not copy the example file as working credentials or put secret values in
+   command arguments, logs or cloud-init. After enrollment and an authorized start,
+   inspect the service and verify actual S3 writes/reads:
 
    ```bash
    ssh <cloud-user>@<warehouse-address>
    sudo systemctl status observability-warehouse
    ```
-
-   When both variables retain their empty defaults, first boot writes only
-   `object-storage.env.example` and leaves the service stopped. Enroll the
-   credentials manually in `object-storage.env` and start the service.
 
 5. Retrieve Grafana's guest-generated initial password over SSH, sign in as
    `admin`, and change the password immediately:
@@ -226,7 +251,7 @@ Omitted/null comments remain server-managed; explicit `""` clears them.
 Removing a record entry or destroying this service deletes its record, not the
 shared zone or other services' records. Guest deletion alone does not remove
 independent DNS inputs. Review all deletes; no record `prevent_destroy` is set.
-Local validation checks OpenTofu configuration, YAML lint and native Alloy
+Local validation checks OpenTofu configuration, YAML lint and native Alloy/Compose
 configuration. The cloudinit provider validates MIME composition, not guest
 module semantics. Use `cloud-init schema --config-file <rendered-cloud-config>`
 on each rendered cloud-config part, not the MIME envelope or unrendered template,
@@ -373,11 +398,9 @@ listener to approved users or a trusted reverse proxy. Keep numeric listener
 values in protected operator configuration, not documentation.
 
 The Alloy administration server listens on all collector interfaces
-without authentication or TLS. When the S3 credential variables are
-assigned, RustFS credentials are rendered into cloud-init, the uploaded Proxmox
-snippet, saved plans, and OpenTofu state before being installed in a root-owned
-file on the warehouse VM. Marking the variables sensitive redacts normal CLI
-output but does not encrypt those locations. Grafana's initial administrator
+without authentication or TLS. RustFS values must remain outside OpenTofu and
+cloud-init; see the warehouse enrollment and historical-artifact boundary above.
+Sensitivity markings redact display, not storage. Grafana's initial administrator
 password is generated in the guest and stored in a root-owned file rather than
 OpenTofu state.
 

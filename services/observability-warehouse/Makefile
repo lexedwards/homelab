@@ -1,10 +1,11 @@
 TOFU ?= tofu
 YAMLLINT ?= yamllint
 ALLOY ?= alloy
+COMPOSE ?= docker compose
 PLAN_FILE ?= deployment.tfplan
 ALLOY_CONFIGS := config/alloy/config.alloy config/alloy/copilot.alloy
 
-.PHONY: help init fmt fmt-check tofu-validate yaml-validate alloy-validate validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate yaml-validate alloy-validate compose-validate validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -14,6 +15,7 @@ help:
 		'tofu-validate    Validate OpenTofu without contacting Proxmox' \
 		'yaml-validate    Lint cloud-init and service YAML templates' \
 		'alloy-validate   Validate the Alloy configuration' \
+		'compose-validate Validate Compose without credentials or a running daemon' \
 		'validate         Run all local validation' \
 		'plan             Write an online plan to PLAN_FILE' \
 		'apply            Apply the previously reviewed PLAN_FILE'
@@ -41,7 +43,10 @@ alloy-validate:
 	TEMPO_ENDPOINT=warehouse.invalid:4317 \
 	$(ALLOY) validate --stability.level=experimental config/alloy
 
-validate: fmt-check tofu-validate yaml-validate alloy-validate
+compose-validate:
+	$(COMPOSE) --env-file /dev/null --file config/compose.yaml config --no-interpolate --quiet
+
+validate: fmt-check tofu-validate yaml-validate alloy-validate compose-validate
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"
