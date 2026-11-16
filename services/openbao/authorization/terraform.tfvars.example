@@ -1,3 +1,0 @@
-# Copy to ignored terraform.tfvars. Never persist configuration_token here.
-# Supply TF_VAR_configuration_token through protected process injection.
-# openbao_address =

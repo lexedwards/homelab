@@ -1,0 +1,16 @@
+# Copy to ignored terraform.tfvars. Never commit the populated file.
+# Supply the administrative token through protected VAULT_TOKEN injection.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+# Required
+# openbao_address =
+
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
+# Required: use hardening's published outputs, not its state.
+# userpass_mount        =
+# administrator_policy  =
+# operator_username     =

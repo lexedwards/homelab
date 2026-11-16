@@ -19,7 +19,7 @@ Parent `make init`/`make validate`
 include this root. Live plans require the previously applied non-secret metadata
 output from the parent infrastructure root, a privately published OpenBao endpoint
 export (`openbao_endpoint_file`), protected Kubernetes credentials,
-explicit ephemeral OpenBao administration and reviewed worker trust. Review a
+non-root OpenBao administration through native `VAULT_TOKEN` and reviewed worker trust. Review a
 saved runtime plan before applying it. A native chart object is not Ready proof;
 wait for real CRDs/releases before enabling service definitions.
 
