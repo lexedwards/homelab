@@ -26,7 +26,6 @@ help:
 init:
 	$(TOFU) init
 	$(MAKE) -C runtime init
-	$(MAKE) -C restore-lab init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -63,7 +62,6 @@ shell-validate:
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate
 	$(MAKE) -C runtime validate
-	$(MAKE) -C restore-lab validate
 
 nfs-chart-validate:
 	test -f "$(NFS_CHART)"

@@ -1,10 +1,9 @@
 # Off-node etcd Backups
 
-The [isolated restore lab](restore-lab/README.md) contains an experimental
-scratch-VM procedure, not a qualified recovery path. The restore experiment failed;
-the operator accepted unproven recovery and deferred a smaller proof.
-The failed VM was removed. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade,
-outage and recovery-decision gates; do not assume a backup guarantees rollback.
+Control-plane recovery remains unproven. The earlier isolated restore experiment
+failed and its implementation has been retired; no automated restore procedure is
+maintained. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade, outage and
+recovery-decision gates. A backup does not guarantee rollback.
 
 This workflow creates native RKE2 snapshots on the existing control-plane host
 and uploads them to the operator-owned RustFS bucket over verified HTTPS. It
@@ -25,13 +24,17 @@ a datastore or upgrade a node. Local validation is not live backup evidence.
 - The producer endpoint must pass system-trusted HTTPS from the control plane.
   Private-CA distribution needs separate review; neither plaintext nor TLS
   verification bypass is supported. Use a dedicated bucket-scoped credential.
+- Encrypted RustFS snapshot retrieval also depends on its external OpenBao KMS.
+  Independent backup credentials do not remove that dependency. Independent
+  OpenBao/key recovery remains deferred; a working-KMS download is not proof of
+  recovery while OpenBao is unavailable.
 - Preserve the RKE2 server token corresponding to every retained recovery point.
   Enroll it and the backup credential in external OpenBao through an independently
   reviewed, service-owned enrollment boundary, plus protected Proton Pass copies.
   This runner does not read/write OpenBao or depend on a mounted-secret controller.
 - Recover the independent copies without Kubernetes or available OpenBao before
   attesting custody. A fingerprint/checkbox does not prove independent custody
-  or a successful restore. Isolated restore qualification is a separate gate.
+  or a successful restore. Keep the unproven recovery limitation explicit.
 - Approve the snapshot-data at-rest protection boundary before uploading real
   datastore contents. Native bootstrap encryption does not encrypt every etcd
   value, and ZIP compression is not encryption. This workflow does not enable

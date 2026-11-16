@@ -88,8 +88,8 @@ request. A reboot is an attempt to use the installed module set, not proof that
 the next kernel has it: enrollment rechecks availability afterwards. The agent
 remains gated on installation success and a separately enrolled token file.
 
-This is the fresh-worker path; it does not alter the control-plane or restore
-lab's separate reboot sequence. Existing guests do not receive updated helpers
+This is the fresh-worker path; it does not alter the control-plane's separate
+reboot sequence. Existing guests do not receive updated helpers
 when snippets change. For an older unenrolled guest, review installation of the
 tracked helper/configuration before using this enrollment flow; do not rerun
 cloud-init to retrofit it.

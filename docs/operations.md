@@ -34,8 +34,8 @@ Check each affected consumer's data and credential requirements:
 - Preserve Kuma's application settings and review its manually configured
   targets after a service change.
 
-The [restore lab](../services/kubernetes/restore-lab/README.md#recovery-inputs)
-records RustFS's OpenBao KMS dependency. Encrypted snapshot retrieval currently
+The [backup recovery requirements](../services/kubernetes/BACKUP.md#ownership-and-prerequisites)
+include RustFS's OpenBao KMS dependency. Encrypted snapshot retrieval currently
 requires the functioning external KMS. Independent OpenBao/key recovery remains
 deferred. Resolve key availability before choosing an order that requires one
 service to restore the other. The exact shared storage
@@ -73,7 +73,8 @@ cycles before executing any restore.
    assume RustFS can recover without OpenBao, or that OpenBao recovery requires
    RustFS; resolve the actual configuration first.
 4. Recover Kubernetes's sole server from an approved matching snapshot/token
-   only through its reviewed recovery procedure; then recover workers, runtime
+   only under a separately reviewed recovery plan; no automated control-plane
+   restore procedure is maintained. Then recover workers, runtime
    integration, and retained data. Never initialize a replacement etcd over useful
    data or use re-provisioning as an implicit restore.
 5. Restore applications and observability from their own state owners. Verify
@@ -89,7 +90,7 @@ Keep connection values and raw evidence private.
 - [Kubernetes lifecycle](../services/kubernetes/LIFECYCLE.md): recorded worker
   maintenance and off-node backup evidence; upgrades and host-loss procedures are
   unrehearsed. Isolated restoration failed and remains unproven.
-- [Kubernetes backups](../services/kubernetes/BACKUP.md), [restore lab](../services/kubernetes/restore-lab/README.md),
+- [Kubernetes backups](../services/kubernetes/BACKUP.md),
   [NFS](../services/kubernetes/NFS.md), and [mounted secrets](../services/kubernetes/SECRETS.md).
 - [OpenBao](../services/openbao/README.md): initialized-service protection,
   operator unseal, certificate lifecycle, and recovery custody.
