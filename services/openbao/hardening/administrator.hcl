@@ -33,3 +33,7 @@ path "identity/*" {
 path "sys/capabilities-self" {
   capabilities = ["update"]
 }
+
+path "kv/metadata/*" {
+  capabilities = ["list"]
+}
