@@ -91,9 +91,6 @@ require(command(['getenforce']) == 'Enforcing' and not command(['swapon', '--noh
 require(not Path('/var/lib/rancher/rke2/server/db/etcd').exists(), 'Never enroll an etcd server as a worker')
 require(not Path('/var/lib/rancher/rke2/agent/client-kubelet.crt').exists(), 'Worker is already enrolled')
 require(Path('/var/lib/kubernetes-agent-installed').read_text().strip() != Path('/proc/sys/kernel/random/boot_id').read_text().strip(), 'Wait for the installed-kernel reboot')
-installed_kernel = command(['dnf', '--quiet', '--cacheonly', 'repoquery', '--installed', '--latest-limit=1',
-                            '--queryformat=%{version}-%{release}.%{arch}', 'kernel-core'])
-require(installed_kernel == command(['uname', '-r']), 'Boot the newest installed kernel')
 require(command(['rke2', '--version']).splitlines()[0].split()[2] == p['version'], 'Installed agent version differs')
 config = json.loads(Path('/etc/rancher/rke2/config.yaml').read_text())
 require(config['node-name'] == p['name'] and config['selinux'] is True, 'Worker configuration differs')

@@ -30,9 +30,10 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   Activate only after configuration/enrollment and any required kernel reboot.
   Installing a kernel does not load its modules; failed installation must not
   enable an unsafe start or enrollment. On Rocky, use DNF consistently for package
-  installation and installed-version checks. Enrollment preflight uses cache-only
-  queries and verifies the running kernel against the newest installed kernel,
-  rather than parsing installation dates or silently installing packages.
+  installation and installed-version checks; read-only package checks should use
+  cache-only queries. A reboot marker proves a boot change, not a kernel version
+  or available modules. Gate service activation on actual prerequisites; do not
+  infer a newest-kernel requirement from a previous missing-module failure.
 - Use DHCP and upstream reservations/DNS for stable addressing. Verify effective
   network rendering on the target OS, not just YAML syntax. Where a renderer drops
   required settings, use its supported native configuration instead of post-boot
