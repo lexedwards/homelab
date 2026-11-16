@@ -83,4 +83,7 @@ power_state:
   mode: reboot
   delay: now
   timeout: 60
-  condition: [test, -f, /var/lib/kubernetes-agent-installed]
+  condition:
+    - bash
+    - -c
+    - test -f /var/lib/kubernetes-agent-installed && cmp -s /var/lib/kubernetes-agent-reboot-required /proc/sys/kernel/random/boot_id

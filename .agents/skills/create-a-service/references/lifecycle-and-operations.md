@@ -33,7 +33,10 @@ repositories, dependencies, static configuration and systemd units/timers/drop-i
   installation and installed-version checks; read-only package checks should use
   cache-only queries. A reboot marker proves a boot change, not a kernel version
   or available modules. Gate service activation on actual prerequisites; do not
-  infer a newest-kernel requirement from a previous missing-module failure.
+  infer a newest-kernel requirement or unconditional reboot from a previous
+  missing-module failure. Check the running kernel's required modules, request a
+  first-boot reboot only when needed, and recheck after it. Activate declared
+  secondary network profiles explicitly rather than depending on that reboot.
 - Use DHCP and upstream reservations/DNS for stable addressing. Verify effective
   network rendering on the target OS, not just YAML syntax. Where a renderer drops
   required settings, use its supported native configuration instead of post-boot

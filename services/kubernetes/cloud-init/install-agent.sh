@@ -9,7 +9,7 @@ source /etc/os-release
 [[ ! -d /var/lib/rancher/rke2/server/db/etcd && ! -f /var/lib/rancher/rke2/agent/client-kubelet.crt ]] || {
   echo 'First-boot installation must not reprovision an enrolled node.' >&2; exit 1;
 }
-rm -f /var/lib/kubernetes-agent-installed
+rm -f /var/lib/kubernetes-agent-installed /var/lib/kubernetes-agent-reboot-required
 version=$1
 selinux_version=$2
 [[ $version =~ ^1\.[0-9]+\.[0-9]+~rke2r[0-9]+-[0-9]+\.el10$ ]]
@@ -33,9 +33,14 @@ restorecon -RF /etc/rancher/rke2 /var/lib/rancher/rke2 \
   /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2 /usr/local/sbin/kubernetes-node-preflight \
   /etc/systemd/system/rke2-agent.service.d /etc/NetworkManager/system-connections/kubernetes-service.nmconnection
 nmcli general reload
+nmcli connection load /etc/NetworkManager/system-connections/kubernetes-service.nmconnection
+nmcli --wait 60 connection up id kubernetes-service ifname ens19
 sshd -t
 systemctl reload sshd
 systemctl daemon-reload
 systemctl enable rke2-agent
 [[ $(getenforce) == Enforcing ]]
+if ! /usr/local/sbin/kubernetes-node-preflight --check-modules; then
+  cat /proc/sys/kernel/random/boot_id > /var/lib/kubernetes-agent-reboot-required
+fi
 cat /proc/sys/kernel/random/boot_id > /var/lib/kubernetes-agent-installed
