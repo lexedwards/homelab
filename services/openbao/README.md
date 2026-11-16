@@ -16,6 +16,8 @@ This is a single server, not an HA cluster.
 - OpenTofu 1.9 or newer, `make`, `yamllint` and Python 3 for local validation.
 - For manual administration, the guest's installed OpenBao CLI or a workstation
   CLI with a verified release signature/checksum and matching architecture.
+- The initialization procedure additionally needs Bash, jq and GNU coreutils on
+  the trusted operator workstation; it requires no sudo or SSH agent.
 - A trusted Incus client, the Micro Node `default` directory storage pool, and
   unmanaged `br0` bridge.
 - A reviewed Debian 13 ARM64 cloud image. The upstream Incus image catalogue
@@ -62,9 +64,10 @@ make init
 make validate
 ```
 
-Validation runs format/OpenTofu checks, YAML template linting, and package-helper and
-deploy-hook syntax checks. It does not contact infrastructure, issue certificates,
-start OpenBao or prove guest systemd/cgroup behavior. The existing service has
+Validation runs format/OpenTofu checks, YAML template linting, and package-helper,
+deploy-hook and initialization-procedure syntax checks. It does not contact
+infrastructure, issue certificates, start OpenBao or prove guest systemd/cgroup
+behavior. The existing service has
 passed authenticated HTTPS access and real certificate renewal/reload checks;
 local validation does not repeat those runtime checks.
 
@@ -205,16 +208,60 @@ send HUP, and verify served TLS and health again.
 Choose the Shamir share count and threshold with the operator before
 initialization. Store shares securely outside this server and outside OpenBao,
 Git, OpenTofu, cloud-init, logs, and issue discussions. Keep a recoverable copy
-outside Micro Node's failure domain. The defaults are five shares with a
-threshold of three; they are not an automatically selected custody policy here.
+outside Micro Node's failure domain. The native CLI defaults to five shares with
+a threshold of three; the procedure below requires both values explicitly, with
+`1 <= threshold <= shares <= 255`. It does not select the custody policy for you.
 
-Run these commands yourself in a private interactive terminal, not an agent
-transcript. Use the certificate's private DNS name and normal system trust:
+The existing service is initialized: **do not run initialization against it**.
+For an explicitly authorized new installation, run the service-local procedure
+yourself on a trusted workstation in a private terminal, not an agent transcript.
+Use the certificate's private DNS name and normal system trust:
 
 ```bash
 export BAO_ADDR='<private-verified-openbao-https-origin>'
-bao status
-bao operator init -key-shares='<share-count>' -key-threshold='<threshold>'
+set +x
+make initialize-openbao \
+  OPENBAO_INIT_DIR='<new-protected-custody-directory>' \
+  OPENBAO_KEY_SHARES='<share-count>' \
+  OPENBAO_KEY_THRESHOLD='<threshold>'
+```
+
+The Make target invokes `scripts/initialize.sh`; it is never a dependency of
+`make init`, `make apply` or `make validate`. All three Make inputs are required
+and have no defaults. They are non-secret selectors, not key shares or tokens;
+`BAO_ADDR` and any supported CA trust remain environment inputs. `make help`
+lists the operator entry point.
+
+The destination must be a new absolute directory directly under an existing,
+operator-owned directory with mode `0700`, outside the repository and the server's
+failure domain. The procedure creates it exclusively as `0700`, with files `0600`.
+Choose a protected/encrypted local filesystem with reliable writes and sufficient
+space. Plaintext shares and the initial root token are stored together in
+`init.json`: this is temporary recovery custody, not independent share distribution.
+Never print it into a transcript, commit it, or leave it on the OpenBao guest.
+
+The procedure checks verified HTTPS and uninitialized Shamir/Raft storage, disables
+client retries, then invokes native `bao operator init` exactly once. It validates
+the captured response and confirms that the server remains initialized and sealed.
+It does not unseal, log in, write OpenTofu state, configure authorization or revoke
+tokens. Its success message proves local capture, not independent recovery custody:
+privately distribute/verify the shares and preserve a recoverable copy outside
+Micro Node before continuing.
+
+Any timeout, interruption, invalid response or failed final check is a stop
+condition. The directory, raw response and protected diagnostics remain, even
+when incomplete; inspect them and the server's status privately. Do not delete
+the directory or choose another destination to force a retry. A successful server
+initialization with lost output cannot be fixed by initializing again. Existing
+destinations and already-initialized storage are refused without an init request.
+The procedure cannot fence a different operator's native CLI: serialize all
+initialization activity. It intentionally supports only this service's root
+namespace, direct verified HTTPS and manual Shamir/Raft setup, not auto-unseal,
+agent endpoints, wrapping or TLS-name overrides.
+
+After recovery custody is verified, manually unseal in the private terminal:
+
+```bash
 bao operator unseal
 ```
 

@@ -71,12 +71,20 @@ Consider Ansible only where repeated orchestration demonstrably warrants it; do
 not add a framework solely to wrap commands. Keep supported declarative API
 configuration in its OpenTofu owner; separate credential issuance/value enrollment.
 
+- **all operator-run scripts need a Makefile entry**. Put the entry in the owning
+  directory, list it in `make help`, and document the Make invocation. Keep it
+  explicit and separate from deployment/validation dependencies. Pass credentials
+  through protected environment/files, never Make arguments or echoed recipes.
+  Guest boot hooks and daemon-internal scripts are not operator entry points.
 - Document invocation, prerequisites, privilege, side effects, completion checks
   and failure/retry behavior. Preserve identity and refuse unsafe overwrites.
 - Make OpenBao initialization, recovery-material custody, scoped access setup and
   root-token revocation separate stages. Initialize only uninitialized storage;
   uncertain output custody is a stop condition, not permission to initialize again.
-  Verify scoped access before revoking initial root access. Preserve manual unseal.
+  Capture recovery output directly into exclusively created protected custody,
+  never a terminal/log stream. Verify independent custody separately from local
+  capture, and scoped access before revoking initial root access. Preserve manual
+  unseal; initialization must not silently continue into later stages.
 - Reuse authoritative version/configuration inputs between fresh bootstrap and
   maintenance; do not create independent definitions. A helper's compatibility
   limits remain distinct from the desired version.
