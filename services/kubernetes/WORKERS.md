@@ -112,14 +112,14 @@ workload Secret synchronization.
 After authorized provisioning and reservations, run from a trusted workstation:
 
 ```bash
-python3 scripts/enroll-worker.py \
+make enroll-worker SCRIPT_ARGS="\
   --server-ssh '<admin>@<server-address>' \
   --worker-ssh '<admin>@<worker-primary-address>' \
   --identity-file '<approved-private-key>' \
   --server-known-hosts '<reviewed-server-host-keys>' \
   --worker-known-hosts '<reviewed-worker-host-keys>' \
   --node-name '<worker-name>' --host '<compute-or-store>' \
-  --api-server '<private-verified-api-url>'
+  --api-server '<private-verified-api-url>'"
 ```
 
 Host keys must already be reviewed; new keys are never accepted automatically.

@@ -3,8 +3,10 @@ YAMLLINT ?= yamllint
 PYTHON ?= python3
 HELM ?= helm
 PLAN_FILE ?= deployment.tfplan
+SCRIPT_ARGS ?= --help
+OPERATOR_TARGETS := backup-recovery-custody check-control-plane check-policy-probe enroll-worker etcd-backup label-secrets-provider prepare-secret-auth restore-control-plane
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare plan apply $(OPERATOR_TARGETS)
 
 help:
 	@printf '%s\n' \
@@ -21,7 +23,16 @@ help:
 		'secrets-csi-validate Verify/render local CSI_DRIVER_CHART and CSI_PROVIDER_CHART with SECRET_ENROLLMENT' \
 		'secrets-csi-prepare Verify/render those inputs and emit private files in new SECRETS_OUTPUT' \
 		'plan             Write an authorized online plan to PLAN_FILE' \
-		'apply            Apply only a previously inspected, unchanged PLAN_FILE'
+		'apply            Apply only a previously inspected, unchanged PLAN_FILE' \
+		'Operator scripts (SCRIPT_ARGS defaults to --help; execution requires separate authorization):' \
+		'backup-recovery-custody Attest independently recovered private files' \
+		'check-control-plane Check the existing single-server cluster' \
+		'check-policy-probe Probe an approved network-policy fixture' \
+		'enroll-worker    Enroll one fresh worker over verified SSH' \
+		'etcd-backup      Plan or explicitly execute backup/status operations' \
+		'label-secrets-provider Check or explicitly apply exact worker directory labels' \
+		'prepare-secret-auth Prepare private authentication inspection artifacts offline' \
+		'restore-control-plane Plan or explicitly restore an owned fenced scratch VM'
 
 init:
 	$(TOFU) init
@@ -87,3 +98,6 @@ plan:
 apply:
 	test -f "$(PLAN_FILE)"
 	$(TOFU) apply "$(PLAN_FILE)"
+
+$(OPERATOR_TARGETS):
+	@$(PYTHON) -B "scripts/$@.py" $(SCRIPT_ARGS)

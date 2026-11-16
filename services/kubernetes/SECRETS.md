@@ -265,15 +265,21 @@ or nested-field syntax is supported by this initial interface.
 From this service directory:
 
 ```bash
-python3 -B scripts/prepare-secret-auth.py \
+make prepare-secret-auth SCRIPT_ARGS="\
   --input /protected/location/auth.json \
-  --output-dir /protected/location/prepared-auth
+  --output-dir /protected/location/prepared-auth"
 ```
 
 - `--input PATH`: required protected JSON configuration, at most 1 MiB.
 - `--output-dir PATH`: required new directory outside this repository. Its parent
   must already exist. The tool creates mode `0700` with mode `0600` files.
 - `--help`: show the command contract without reading configuration.
+
+Omitting `SCRIPT_ARGS` shows that help. `make label-secrets-provider` exposes the
+worker-local directory checker in the same way; only a separately authorized
+`SCRIPT_ARGS=--apply` changes the exact approved mapping. That target requires a
+reviewed checkout and root execution context on the intended worker, not an
+operator workstation. It does not replace runtime's pinned-SSH orchestration.
 
 Exit `0` means the files were prepared, not that authentication works. Exit `1`
 means validation or file creation failed; argument errors use exit `2`. Values and

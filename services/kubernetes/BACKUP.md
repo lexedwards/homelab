@@ -106,12 +106,12 @@ live server-token file. The helper rejects the live default path, but the operat
 must verify the copies' actual origin and availability:
 
 ```bash
-python3 -B scripts/backup-recovery-custody.py \
+make backup-recovery-custody SCRIPT_ARGS="\
   --config /protected/backup-target.json \
   --credentials-file /protected/recovered-backup-credentials.json \
   --server-token-file /protected/recovered-server-token \
   --independent-copies-confirmed \
-  --output /protected/new-backup-recovery-custody.json
+  --output /protected/new-backup-recovery-custody.json"
 ```
 
 Use `--previous /protected/previous-custody.json` during rotation to retain older
@@ -120,6 +120,13 @@ until their retained snapshots and version history have a reviewed disposition.
 The helper correlates the normalized server-password hash with native snapshot
 annotations; it never writes the token into its output. Credential rotation
 changes the credential fingerprint and requires renewed independent custody.
+
+`make backup-recovery-custody` shows help unless `SCRIPT_ARGS` is supplied. From a
+reviewed checkout on the control-plane guest, `make etcd-backup` likewise shows
+help; `SCRIPT_ARGS=backup` selects the non-mutating native plan and
+`SCRIPT_ARGS='status --execute'` selects the separately authorized status operation.
+Root-only inputs require the approved root execution context. These Make entries
+do not install the helper, elevate privileges or enable the existing timer.
 
 Never put values in CLI arguments, environment debug logs, OpenTofu inputs/state,
 cloud-init or tickets. Native credentials are supplied only to the child CLI's

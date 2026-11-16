@@ -75,6 +75,9 @@ configuration in its OpenTofu owner; separate credential issuance/value enrollme
   directory, list it in `make help`, and document the Make invocation. Keep it
   explicit and separate from deployment/validation dependencies. Pass credentials
   through protected environment/files, never Make arguments or echoed recipes.
+  A thin argument-forwarding target should default to help, preserve the script's
+  native safety/privilege checks and document its working directory; it must not
+  become a second configuration parser or remote-execution owner.
   Guest boot hooks and daemon-internal scripts are not operator entry points.
 - Document invocation, prerequisites, privilege, side effects, completion checks
   and failure/retry behavior. Preserve identity and refuse unsafe overwrites.

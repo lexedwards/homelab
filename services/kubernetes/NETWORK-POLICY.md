@@ -81,12 +81,12 @@ directions. Never substitute a Service that might route back to the source pod.
 ### Probe Command
 
 ```bash
-python3 scripts/check-policy-probe.py \
+make check-policy-probe SCRIPT_ARGS="\
   --source 'policy-check/<client-pod>' \
   --destination 'policy-check/<server-pod>' \
   --port '<reviewed-fixture-listener>' --expect allow \
   --api-server '<private-verified-api-url>' \
-  --evidence '<protected-new-receipt.json>'
+  --evidence '<protected-new-receipt.json>'"
 ```
 
 - `--source`, `--destination`: distinct `namespace/pod` identities. Both must be

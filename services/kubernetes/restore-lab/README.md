@@ -155,7 +155,10 @@ output and lab server journal output are suppressed, not published as evidence.
 
 ## Execute and verify
 
-Use `../scripts/restore-control-plane.py --help` for required file arguments.
+Use `make -C .. restore-control-plane` for required file arguments; it defaults
+to help. Pass trusted non-secret flags and protected input paths in `SCRIPT_ARGS`.
+Relative paths resolve from the parent Kubernetes service directory, not this
+lab directory. The native script remains plan-only unless `--execute` is given.
 Its default mode reads only the target metadata: no credentials, snapshot,
 API calls or guest changes. After procedure review and explicit runtime approval,
 add `--execute --receipt <new-private-receipt>` with the same file arguments.

@@ -94,6 +94,39 @@ These checks do not exercise RPM installation, kernel boot, SELinux policy,
 authenticated DNS publication or runtime readiness. No infrastructure is created
 or contacted. Init downloads providers but does not plan or deploy it.
 
+### Operator commands
+
+Run `make help` in this service directory to discover operator entry points.
+Each command below defaults to its script's `--help`, without reading deployment
+inputs or contacting services. Supply only trusted, shell-quoted non-secret flags
+through `SCRIPT_ARGS`; credentials remain in the scripts' protected file or
+environment channels. Recipes are not echoed, but Make arguments are still command
+arguments: never put a token, password or key value in them. Relative input paths
+resolve from this service directory, including when using `make -C`.
+
+```bash
+make enroll-worker
+make prepare-secret-auth SCRIPT_ARGS="--input '/protected/auth.json' --output-dir '/protected/new-auth'"
+```
+
+| Make target | Execution context and effect after explicit arguments |
+| --- | --- |
+| `backup-recovery-custody` | Trusted recovery workstation; reads recovered copies and writes a new attestation. See [backup custody](BACKUP.md). |
+| `check-control-plane` | Trusted client with the selected kubeconfig/kubectl; bounded read-only API checks. Guest defaults require guest-local execution. |
+| `check-policy-probe` | Authorized cluster client; creates a probe connection and Cilium observations. See [network-policy qualification](NETWORK-POLICY.md). |
+| `enroll-worker` | Trusted workstation; privileged SSH enrollment and short-lived token issuance/revocation. See [worker enrollment](WORKERS.md). |
+| `etcd-backup` | Reviewed control-plane guest; native plan by default, mutation only with `--execute`. See [backup operations](BACKUP.md). |
+| `label-secrets-provider` | Approved Rocky worker with root privileges; checks local SELinux mapping, changes it only with `--apply`. See [secret delivery](SECRETS.md). |
+| `prepare-secret-auth` | Trusted workstation; offline private inspection artifacts only. See [authentication preparation](SECRETS.md). |
+| `restore-control-plane` | Trusted recovery workstation; native plan by default, scratch restore only with `--execute`. See the [restore lab](restore-lab/README.md). |
+
+These entries call the existing scripts without changing their flags, safety
+checks or privilege requirements. They never elevate privileges or start an SSH
+agent. Run guest-local entries only from a reviewed checkout on the intended guest
+with the required tools/identity; the Makefile is not a remote-execution layer.
+Installed systemd helpers retain their existing native invocation and scheduling.
+None of these targets is a deployment or validation dependency.
+
 ## Reviewed plan and deployment
 
 Only after separate authorization, verify template/key fingerprints, current
