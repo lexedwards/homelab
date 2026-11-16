@@ -85,7 +85,7 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
 checks and the repository's literal service-boundary check, including the runtime
-and restore-lab roots. `make test` checks only the worker DNS transformations:
+root. `make test` checks only the worker DNS transformations:
 case-insensitive primary-MAC address selection, loopback/link-local filtering,
 and reversed IPv4 PTR names, with the DNS provider mocked. Native variable and
 lifecycle validation retain responsibility for invalid inputs.
@@ -137,11 +137,12 @@ user-data, not a post-boot command or a helper that rewrites network settings.
 `ens18` is the primary VirtIO interface in the reviewed Rocky/Q35 single-NIC
 layout. Revalidate this mapping if the image or PCI/NIC layout changes. Workers
 use separate primary network-data and a native secondary NetworkManager profile;
-see the worker runbook for the renderer limitation and required reboot boundary.
+see the [worker runbook][workers] for the renderer limitation, explicit secondary
+profile activation and module-availability-based reboot decision.
 
 The pinned HashiCorp cloudinit provider composes plain MIME user-data; network-data
-stays separate. `cloud-init/node-baseline.yaml.tftpl` is shared by the server,
-workers and isolated restore lab. It declares distribution packages, signed EL10
+stays separate. `cloud-init/node-baseline.yaml.tftpl` is shared by the server and
+workers. It declares distribution packages, signed EL10
 repositories, the reviewed Rancher key, module/sysctl files and tmpfiles rules.
 Role templates retain identity, SSH, RKE2 configuration and activation gates.
 
@@ -311,8 +312,8 @@ The backup policy is six-hour snapshots retained fourteen days
 in a dedicated off-node bucket, verified TLS and independent credential custody.
 Approximately four hours is a planning recovery target, not an SLA or tested
 restore duration. Off-node backup and scheduled execution were verified, but the
-isolated restore experiment failed. The operator accepted unproven recovery and
-deferred a smaller lab. Do not call this server
+isolated restore experiment failed and its implementation has been retired.
+No automated control-plane restore procedure is maintained. Do not call this server
 restore-qualified or assume a snapshot is a proven rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 
@@ -326,8 +327,9 @@ Expect API/scheduling/reconciliation downtime for a single-server restart or
 `compute` outage. The initialized server passed guest-reboot checks; repeat
 identity/health checks after future maintenance without reconstructing etcd.
 Initial bootstrap failure may recreate only reviewed newly owned resources;
-after useful data exists, use an authorized isolated restore, not VM deletion,
-`cluster-reset` against production or an unreviewed package downgrade.
+after useful data exists, stop and agree a separately reviewed recovery plan.
+VM deletion, `cluster-reset` against production and unreviewed package downgrades
+are not implicit repair operations.
 
 ### Recovering an earlier failed first boot
 

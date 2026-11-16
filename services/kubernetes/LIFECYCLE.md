@@ -14,7 +14,7 @@ worker on each Proxmox host. The control plane is not highly available.
 | --- | --- |
 | Backups | Native off-node upload, independent credential custody, freshness/failure reporting and a natural six-hour timer run verified. |
 | Worker maintenance | Replacement and planned drained reboot checks passed; do not repeat them merely to complete documentation. |
-| Isolated restore | Experiment failed; recovery remains unproven. Operator accepted the risk and deferred a smaller proof. The failed VM was removed. |
+| Control-plane recovery | Earlier isolated restore experiment failed; its implementation has been retired. Recovery remains unproven, with no maintained automated restore procedure. |
 | Server-first upgrade and bounded host-loss exercises | Procedures below are unrehearsed, not runtime acceptance evidence. |
 | Three-server expansion | Future design only; no extra server or HA frontend is deployed by this runbook. |
 
@@ -106,8 +106,8 @@ the change plan rather than treating this document as a new version pin.
    exclusions for that exact transaction. Do not disable signature checks or use
    an unpinned install script. Review any target-minor repository change first.
 3. Review version-dependent tooling before starting. The backup helper rejects
-   versions other than its maintained pin; enrollment, chart render checks and
-   the restore helper also contain version assumptions. Prepare their compatible
+   versions other than its maintained pin; enrollment and chart render checks
+   also contain version assumptions. Prepare their compatible
    updates and checks without assuming they continue to work after an RPM change.
    Preserve the timer's intended schedule and make failed/missed backup runs visible.
 4. Complete the common baseline and approved pre-upgrade snapshot/custody checks.
