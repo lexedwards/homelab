@@ -19,7 +19,8 @@ implementation reference.
    Its full-control VM resource is not the default for every new clone.
    `services/kubernetes/cloud-init.tf` demonstrates the Rocky/RKE2 alternative:
    native distribution packages and signed `yum_repos`, with a bounded explicit
-   install command preserving RKE2 repository exclusions and reboot/token gates.
+   install command preserving RKE2 repository exclusions. Workers request a reboot
+   only when module availability requires it and retain the separate token gate.
 4. Inspect the schema of the provider version pinned by current roots before
    using an argument not present in those examples.
 
