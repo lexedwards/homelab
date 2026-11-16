@@ -134,6 +134,10 @@ match. Verify the full configured OS FQDN before enrollment as described above;
 this command does not validate its DNS suffix or upstream DNS records.
 
 The command refuses existing node identities, agent certificates and token files.
+Before issuing a token, worker preflight uses a cache-only DNF query to require
+the running kernel to match the newest installed `kernel-core` version. Missing
+packages, query failures or an older running kernel block enrollment; no package
+installation or repository refresh is performed by this check.
 It transfers credentials through subprocess stdin over pinned SSH, exclusively
 creates root-only mode-0600 `/etc/rancher/rke2/join-token`, restores its label and
 queues agent startup with native `systemctl start --no-block`. The command waits
