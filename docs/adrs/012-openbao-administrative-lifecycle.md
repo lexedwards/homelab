@@ -25,8 +25,11 @@ Use three sibling roots under `services/openbao/`:
   administration. The former `authorization/` state moves here unchanged.
 - `accounts/` owns identity metadata and policy assignments for people, systems
   and machine accounts without another service's IaC owner. Service-specific
-  roles and policies remain with their service under ADR 002. No speculative
-  machine identities are provisioned.
+  runtime roles and policies remain with their service under ADR 002. Accounts
+  also owns the personal operator's optional exact-record warehouse credential
+  editor: create, update and read only, with no deletion or wildcard access. This
+  is human credential enrollment, not the warehouse's runtime authorization. No
+  speculative machine identities are provisioned.
 
 Use userpass for the named personal administrator. Store its unique password in
 Proton Pass. Password enrollment, login, issued tokens and root revocation stay

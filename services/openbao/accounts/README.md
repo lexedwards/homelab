@@ -2,9 +2,10 @@
 
 This root owns identity metadata and policy assignments for people, systems and
 machine accounts without another service's IaC owner. It currently manages only
-the named personal administrator. Service-specific roles and policies remain in
-their service roots. No future CI/CD identity is provisioned; machine automation
-must use a separate identity, never the operator's password.
+the named personal administrator and its optional warehouse credential-editing
+policy. Service-specific runtime roles and policies remain in their service roots.
+No future CI/CD identity is provisioned; machine automation must use a separate
+identity, never the operator's password.
 
 ## Credential Boundary
 
@@ -105,6 +106,43 @@ to mount limits. Renew before expiry or log in again. A valid, sufficiently
 privileged `VAULT_TOKEN` is required for both plan and saved-plan apply. Remove old
 `TF_VAR_configuration_token` and `TF_VAR_openbao_admin_token` injection from
 operator setup; service-specific enrollment-issuer inputs remain unchanged.
+
+## Warehouse Credential Editing
+
+The base administrator policy manages authorization, not secret values. To enroll
+and verify warehouse S3 credentials, set the optional `warehouse_secret_path` in
+this root's ignored tfvars to the same exact KV-v2 **data API path** supplied as
+`secret_path` to the warehouse access root. Use an explicit operator-supplied
+value, not cross-service state access. The default `null` creates no editor policy
+and adds no secret-value grant.
+
+When enabled, this root creates `openbao-warehouse-credential-editor` and adds it
+to the named administrator's token policies, preserving the administrative policy.
+The editor permits only `create`, `update` and `read` on that exact record. It
+grants no wildcard, child-path, listing, metadata, delete, undelete or version
+destruction access. Existing policies still contribute their own permissions;
+the administrator is trusted to author ACLs and is not isolated from self-grants.
+Warehouse runtime reader and enrollment-issuer policies remain warehouse-owned.
+
+From canonical `main`, generate and review a fresh accounts plan using the current
+non-root `VAULT_TOKEN`. Expect one policy creation and a metadata-only account
+update, without password fields. Apply only that reviewed plan under separate
+authorization. Existing policy-name collisions require an ownership/adoption
+decision, not forced overwrite.
+
+After applying, log in again and export the fresh token using the login procedure
+above. Existing sessions do not acquire the newly attached policy. Credential
+population and value verification are separate protected operations outside
+OpenTofu; do not print either AWS credential in logs or transcripts. A full KV
+write replaces the record's fields and creates a new version; `update` permits
+replacement of its current contents even though deletion is not granted. This
+policy does not grant the `patch` capability.
+
+Removing an attachment affects future logins, not tokens already issued with that
+policy. Explicitly retire those tokens when removing access. The policy is
+destruction-guarded; reverting the input to `null` is not an automatic revocation
+procedure. A separately reviewed removal must handle outstanding tokens and the
+policy's lifecycle guard.
 
 ## Explicitly Revoke The Original Root Token
 

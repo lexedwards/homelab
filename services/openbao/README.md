@@ -10,7 +10,7 @@ again or rerun first boot to adopt this layout.**
 | --- | --- | --- |
 | [init](init/README.md) | Incus server, durable volume, DNS and first-boot configuration | Independent Incus/DNS credentials; no OpenBao API dependency |
 | [hardening](hardening/README.md) | Shared AppRole/userpass mounts and administrative policy | Initial root token only for bootstrap; non-root administration afterwards |
-| [accounts](accounts/README.md) | Personal administrator metadata and identities without another IaC service owner | Named non-root administrator |
+| [accounts](accounts/README.md) | Personal administrator metadata, optional exact-record warehouse credential editing, and identities without another IaC service owner | Named non-root administrator |
 
 Service-specific policies, paths and roles stay with their owning services, per
 [ADR 002][ownership]. `accounts/` does not centralize those definitions. Future

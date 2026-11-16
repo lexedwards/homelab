@@ -43,10 +43,42 @@ variable "administrator_policy" {
   }
 }
 
+variable "warehouse_secret_path" {
+  description = "Exact KV-v2 data path for personal warehouse credential create/update/read access; null disables this grant."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition = var.warehouse_secret_path == null ? true : (
+      can(regex("^[a-z][a-z0-9-]*/data/[A-Za-z0-9_/-]+$", var.warehouse_secret_path)) &&
+      !contains(["sys", "auth", "identity", "cubbyhole"], split("/", var.warehouse_secret_path)[0]) &&
+      alltrue([for part in split("/", var.warehouse_secret_path) : part != ""])
+    )
+    error_message = "Use null or one exact KV-v2 data path without wildcards or traversal."
+  }
+}
+
 provider "vault" {
   address          = var.openbao_address
   skip_tls_verify  = false
   skip_child_token = true
+}
+
+resource "vault_policy" "warehouse_credentials" {
+  count = nonsensitive(var.warehouse_secret_path == null) ? 0 : 1
+
+  name            = "openbao-warehouse-credential-editor"
+  allow_overwrite = false
+  policy          = <<-POLICY
+    path ${jsonencode(var.warehouse_secret_path)} {
+      capabilities = ["create", "update", "read"]
+    }
+  POLICY
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_generic_endpoint" "operator" {
@@ -54,7 +86,7 @@ resource "vault_generic_endpoint" "operator" {
   ignore_absent_fields = true
   disable_delete       = true
   data_json = jsonencode({
-    token_policies          = [var.administrator_policy]
+    token_policies          = concat([var.administrator_policy], vault_policy.warehouse_credentials[*].name)
     token_no_default_policy = true
     token_ttl               = 3600
     token_max_ttl           = 28800
