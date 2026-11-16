@@ -220,8 +220,17 @@ Use the certificate's private DNS name and normal system trust:
 ```bash
 export BAO_ADDR='<private-verified-openbao-https-origin>'
 set +x
-bash scripts/initialize.sh '<new-protected-custody-directory>' '<share-count>' '<threshold>'
+make initialize-openbao \
+  OPENBAO_INIT_DIR='<new-protected-custody-directory>' \
+  OPENBAO_KEY_SHARES='<share-count>' \
+  OPENBAO_KEY_THRESHOLD='<threshold>'
 ```
+
+The Make target invokes `scripts/initialize.sh`; it is never a dependency of
+`make init`, `make apply` or `make validate`. All three Make inputs are required
+and have no defaults. They are non-secret selectors, not key shares or tokens;
+`BAO_ADDR` and any supported CA trust remain environment inputs. `make help`
+lists the operator entry point.
 
 The destination must be a new absolute directory directly under an existing,
 operator-owned directory with mode `0700`, outside the repository and the server's
