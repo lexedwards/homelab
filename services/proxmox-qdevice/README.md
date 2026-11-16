@@ -94,6 +94,17 @@ OpenTofu rewrites `/root/.ssh/authorized_keys` when `root_authorized_keys`
 changes. It does not detect manual edits made inside the instance. SSH remains
 available after setup unless upstream firewall policy blocks it.
 
+The pinned HashiCorp cloudinit provider composes plain, uncompressed MIME user-data
+from the existing cloud-config template. Package installation and SSH hardening
+remain native cloud-init declarations; the root authorized-keys file remains an
+ongoing OpenTofu-owned Incus file, not a second cloud-init key owner.
+
+`make validate` checks OpenTofu syntax/formatting and lints that YAML template.
+It does not contact Incus or prove QDevice/SSH/quorum health. Updating user-data
+does not reconfigure an existing guest. Do not replace an enrolled QDevice or
+rerun cloud-init to adopt a metadata-format change; follow the coordinated
+replacement procedure below if replacement is separately authorized.
+
 OpenTofu uses local state in this directory. State and saved plans are ignored
 by Git and can contain the configured public keys. Back up state and handle plan
 files as environment-specific data.

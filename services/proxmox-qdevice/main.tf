@@ -29,6 +29,17 @@ data "incus_network" "br0" {
   }
 }
 
+data "cloudinit_config" "user_data" {
+  gzip          = false
+  base64_encode = false
+
+  part {
+    filename     = "proxmox-qdevice-cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content      = file("${path.module}/cloud-init/user-data.tftpl")
+  }
+}
+
 resource "incus_instance" "proxmox_qdevice" {
   name     = "proxmox-qdevice"
   image    = var.incus_image
@@ -51,7 +62,7 @@ resource "incus_instance" "proxmox_qdevice" {
 
   config = {
     "boot.autostart"       = "true"
-    "cloud-init.user-data" = trimspace(templatefile("${path.module}/cloud-init/user-data.tftpl", {}))
+    "cloud-init.user-data" = data.cloudinit_config.user_data.rendered
     "limits.cpu"           = "1"
     "limits.memory"        = "256MiB"
     "security.nesting"     = "true"
