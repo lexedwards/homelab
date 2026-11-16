@@ -14,3 +14,7 @@
 # userpass_mount        =
 # administrator_policy  =
 # operator_username     =
+
+# Optional: null leaves warehouse secret-value access disabled. When enabled,
+# use the exact secret_path supplied to the warehouse access root, not its state.
+# warehouse_secret_path = null
