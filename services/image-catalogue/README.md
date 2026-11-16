@@ -90,7 +90,7 @@ an explicit VM ID, supported release channel, downloaded file name, and template
 disk size. QEMU guest agent support defaults to enabled and can be disabled per
 image.
 
-The supported channels are `amazon-linux-2023`, `debian-13`, `fedora-44`,
+The supported channels are `amazon-linux-2023`, `debian-13`, `fedora-45`,
 `rocky-linux-10`, and `ubuntu-26.04`. OpenTofu reads official publisher metadata
 during each refreshed plan and resolves the selected channel to an immutable
 image URL, its published checksum, and the checksum algorithm. Channel names
@@ -101,7 +101,7 @@ release remains a reviewed code change.
 | --- | --- | --- |
 | `amazon-linux-2023` | [`latest/kvm/SHA256SUMS`][amazon-checksums] | The manifest filename contains the release ID used in the versioned URL. |
 | `debian-13` | [Genericcloud amd64 metadata][debian-metadata] and [`SHA512SUMS`][debian-checksums] | The metadata build version selects the versioned release directory and matching qcow2 checksum. |
-| `fedora-44` | [`releases.json`][fedora-releases] | The Cloud Base Generic x86_64 entry supplies the exact URL and checksum. |
+| `fedora-45` | [`releases.json`][fedora-releases] | The Cloud Base Generic x86_64 entry supplies the exact URL and checksum. |
 | `rocky-linux-10` | [Rocky 10 `CHECKSUM`][rocky-checksums] | The versioned GenericCloud Base entry is selected instead of its mutable `latest` alias. |
 | `ubuntu-26.04` | [Resolute `SHA256SUMS`][ubuntu-checksums] and [`build-info.txt`][ubuntu-build] | The build serial selects the dated release directory and the manifest supplies its checksum. |
 

@@ -43,16 +43,16 @@ locals {
     data.http.debian_13_checksums.response_body,
   ))
 
-  fedora_44_matches = [
+  fedora_45_matches = [
     for image in jsondecode(data.http.fedora_releases.response_body) : image
-    if image.version == "44" &&
+    if image.version == "45" &&
     image.arch == "x86_64" &&
     image.variant == "Cloud" &&
     image.subvariant == "Cloud_Base" &&
     strcontains(image.link, "/Fedora-Cloud-Base-Generic-") &&
     endswith(image.link, ".x86_64.qcow2")
   ]
-  fedora_44 = one(local.fedora_44_matches)
+  fedora_45 = one(local.fedora_45_matches)
 
   rocky_linux_10_match = regex(
     "SHA256 \\((Rocky-10-GenericCloud-Base-([0-9]+\\.[0-9]+-[0-9]+\\.[0-9]+)\\.x86_64\\.qcow2)\\) = ([0-9a-f]{64})",
@@ -79,9 +79,9 @@ locals {
       checksum           = local.debian_13_checksum
       checksum_algorithm = "sha512"
     }
-    "fedora-44" = {
-      url                = local.fedora_44.link
-      checksum           = local.fedora_44.sha256
+    "fedora-45" = {
+      url                = local.fedora_45.link
+      checksum           = local.fedora_45.sha256
       checksum_algorithm = "sha256"
     }
     "rocky-linux-10" = {

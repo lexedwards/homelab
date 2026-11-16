@@ -144,7 +144,7 @@ variable "cloud_images" {
       contains([
         "amazon-linux-2023",
         "debian-13",
-        "fedora-44",
+        "fedora-45",
         "rocky-linux-10",
         "ubuntu-26.04",
       ], image.release_channel) &&
