@@ -11,9 +11,13 @@ AppRole mount, plus the exact existing KV-v2 data path. The dedicated record mus
 contain string fields `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Keep value
 enrollment separate and protected; do not add a secret value resource/data source.
 
-Inject the trusted administrative credential through ephemeral
-`TF_VAR_configuration_token`, not tfvars. Supply it for authorized planning and
-applying. Do not give that credential to the guest or ordinary deployment process.
+Inject the trusted non-root administrative credential through the provider's native
+`VAULT_TOKEN` environment variable, not tfvars. Supply a valid, privileged token for
+both authorized planning and saved-plan apply. See [administrative login] for the
+interactive userpass login and explicit token export: CLI login alone does not set
+`VAULT_TOKEN`. Remove obsolete `TF_VAR_configuration_token` injection. Do not give
+that credential to the guest or ordinary deployment process. The separate
+enrollment-issuer credential and its delivery boundary are unchanged.
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
@@ -58,3 +62,4 @@ as a destroy-time side effect. Rotation/adoption requires a separately reviewed
 procedure, not deletion of working files to force first-boot provisioning.
 
 [SSH enrollment decision]: ../../../docs/adrs/011-ssh-approle-enrollment.md
+[administrative login]: ../../openbao/accounts/README.md

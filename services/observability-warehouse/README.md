@@ -572,5 +572,5 @@ entry, provider-native private-key availability, PAM username, and target snippe
 [Alloy Linux installation]: https://grafana.com/docs/alloy/latest/set-up/install/linux/
 [Grafana Debian installation]: https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/
 [accepted introduction decision]: ../../docs/adrs/011-ssh-approle-enrollment.md
-[AppRole mount]: ../openbao/authorization/README.md
+[AppRole mount]: ../openbao/hardening/README.md
 [access root]: access/README.md

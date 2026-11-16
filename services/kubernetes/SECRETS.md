@@ -32,7 +32,7 @@ No persisted apply runs from a feature worktree.
 
 - OpenBao's service root exports `api_endpoint`, derived from its service-owned
   DNS name and native HTTPS port. Make that output available through an inspected
-  output-only apply in canonical `services/openbao` first. The producer publishes
+  output-only apply in canonical `services/openbao/init` first. The producer publishes
   `tofu output -json api_endpoint` into a protected file outside Git. Supply its
   absolute path as `openbao_endpoint_file`. Do not duplicate its hostname/port,
   import its service implementation, read its state or expose authentication.
@@ -54,13 +54,15 @@ No persisted apply runs from a feature worktree.
   authenticated Node API, not static IP/MAC overrides. Load the approved guest
   and Proxmox SSH identities into the operator's agent; no private-key/password
   argument is stored in OpenTofu.
-- Inject a short-lived scoped setup token through
-  `TF_VAR_openbao_admin_token`, never tfvars or a literal command argument.
-  This variable is **ephemeral**, requiring OpenTofu 1.11+. Its actual value is
-  excluded from state and saved plans. Inject it again for apply; it is not
-  recovered from the plan or a saved CLI login. Do not enable `TF_LOG`, shell
-  tracing or HTTP debug logging. Kubernetes credentials remain inside the
-  protected kubeconfig/approved authentication helper, outside state/plan data.
+- Inject a valid non-root administrative token through the Vault provider's native
+  `VAULT_TOKEN`, never tfvars or a literal command argument. See
+  [administrative login](../openbao/accounts/README.md) for interactive userpass
+  login and the explicit captured export: CLI login caches a session token but
+  does not export `VAULT_TOKEN`. Keep credentials valid and privileged for both
+  plan and saved-plan apply; the plan does not supply them. Remove obsolete
+  `TF_VAR_openbao_admin_token` injection. Do not enable `TF_LOG`, shell tracing or
+  HTTP debug logging. Kubernetes credentials remain inside the protected
+  kubeconfig/approved authentication helper, outside state/plan data.
 
 The API-compatible `hashicorp/vault` provider manages OpenBao's native Kubernetes
 auth method, not a different authentication protocol. The pinned provider schema

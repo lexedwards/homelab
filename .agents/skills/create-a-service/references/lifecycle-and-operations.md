@@ -90,7 +90,14 @@ configuration in its OpenTofu owner; separate credential issuance/value enrollme
   Capture recovery output directly into exclusively created protected custody,
   never a terminal/log stream. Verify independent custody separately from local
   capture, and scoped access before revoking initial root access. Preserve manual
-  unseal; initialization must not silently continue into later stages.
+  unseal; initialization must not silently continue into later stages. OpenBao's
+  `init/`, `hardening/` and `accounts/` roots separate infrastructure, shared auth
+  and otherwise unowned identities. Root is only for initial administrative
+  bootstrap; ongoing API administration uses native `VAULT_TOKEN`. Password
+  enrollment/login stay outside OpenTofu. Verify the selected original root token
+  before explicit self-revocation; the new administrator's self-revocation would
+  not retire it. Preserve existing local state and workspace metadata when moving
+  roots; directory changes must not redeploy initialized services.
 - Reuse authoritative version/configuration inputs between fresh bootstrap and
   maintenance; do not create independent definitions. A helper's compatibility
   limits remain distinct from the desired version.

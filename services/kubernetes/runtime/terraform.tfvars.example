@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # Provider
 # -----------------------------------------------------------------------------
-# Inject TF_VAR_openbao_admin_token ephemerally; never put the token in tfvars.
+# Inject VAULT_TOKEN through the provider's native environment channel, never tfvars.
 # Load the approved guest SSH identity into the operator's agent.
 # API/SSH-user/worker-cohort metadata comes from the infrastructure state.
 # OpenBao publishes its api_endpoint JSON output; never read the hosting state.

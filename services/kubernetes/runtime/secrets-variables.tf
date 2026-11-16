@@ -41,18 +41,6 @@ variable "openbao_endpoint_file" {
   }
 }
 
-variable "openbao_admin_token" {
-  description = "Short-lived scoped setup credential, supplied only through TF_VAR_openbao_admin_token for plan/apply. Ephemeral: never persisted in state or saved plans; no CLI token-cache fallback."
-  type        = string
-  sensitive   = true
-  ephemeral   = true
-  default     = null
-  validation {
-    condition     = var.secrets_platform == null ? true : try(length(trimspace(var.openbao_admin_token)) > 0, false)
-    error_message = "Enabled OpenBao management requires an explicitly injected ephemeral administration token. Do not put it in tfvars, argv or logs."
-  }
-}
-
 variable "secrets_qualification" {
   description = "Owned synthetic service definition only: exact KV-v2 record path and zero/two replicas per runtime. Actual values are populated outside OpenTofu. Enable only after the driver CRDs are installed."
   type = object({

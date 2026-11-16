@@ -36,7 +36,6 @@ provider "vault" {
   address          = local.openbao_endpoint
   skip_child_token = true
   skip_tls_verify  = false
-  token            = var.openbao_admin_token
 }
 
 module "secrets_qualification_delegation" {

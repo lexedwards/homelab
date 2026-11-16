@@ -32,7 +32,9 @@ Repository-level `modules/openbao-deployment-access` defines a bounded named tok
 and a separate issuer policy. An approved administrator can mint a writer directly
 through that role or delegate the issuer policy to an operator identity. Issuance
 and value enrollment use protected files/stdin, outside OpenTofu. OpenTofu stores
-only definitions and uses ephemeral administrative inputs.
+only definitions. [ADR 012](012-openbao-administrative-lifecycle.md) supersedes the
+original ephemeral-input channel with the provider's native `VAULT_TOKEN` channel;
+the administrative ownership boundary remains unchanged.
 
 ## Consequences
 

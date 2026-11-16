@@ -31,16 +31,8 @@ variable "secret_path" {
   }
 }
 
-variable "configuration_token" {
-  description = "Trusted administrative credential; never supplied to the guest."
-  type        = string
-  sensitive   = true
-  ephemeral   = true
-}
-
 provider "vault" {
   address          = var.openbao_address
-  token            = var.configuration_token
   skip_tls_verify  = false
   skip_child_token = true
 }
