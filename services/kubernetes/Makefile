@@ -2,9 +2,10 @@ TOFU ?= tofu
 YAMLLINT ?= yamllint
 PYTHON ?= python3
 HELM ?= helm
+ALLOY ?= alloy
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -20,6 +21,7 @@ help:
 		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
 		'secrets-csi-validate Verify/render local CSI_DRIVER_CHART and CSI_PROVIDER_CHART with SECRET_ENROLLMENT' \
 		'secrets-csi-prepare Verify/render those inputs and emit private files in new SECRETS_OUTPUT' \
+		'observability-chart-validate Verify/render OBSERVABILITY_CHART and validate with chart-matching ALLOY' \
 		'plan             Write an authorized online plan to PLAN_FILE' \
 		'apply            Apply only a previously inspected, unchanged PLAN_FILE'
 
@@ -54,6 +56,7 @@ yaml-validate:
 	$(YAMLLINT) examples/nfs-workloads.yaml.tftpl
 	$(YAMLLINT) platform/secrets-csi.yaml.tftpl
 	$(YAMLLINT) examples/secrets-workloads.yaml
+	$(YAMLLINT) platform/observability/values.yaml
 
 shell-validate:
 	bash -n cloud-init/install-server.sh
@@ -78,6 +81,9 @@ secrets-csi-validate:
 secrets-csi-prepare:
 	test -n "$(SECRETS_OUTPUT)"
 	$(PYTHON) -B scripts/prepare-secrets-csi.py --driver-chart "$(CSI_DRIVER_CHART)" --provider-chart "$(CSI_PROVIDER_CHART)" --enrollment "$(SECRET_ENROLLMENT)" --helm "$(HELM)" --output-dir "$(SECRETS_OUTPUT)"
+
+observability-chart-validate:
+	$(PYTHON) -B scripts/validate-observability-chart.py --chart "$(OBSERVABILITY_CHART)" --helm "$(HELM)" --alloy "$(ALLOY)"
 
 plan:
 	$(TOFU) plan -out="$(PLAN_FILE)"

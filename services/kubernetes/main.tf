@@ -55,7 +55,7 @@ locals {
   }
   cilium_bootstrap_config = yamlencode(local.cilium_chart_config)
   cilium_config = yamlencode(merge(local.cilium_chart_config, {
-    spec = { valuesContent = yamlencode(merge(local.cilium_bootstrap_values, local.service_exposure_values)) }
+    spec = { valuesContent = yamlencode(merge(local.cilium_bootstrap_values, local.service_exposure_values, local.cilium_observability_values)) }
   }))
   cloud_init = templatefile("${path.module}/cloud-init/user-data.tftpl", {
     hostname             = var.control_plane.name

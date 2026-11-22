@@ -27,7 +27,7 @@ data "external" "secrets_chart" {
 }
 
 provider "kubernetes" {
-  config_path = try(var.secrets_platform.kubeconfig_path, null)
+  config_path = var.cluster_api == null ? try(var.secrets_platform.kubeconfig_path, null) : var.cluster_api.kubeconfig_path
   host        = local.secrets_enabled ? local.cluster_connection.api_host : null
   insecure    = false
 }
