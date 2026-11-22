@@ -5,7 +5,8 @@ Its worker-hosted collector scrapes kubelet, resource, cAdvisor, API-server,
 kube-state-metrics and Cilium endpoints and exports cumulative OTLP metrics to
 warehouse Alloy. The same collector watches Kubernetes events and collects
 stdout/stderr from all pods through the API, then exports logs over OTLP. This is
-collection configuration, not deployed acceptance.
+configuration alone, not deployed acceptance. Live acceptance belongs in the
+owning tracker issues.
 
 Node CPU/memory and readiness/pressure coverage does not require Node Exporter,
 host mounts or a control-plane collector. Full host-device monitoring and
@@ -48,6 +49,19 @@ Rotation, reader reconnect, container replacement, API unavailability and collec
 restart can lose or replay records. Queues are shared with the configured export
 pipeline and are lost on restart. Observe failures and compare synthetic sequence
 numbers before/after approved tests; do not infer continuity from a Ready pod.
+
+The bounded November 2026 acceptance tests delivered all 480 numbered stdout/stderr
+records from ordinary and Kata pods on both workers, including container restart,
+without observed duplicates. After collector replacement, all 80 reconnect markers
+arrived and the original records showed no replay. Rotation tests delivered all
+12,288 approximately 1-KiB records per runtime while the current API log files
+retained only their rotated tails. These observations do not guarantee continuity
+at other rates or through longer outages.
+
+A short collector-only export denial produced timeout/retry logs and queued data.
+All 40 test markers arrived after recovery, and queues drained to zero. Configured
+capacity remained 100 batches per signal; the test did not establish saturation
+capacity or restart durability. No warehouse restart was needed.
 
 Applications must not disclose secrets. Optional collection redaction is separate
 defence in depth, not a way to hide unsafe logging. Do not emit real credentials
@@ -138,7 +152,7 @@ the command. It does not establish collector authorization or network enforcemen
    restart RKE2 to deliver the change.
 4. Observe Cilium reconciliation and replacement agent/operator readiness. Verify
    node/API health and ordinary/Kata networking and service exposure before
-   accepting the datapath change. Check metrics from every agent and the operator.
+    accepting the datapath change. Check metrics from every agent and the operator.
 5. Query the real warehouse. Confirm all nodes and required sources, stable
    cluster/node/namespace/workload labels, no duplicate series and export health.
    Neither administrative metric reads nor the local validator proves delivery.
@@ -149,7 +163,14 @@ the command. It does not establish collector authorization or network enforcemen
    pods on each worker. Query their node/namespace/workload identity and event
    object/timestamp fields in Loki. Exercise container restart, bounded rotation
    and collector reconnect; record gaps/replay and recovery rather than claiming
-   lossless delivery. Use only owned fixtures and preserve runtime selection.
+    lossless delivery. Use only owned fixtures and preserve runtime selection.
+
+If the parent plan includes unrelated VM drift, do not apply it. A configuration-only
+native-file update requires separate operator approval: compare generated values
+with the effective live configuration, preserve a private backup, replace the
+persistent file atomically, then check datapath and existing-service health. This
+does not reconcile parent infrastructure state or authorize a later VM apply.
+An absent service-exposure fixture is a verification gap, not a failed live service.
 
 Use the supplied query API access privately. Expected PromQL starting points are
 below; verify translated names and labels against real ingestion before recording
@@ -171,6 +192,10 @@ Missing or stale series are not healthy zeros. Compare source discovery, scrape
 success, collector failure metrics and warehouse/query availability. The existing
 warehouse converter drops delta-temporality metrics; do not change the producer
 to delta to repair missing data.
+
+For large synthetic log checks, start with aggregate counts and return only parsed
+sequence fields when comparing individual records. A full-body query can time out
+even when Loki is ready; distinguish query cost from ingestion or service failure.
 
 ## Upgrade and rollback
 
