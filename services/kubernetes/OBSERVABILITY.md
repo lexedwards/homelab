@@ -81,6 +81,14 @@ create ClusterRoles. Collectors cannot read Secrets or ConfigMaps and do not use
 administrative client certificates. Existing warehouse deployment/state remains
 separate; supply its published endpoint rather than reading its state.
 
+Cilium assigns reserved identities to API-server and node endpoints. CIDR-only
+egress policies do not cover those identities. The runtime therefore also owns
+namespace-scoped CiliumNetworkPolicies: API access for platform pods on the API
+ports, and node-identity access for only the cluster collector on kubelet/Cilium
+metrics ports. This covers joined cluster nodes, not arbitrary external hosts.
+Exact-address policies still bound DNS and warehouse export. Do not enable a
+cluster-wide CIDR matching mode or add broad egress to repair these paths.
+
 Node discovery uses verified kubelet CA and IP identity. The pinned chart's
 experimental component-replacement interface removes its default TLS bypass.
 Chart upgrades require rerendering and revalidation of all three replacements.
@@ -175,6 +183,11 @@ Rollback collector configuration through its canonical OpenTofu/chart owner usin
 a fresh reviewed plan; restore the previously reviewed pin/values, not a second
 Helm release. Roll back Cilium through the same persistent native file owner and
 wait for datapath health. Do not delete release Secrets or weaken TLS/SELinux.
+
+The telemetry chart uses the native controller's `retry` failure policy, supported
+by the reviewed RKE2 CRD. Fix the cause and apply a reviewed configuration change
+to retry a failed install/upgrade; it does not request an uninstall/reinstall.
+Do not switch to `reinstall` or remove release state to clear a failure.
 
 The namespace/chart have destruction guards. Setting the input to null is not an
 automatic safe uninstall; review removal explicitly. Back up runtime state through
