@@ -38,34 +38,50 @@ the cluster DNS record to itself.
 
 ## Deploy, then introduce access separately
 
-1. Deploy only the fixed installation assets from canonical `main`. The published
-   DNS identity must be known and resolve correctly before enrollment/startup.
-   Network, SSH and guest-agent services remain available while RKE2 is gated.
-2. Prepare the independent [OpenBao authorization](recovery/README.md) and populate
+1. Prepare the independent [OpenBao authorization](recovery/README.md) and populate
    its runtime profile and three credential records outside Terraform state.
    Preserve the existing server token. For a first cluster, provision its initial
    token out of band; do not rotate an existing cluster's token to fit bootstrap.
-3. For an existing cluster, independently enroll its namespace UID, actual server
+2. For an existing cluster, independently enroll its namespace UID, actual server
    CA certificate, qualified RKE2 version and normalized native token hash into the
    identity record. Preserve matching token and application-credential copies in
    OpenBao plus independent recovery custody. Absence of that record is permitted
    only for genuine first creation; existing snapshots then prevent creation.
-4. Export the recovery root's `enrollment` output into a private file. Obtain an
-   exact-role wrapped-SecretID issuer, not an administrator or S3 operator token.
-   From the canonical Kubernetes service directory:
+3. Supply the recovery root's non-secret `enrollment` output as `bootstrap_access`
+   in the VM root's private inputs. Set `bootstrap_ssh_known_hosts_file` to an
+   independently verified guest host-key/CA file. Inject the exact-role wrapped
+   issuer only through ephemeral `TF_VAR_bootstrap_issuer_token`; do not write it
+   to tfvars, state or a saved plan. Leave `publication_access` null: bootstrap
+   completion owns publication through its separate OpenBao record.
+4. From canonical `main`, use the owning root's existing state to plan, inspect
+   and apply with explicit deployment approval. After creating the VM and API DNS,
+   `terraform_data.bootstrap_enrollment` waits for cloud-init and introduces access
+   over verified SSH automatically. VM replacement recreates this hook. Changing
+   `bootstrap_enrollment_revision` retries enrollment without changing VM assets or
+   rotating a matching SecretID. Network, SSH and guest-agent services remain
+   available while RKE2 waits. Neither access metadata nor discovery enters cloud-init.
 
-   ```text
-   python3 -B scripts/enroll-bootstrap.py \
-     --enrollment <private-enrollment-output> \
-     --known-hosts <independently-verified-host-key-or-CA-file> \
-     --target <approved-user-at-guest> --issuer-file <private-scoped-issuer>
-   ```
+An enrollment/activation error fails the apply and leaves the hook retryable;
+empty-datastore RKE2 startup stays gated until its safety checks pass. Successful
+enrollment is not cluster readiness or recovery acceptance. With null
+`bootstrap_access`, apply does not enroll: an empty VM continues waiting. This
+preserves explicit separately approved installation/manual-enrollment use.
 
-   First-contact scanning is not host attestation. The command transfers only
-   non-secret access metadata plus a one-time wrapped SecretID over verified SSH.
-   The host saves the reusable SecretID root-only before activation. Repeating
-   introduction for the same role reuses that credential; a different role fails
-   instead of silently rotating it. No VM resource or first-boot bytes change.
+For an explicitly approved standalone introduction or diagnostic retry, the same
+transport remains available from the canonical Kubernetes service directory:
+
+```text
+python3 -B scripts/enroll-bootstrap.py \
+  --enrollment <private-enrollment-output> \
+  --known-hosts <independently-verified-host-key-or-CA-file> \
+  --target <approved-user-at-guest> --issuer-file <private-scoped-issuer>
+```
+
+First-contact scanning is not host attestation. Both paths transfer only
+non-secret access metadata plus a one-time wrapped SecretID over verified SSH.
+The host saves the reusable SecretID root-only before activation. Repeating
+introduction for the same role reuses that credential; a different role fails
+instead of silently rotating it. No VM resource or first-boot bytes change.
 
 The five-minute timer starts an inactive RKE2 service and completes identity and
 publication work. It does not restart an already running server. Endpoint/storage
@@ -132,6 +148,8 @@ recovery remain separate concerns.
 plus isolated filesystem guards. Bubblewrap needs enabled user namespaces; it
 cannot access the network or real datastore. Native OpenTofu console rendering
 also compares actual installation bytes before/after enrollment-input changes.
+Transport fixtures exercise first introduction, matching-credential reuse and
+failure propagation with stubbed SSH/OpenBao in a network-isolated namespace.
 No operation-mode variables exist in the VM root. Local checks do not establish
 the new end-to-end restore, enrollment, identity-writer ACL or snapshot transport
 behavior; those remain main-only live qualification gates.

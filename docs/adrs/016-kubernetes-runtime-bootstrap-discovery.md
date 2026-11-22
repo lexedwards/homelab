@@ -16,6 +16,9 @@ replacement and adds unnecessary operator decisions to boot.
 Keep cloud-init as fixed installation assets and an enrollment-gated startup
 procedure. Introduce OpenBao access over verified SSH separately; obtain runtime
 configuration, existing identity and distinct application credentials from OpenBao.
+As with the warehouse, an apply-time hook owns verified-SSH introduction after
+VM/DNS creation. Its access/host-key/retry inputs affect only enrollment, never
+cloud-init. The issuer is ephemeral; matching credentials are reused on retry.
 
 Preserve initialized local data first. Otherwise join a verified available
 cluster, recover the newest valid matching backup when the exclusive old server

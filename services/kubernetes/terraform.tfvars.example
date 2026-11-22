@@ -69,8 +69,14 @@
 # Runtime bootstrap enrollment
 # -----------------------------------------------------------------------------
 
-# No VM-root bootstrap inputs. Install fixed assets, then follow RECOVERY.md
-# to introduce OpenBao access over verified SSH independently of VM state.
+# Optional: null skips apply-time enrollment; empty hosts wait for access.
+# bootstrap_access = null
+# Supply the recovery root's unchanged non-secret enrollment output privately.
+# bootstrap_ssh_known_hosts_file = null
+# bootstrap_enrollment_revision = "1"
+# bootstrap_issuer_token = null
+# Inject the exact-role issuer through ephemeral TF_VAR_bootstrap_issuer_token.
+# Keep publication_access null when bootstrap_access owns publication.
 # Discovery, runtime configuration and credentials never enter cloud-init.
 
 # -----------------------------------------------------------------------------

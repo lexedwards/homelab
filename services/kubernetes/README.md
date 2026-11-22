@@ -47,7 +47,9 @@ The VM installs fixed tools; enrollment metadata never changes those assets.
 
 [Guarded bootstrap and recovery](RECOVERY.md) adds an independent OpenBao
 authorization root and one automatic discovery procedure, without lifecycle
-switches in Terraform. An empty host waits for SSH/OpenBao enrollment; uncertainty
+switches in Terraform. With `bootstrap_access`, apply automatically introduces
+OpenBao access over verified SSH after VM/DNS creation. An empty host waits for
+that enrollment; uncertainty
 or missing backups for a known cluster cannot create a new one. This path is not yet live-qualified;
 deployment and qualification must use canonical `main` after merge and approval.
 

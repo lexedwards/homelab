@@ -71,6 +71,7 @@ shell-validate:
 	bash -n scripts/enroll-control-plane.sh
 	bash -n scripts/bootstrap-credentials.sh
 	bash -n scripts/check-bootstrap-guards.sh
+	bash -n scripts/check-control-plane-enrollment.sh
 
 publication-validate:
 	$(PYTHON) -B scripts/publish-kubeconfig.py --help >/dev/null
@@ -87,6 +88,7 @@ bootstrap-validate:
 
 bootstrap-guard-check:
 	bash scripts/check-bootstrap-guards.sh
+	bash scripts/check-control-plane-enrollment.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check
 	$(MAKE) -C runtime validate

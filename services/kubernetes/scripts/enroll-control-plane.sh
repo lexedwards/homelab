@@ -3,7 +3,7 @@ set +x
 set -Eeuo pipefail
 umask 077
 exec 3>&2 2>/dev/null
-trap 'printf "Kubernetes publication enrollment failed; inspect host identity/access privately.\n" >&3' ERR
+trap 'printf "Control-plane enrollment failed; inspect host identity/access privately.\n" >&3' ERR
 
 [[ ${BAO_ADDR:-} =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
 [[ ${BAO_AUTH_MOUNT:-} =~ ^[a-z][a-z0-9-]*$ ]]

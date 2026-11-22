@@ -44,10 +44,13 @@ token cannot read, rewrite existing identity, or write credential/configuration
 records. The administrative setup cannot populate application values through state.
 The new nested CAS constraint needs live denial/lifetime qualification on `main`.
 
-Export `enrollment` privately for `scripts/enroll-bootstrap.py`; do not pass it to
-the VM root or cloud-init. `issuer_policy` can mint only a short-lived wrapped
-SecretID for that AppRole. Introduction, runtime profile changes, credential
-rotation and snapshot discovery do not alter any VM asset.
+Export `enrollment` privately as the VM root's `bootstrap_access` input; it feeds
+only the apply-time verified-SSH hook, never cloud-init or VM installation assets.
+Provide verified host keys and an ephemeral exact-role issuer as described in
+[RECOVERY.md](../RECOVERY.md). The standalone `scripts/enroll-bootstrap.py` remains
+available for explicitly approved manual introduction. `issuer_policy` can mint
+only a short-lived wrapped SecretID for that AppRole. Introduction, runtime profile
+changes, credential rotation and snapshot discovery do not alter any VM asset.
 
 See [RECOVERY.md](../RECOVERY.md) for single-server ownership/fencing, automatic
 discovery, safe retries and acceptance. No production deployment, native restore
