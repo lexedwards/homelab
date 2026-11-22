@@ -8,9 +8,18 @@ destinations:
     protocol: http
     timeout: 5s
     metrics: {enabled: true}
-    logs: {enabled: false}
+    logs: {enabled: true}
     traces: {enabled: false}
     processors:
+      transform:
+        logs:
+          resource:
+            - 'delete_key(attributes, "loki.resource.labels")'
+            - 'delete_key(attributes, "loki.attribute.labels")'
+          logToResource:
+            node: k8s.node.name
+          log:
+            - 'set(attributes["loki.resource.labels"], "service.name, service.namespace, deployment.environment.name, host.name, k8s.cluster.name, k8s.namespace.name, k8s.node.name")'
       resourceAttributes:
         useDefaultRemoveList: false
       batch:
@@ -48,6 +57,31 @@ clusterMetrics:
         - apiserver_request_duration_seconds_sum
         - apiserver_request_duration_seconds_count
         - apiserver_current_inflight_requests
+
+podLogsViaKubernetesApi:
+  enabled: true
+  collector: cluster
+  extraDiscoveryRules: |
+    rule {
+      source_labels = ["__meta_kubernetes_pod_node_name"]
+      target_label = "node"
+    }
+    rule {
+      source_labels = ["__meta_kubernetes_pod_controller_name"]
+      target_label = "workload"
+    }
+    rule {
+      source_labels = ["__meta_kubernetes_pod_controller_kind"]
+      target_label = "workload_kind"
+    }
+
+clusterEvents:
+  enabled: true
+  collector: cluster
+  logFormat: json
+  labels:
+    reason: reason
+    node: node
 
 telemetryServices:
   kube-state-metrics:
@@ -100,6 +134,8 @@ collectors:
     serviceAccount:
       name: observability-cluster
     alloy:
+      clustering:
+        enabled: true
       enableReporting: false
       securityContext:
         runAsNonRoot: true
@@ -248,6 +284,12 @@ extraObjects:
         verbs: [get, list, watch]
       - apiGroups: [""]
         resources: [nodes/metrics]
+        verbs: [get]
+      - apiGroups: [""]
+        resources: [events]
+        verbs: [get, list, watch]
+      - apiGroups: [""]
+        resources: [pods/log]
         verbs: [get]
       - nonResourceURLs: [/metrics]
         verbs: [get]
