@@ -52,6 +52,10 @@ network errors. No charts are vendored and there is no offline fallback. Saved
 plans contain the verified chart bytes; cluster image pulls still require
 reachable registries. Reliable internet access is an operating prerequisite.
 
+The CSI driver archive uses an immutable publisher commit because its original
+Pages URL was repacked without changing the chart version or unpacked contents.
+The reviewed checksum and deployed archive bytes remain unchanged.
+
 ## Private DNS routing
 
 Set optional `private_dns_forwarding` in protected runtime inputs to an exact
