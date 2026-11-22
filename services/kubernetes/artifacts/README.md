@@ -55,6 +55,10 @@ this root's protected state to create a fresh saved plan, inspect it privately,
 and apply only that unchanged plan. Do not import or adopt a policy/bucket owned
 elsewhere without a separately reviewed ownership change.
 
+`make plan` saves `deployment.tfplan`; inspect it privately with `tofu show`
+before running `make apply`. Both targets accept `PLAN_FILE` overrides. The apply
+target requires an existing saved plan and never creates one implicitly.
+
 Export the sensitive `publisher`, `publisher_value_enrollment` and `enrollment`
 outputs into private files with `umask 077`. They contain scope and enrollment
 metadata, not credentials. Keep exact deployment locators out of shared logs.
