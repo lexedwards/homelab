@@ -23,8 +23,8 @@ provider "technitium" {
 
 locals {
   compute = var.proxmox_nodes["compute"]
-  rke2_config = yamlencode({
-    "node-name"             = var.control_plane.name
+  rke2_config = yamlencode(merge({
+    "node-name"             = local.server_node_name
     "tls-san"               = [var.api_dns.name]
     "selinux"               = true
     "write-kubeconfig-mode" = "0600"
@@ -34,7 +34,9 @@ locals {
     "cluster-cidr"          = var.cluster_networks.pods
     "service-cidr"          = var.cluster_networks.services
     "disable"               = ["rke2-ingress-nginx", "rke2-traefik"]
-  })
+    }, contains(["join", "restore"], var.cluster_bootstrap.mode) ? { "token-file" = "/etc/rancher/rke2/bootstrap-server-token" } : {},
+    var.cluster_bootstrap.mode == "join" ? { "server" = var.cluster_bootstrap.join_server } : {}
+  ))
   cilium_bootstrap_values = {
     kubeProxyReplacement = true
     k8sServiceHost       = var.api_dns.name

@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry Kubernetes bootstrap after enrollment or dependency recovery
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=5min
+Unit=kubernetes-bootstrap.service
+
+[Install]
+WantedBy=timers.target

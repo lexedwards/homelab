@@ -77,6 +77,9 @@ class NativeS3:
         self.identity = credentials(identity)
 
     def request(self, method, path, data=b'', headers=()):
+        return self._request(method, path, data, headers)
+
+    def _request(self, method, path, data=b'', headers=(), output=None, max_bytes=131072, timeout=60):
         require(method in ['GET', 'PUT'] and path.startswith('/') and not path.startswith('//') and
                 '\r' not in path and '\n' not in path, 'Unsupported object-store request')
         require(isinstance(data, bytes) and len(data) <= 131072, 'Request payload is too large')
@@ -87,8 +90,8 @@ class NativeS3:
             'user': self.identity['AWS_ACCESS_KEY_ID'] + ':' + self.identity['AWS_SECRET_ACCESS_KEY'],
             'proto': '=https',
             'connect-timeout': '10',
-            'max-time': '60',
-            'max-filesize': '131072',
+            'max-time': str(timeout),
+            'max-filesize': str(max_bytes),
         }
         lines = [key + ' = ' + json.dumps(value) for key, value in settings.items()]
         lines += ['silent', 'show-error', 'header = ' + json.dumps('x-amz-content-sha256: ' + hashlib.sha256(data).hexdigest())]
@@ -104,8 +107,10 @@ class NativeS3:
                 os.lseek(descriptor, 0, os.SEEK_SET)
                 lines.append('data-binary = ' + json.dumps('@/proc/' + str(os.getpid()) + '/fd/' + str(descriptor)))
             arguments = ['curl', '-q', '--config', '-', '--write-out', '\n%{http_code}\n%header{etag}']
+            if output is not None:
+                arguments += ['--output', '/proc/' + str(os.getpid()) + '/fd/' + str(output)]
             response = subprocess.run(arguments, input=('\n'.join(lines) + '\n').encode(),
-                                      capture_output=True, timeout=75)
+                                      capture_output=True, timeout=timeout + 15)
             require(response.returncode == 0, 'Verified HTTPS/SigV4 request failed; no credentials or child diagnostics displayed')
         finally:
             if descriptor is not None:
@@ -113,3 +118,29 @@ class NativeS3:
         body, status, etag = response.stdout.rsplit(b'\n', 2)
         require(re.fullmatch(rb'[0-9]{3}', status) is not None, 'Invalid HTTP result')
         return int(status), etag.decode('ascii'), body
+
+    def download(self, path, destination, max_bytes):
+        destination = Path(destination)
+        require(isinstance(max_bytes, int) and 0 < max_bytes <= 16 * 1024 ** 3, 'Invalid snapshot download bound')
+        require(not any(item.is_symlink() for item in [destination, *destination.parents]), 'Snapshot custody must not use symlinks')
+        parent = destination.parent.stat()
+        require(parent.st_uid == os.geteuid() and stat.S_ISDIR(parent.st_mode) and not parent.st_mode & 0o077,
+                'Snapshot custody requires an owned private parent directory')
+        descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        complete = False
+        try:
+            status, _, _ = self._request('GET', path, output=descriptor, max_bytes=max_bytes, timeout=600)
+            require(status == 200, 'Snapshot GetObject failed (HTTP ' + str(status) + ')')
+            os.fsync(descriptor)
+            size = os.fstat(descriptor).st_size
+            require(0 < size <= max_bytes, 'Downloaded snapshot size is invalid')
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            checksum = hashlib.sha256()
+            while data := os.read(descriptor, 1024 * 1024):
+                checksum.update(data)
+            complete = True
+            return {'size': size, 'sha256': checksum.hexdigest()}
+        finally:
+            os.close(descriptor)
+            if not complete:
+                destination.unlink()

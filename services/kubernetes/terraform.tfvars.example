@@ -66,6 +66,28 @@
 # cilium_metrics_enabled = false
 
 # -----------------------------------------------------------------------------
+# Empty-datastore bootstrap
+# -----------------------------------------------------------------------------
+
+# Optional default: initialized startup only; an empty VM is blocked.
+# cluster_bootstrap = {
+#   mode                         = "existing"
+#   node_name                    = null
+#   access                       = null
+#   backup                       = null
+#   recovery_point               = null
+#   join_server                  = null
+#   fencing_confirmed            = false
+#   independent_custody_confirmed = false
+# }
+# For create/join/restore, use the recovery-root enrollment and RECOVERY.md.
+# No actual server token, S3 credential or SecretID belongs in this object.
+# bootstrap_ssh_known_hosts_file = null
+# bootstrap_issuer_token         = null
+# bootstrap_enrollment_revision  = "1"
+# Inject only the ephemeral exact-role issuer via TF_VAR_bootstrap_issuer_token.
+
+# -----------------------------------------------------------------------------
 # Kubeconfig publication
 # -----------------------------------------------------------------------------
 

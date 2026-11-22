@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars, fill required inputs privately, and never commit it.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+# Inject trusted configuration-operator authentication through VAULT_TOKEN.
+# Required
+# openbao_address =
+# approle_mount   =
+
+# -----------------------------------------------------------------------------
+# Bootstrap authorization
+# -----------------------------------------------------------------------------
+
+# Required
+# enrollment_name =
+# mode            =
+
+# Optional defaults; exact paths become required for the selected lifecycle.
+# Create: S3 record only. Join: existing token record only. Restore: both.
+# s3_secret_path    = null
+# server_token_path = null
+# backup            = null
+# Create/restore backup shape; key stays null for create and is exact for restore.
+# backup = {
+#   endpoint =
+#   bucket   =
+#   region   =
+#   key      = null
+# }

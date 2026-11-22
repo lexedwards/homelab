@@ -66,9 +66,8 @@ variable "publication_enrollment_revision" {
 locals {
   publication_enabled = nonsensitive(var.publication_access != null)
   publication_assets = {
-    "/usr/local/libexec/homelab/kubernetes_object_store.py" = { source = "scripts/kubernetes_object_store.py", mode = "0644" }
-    "/usr/local/libexec/homelab/publish-kubeconfig.py"      = { source = "scripts/publish-kubeconfig.py", mode = "0700" }
-    "/usr/local/sbin/kubeconfig-credentials"                = { source = "scripts/kubeconfig-credentials.sh", mode = "0700" }
+    "/usr/local/libexec/homelab/publish-kubeconfig.py" = { source = "scripts/publish-kubeconfig.py", mode = "0700" }
+    "/usr/local/sbin/kubeconfig-credentials"           = { source = "scripts/kubeconfig-credentials.sh", mode = "0700" }
     "/etc/systemd/system/kubernetes-publication-credentials.service" = {
       source = "config/kubernetes-publication-credentials.service", mode = "0644"
     }
@@ -86,12 +85,12 @@ locals {
     role_id       = var.publication_access.role_id
     reader_policy = var.publication_access.reader_policy
     secret_path   = var.publication_access.secret_path
-    implementation_sha256 = sha256(join("", [
+    implementation_sha256 = sha256(join("", concat([
       for destination in sort(keys(local.publication_assets)) : filesha256("${path.module}/${local.publication_assets[destination].source}")
-    ]))
+    ], [filesha256("${path.module}/scripts/kubernetes_object_store.py")])))
   } : null
   publication_target = local.publication_enabled ? merge(var.publication_access.publication, {
-    initializer        = true
+    initializer        = var.cluster_bootstrap.mode != "join"
     rke2_config_sha256 = sha256(local.rke2_config)
   }) : null
   publication_files = local.publication_enabled ? concat([
@@ -125,7 +124,7 @@ resource "terraform_data" "publication_enrollment" {
     var.publication_enrollment_revision,
   ]
 
-  depends_on = [proxmox_virtual_environment_vm.control_plane, technitium_record.api]
+  depends_on = [proxmox_virtual_environment_vm.control_plane, technitium_record.api, terraform_data.bootstrap_enrollment]
   lifecycle {
     replace_triggered_by = [proxmox_virtual_environment_vm.control_plane]
   }

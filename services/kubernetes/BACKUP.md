@@ -1,9 +1,11 @@
 # Off-node etcd Backups
 
-Control-plane recovery remains unproven. The earlier isolated restore experiment
-failed and its implementation has been retired; no automated restore procedure is
-maintained. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade, outage and
-recovery-decision gates. A backup does not guarantee rollback.
+An earlier isolated restore experiment failed and was retired. A later synthetic
+native new-VM restore preserved the original cluster and worker identity, but the
+new [guarded bootstrap](RECOVERY.md) still needs live qualification from canonical
+`main` after merge and approval. Production replacement remains unqualified.
+See the [lifecycle runbooks](LIFECYCLE.md) for upgrade, outage and recovery-decision
+gates. A backup does not guarantee rollback.
 
 This workflow creates native RKE2 snapshots on the existing control-plane host
 and uploads them to the operator-owned RustFS bucket over verified HTTPS. It
