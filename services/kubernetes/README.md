@@ -40,17 +40,19 @@ The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
 describe their qualification results and limits. Recorded results do not replace
 fresh health checks before maintenance.
 
-[Kubeconfig publication](artifacts/README.md) defines a separate configuration
-bucket, application-scoped OpenBao access and separately introduced runtime publication.
-It never uses the backup bucket or places operator S3 credentials on the host.
+[Cluster storage and publication](artifacts/README.md) declares separate backup
+and configuration buckets for a stable friendly cluster name. Publisher access
+is exactly `kubeconfig.yaml` from the outset; UID/CA remain identity evidence.
+Publication never uses the backup bucket or places operator S3 credentials on the host.
 The VM installs fixed tools; enrollment metadata never changes those assets.
 
 [Guarded bootstrap and recovery](RECOVERY.md) adds an independent OpenBao
 authorization root and one automatic discovery procedure, without lifecycle
 switches in Terraform. With `bootstrap_access`, apply automatically introduces
 OpenBao access over verified SSH after VM/DNS creation. An empty host waits for
-that enrollment; uncertainty
-or missing backups for a known cluster cannot create a new one. This path is not yet live-qualified;
+that enrollment; uncertainty or missing backups for a known cluster cannot create
+a new one. External OpenBao and RustFS are accepted recovery dependencies; no
+local-only restore route is required. This path is not yet live-qualified;
 deployment and qualification must use canonical `main` after merge and approval.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI

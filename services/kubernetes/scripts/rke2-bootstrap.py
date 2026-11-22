@@ -51,6 +51,7 @@ def execute(enrollment, approle):
         require(not (DATA / 'server/db').exists() and not (DATA / 'server/tls').exists(), 'Partial local bootstrap material requires inspection')
         with closing(BootstrapReader(private_json(enrollment), approle)) as reader:
             config = profile(reader.read('config_path'))
+            require(config['cluster_name'] == reader.enrollment['cluster_name'], 'Runtime profile differs from the enrolled cluster name')
             known = identity(reader.read('identity_path'))
             record = reader.read('server_token_path')
             require(set(record) == {'server_token'}, 'Unexpected server-token record')

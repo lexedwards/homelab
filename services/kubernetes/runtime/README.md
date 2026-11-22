@@ -38,7 +38,8 @@ or refresh this root's auth resources; authorization remains administrative.
 
 Optional `recovery_custody` similarly defines only two fingerprint-addressed
 recovery records and their separate bounded writer/issuer, after checking the
-initialized cluster UID. It grants no workload read access and populates nothing.
+initialized cluster UID. Paths and authorization names use the stable friendly
+`cluster_name`, not that UID. It grants no workload read access and populates nothing.
 See [backup custody and host operations](../BACKUP.md); six-hour native backups do
 not depend on this API-managed authorization stage being available.
 

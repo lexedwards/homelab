@@ -15,8 +15,9 @@ and retention boundaries.
 ## Decision
 
 Keep snapshots exclusively in the backup bucket and publish the kubeconfig in a
-separate private, encrypted, versioned configuration bucket, keyed by the existing
-cluster identity and using its stable API endpoint. Workstation operators provision
+separate private, encrypted, versioned configuration bucket for each cluster.
+Use a stable friendly cluster name for both bucket names and `kubeconfig.yaml` for
+the configuration object, with the stable API endpoint. Workstation operators provision
 storage and authorization; hosts fetch a distinct exact-object application S3
 credential from external OpenBao through trusted SSH AppRole introduction.
 
@@ -35,5 +36,8 @@ replacement. Keep the snapshot's matching server token in its independent
   operation, while recovery of the cluster remains independent of publication.
 - Separate buckets, application credentials and enrollment records add lifecycle
   work but avoid delivering workstation operator authority to a host.
+- Both bucket names and exact publisher scope exist before first boot. Namespace
+  UID and CA remain identity evidence, not storage addresses. No wildcard
+  publisher grant or post-creation authorization handoff is needed.
 
 [custody]: 007-kubernetes-recovery-custody.md

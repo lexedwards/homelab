@@ -38,6 +38,16 @@ the cluster DNS record to itself.
 
 ## Deploy, then introduce access separately
 
+Choose the stable friendly `cluster_name` before deployment. The storage root
+declares `<cluster-name>-backups` and `<cluster-name>-configuration`, with separate
+application credentials. Snapshot keys use `snapshots/`; kubeconfig uses exactly
+`kubeconfig.yaml`. UID and CA still verify the original cluster, but never address
+its storage. No wildcard publisher grant or UID-dependent enrollment is needed.
+
+External OpenBao and RustFS are accepted recovery dependencies. If either is
+unavailable, an empty server waits safely. This workflow does not provide a
+local-only backup restore route; independent token custody remains required.
+
 1. Prepare the independent [OpenBao authorization](recovery/README.md) and populate
    its runtime profile and three credential records outside Terraform state.
    Preserve the existing server token. For a first cluster, provision its initial
@@ -127,9 +137,8 @@ Keep independent identity custody protected; deletion of its OpenBao record is
 not a supported reset operation.
 
 The host then obtains the separate application publisher pair and renders its
-publication metadata locally. For the first namespace, use a dedicated
-configuration bucket and the publisher's filename-scoped initial grant; once the
-UID is known it can be tightened to the exact key. Publication remains create-only;
+publication metadata locally. Use the dedicated configuration bucket and the
+predeclared exact `kubeconfig.yaml` grant, even on first creation. Publication remains create-only;
 changed retained contents need the [explicit conditional refresh](artifacts/README.md).
 Credentials and operational metadata never enter cloud-init or VM state.
 
@@ -150,6 +159,11 @@ cannot access the network or real datastore. Native OpenTofu console rendering
 also compares actual installation bytes before/after enrollment-input changes.
 Transport fixtures exercise first introduction, matching-credential reuse and
 failure propagation with stubbed SSH/OpenBao in a network-isolated namespace.
-No operation-mode variables exist in the VM root. Local checks do not establish
-the new end-to-end restore, enrollment, identity-writer ACL or snapshot transport
-behavior; those remain main-only live qualification gates.
+`make bootstrap-authorization-check BAO_BINARY=<reviewed-local-binary>` additionally
+loads the actual rendered policies into disposable OpenBao and exercises the
+guest AppRole client over verified local TLS. It proves first registration and
+denied unsafe CAS, overwrite, metadata changes and deleted-history replay without
+using production credentials. A matching OpenBao 2.7.2 binary and enabled user
+namespaces are required. No operation-mode variables exist in the VM root.
+Local checks do not establish end-to-end restore, deployed enrollment or actual
+RustFS snapshot transport; those remain main-only live qualification gates.

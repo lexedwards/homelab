@@ -14,14 +14,11 @@
 # -----------------------------------------------------------------------------
 # Cluster artifacts — Required
 # -----------------------------------------------------------------------------
-# configuration_bucket =
-# backup_bucket        =
+# cluster_name         =
 # api_server           =
 # approle_mount        =
 # publisher_secret_path =
 
 # Cluster artifacts — Optional
 # cluster_uid     = null
-# enrollment_name = "control-plane"
-# A null UID permits only rke2/*/kubeconfig.yaml within the dedicated config bucket
-# for first creation; use the actual namespace UID for exact-key scope afterwards.
+# UID is identity evidence for standalone publication only; never a bucket/key.

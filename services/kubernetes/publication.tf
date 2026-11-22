@@ -8,11 +8,12 @@ variable "publication_access" {
     reader_policy = string
     secret_path   = string
     publication = object({
-      endpoint    = string
-      bucket      = string
-      region      = string
-      cluster_uid = string
-      api_server  = string
+      endpoint     = string
+      bucket       = string
+      region       = string
+      cluster_uid  = string
+      cluster_name = string
+      api_server   = string
     })
   })
   default   = null
@@ -21,7 +22,7 @@ variable "publication_access" {
     condition = var.publication_access == null ? true : try(
       can(regex("^https://[A-Za-z0-9.-]+(:[0-9]+)?$", var.publication_access.address)) &&
       can(regex("^[a-z][a-z0-9-]*$", var.publication_access.auth_mount)) &&
-      var.publication_access.role_name == "kubernetes-${var.publication_access.publication.cluster_uid}-kubeconfig" &&
+      var.publication_access.role_name == "kubernetes-${var.publication_access.publication.cluster_name}-kubeconfig" &&
       var.publication_access.reader_policy == "${var.publication_access.role_name}-read" &&
       can(regex("^[A-Za-z0-9-]+$", var.publication_access.role_id)) &&
       can(regex("^[a-z][a-z0-9-]*/data/[A-Za-z0-9_/-]+$", var.publication_access.secret_path)) &&
@@ -31,6 +32,8 @@ variable "publication_access" {
       can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.publication_access.publication.bucket)) &&
       can(regex("^[a-z0-9-]+$", var.publication_access.publication.region)) &&
       can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.publication_access.publication.cluster_uid)) &&
+      can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.publication_access.publication.cluster_name)) &&
+      var.publication_access.publication.bucket == "${var.publication_access.publication.cluster_name}-configuration" &&
       var.publication_access.publication.api_server == "https://${var.api_dns.name}:6443",
     false)
     error_message = "Supply the unchanged artifacts-root enrollment export for this cluster and the infrastructure's stable API identity; never supply credential values."

@@ -6,6 +6,7 @@ variable "bootstrap_access" {
     role_name               = string
     role_id                 = string
     reader_policy           = string
+    cluster_name            = string
     identity_token_role     = string
     identity_writer_policy  = string
     config_path             = string
@@ -20,10 +21,11 @@ variable "bootstrap_access" {
     condition = var.bootstrap_access == null ? true : try(
       can(regex("^https://[A-Za-z0-9.-]+(:[0-9]+)?$", var.bootstrap_access.address)) &&
       can(regex("^[a-z][a-z0-9-]*$", var.bootstrap_access.auth_mount)) &&
-      can(regex("^kubernetes-[a-z0-9-]+-bootstrap$", var.bootstrap_access.role_name)) &&
+      can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.bootstrap_access.cluster_name)) &&
+      var.bootstrap_access.role_name == "kubernetes-${var.bootstrap_access.cluster_name}-bootstrap" &&
       can(regex("^[A-Za-z0-9-]+$", var.bootstrap_access.role_id)) &&
       var.bootstrap_access.reader_policy == "${var.bootstrap_access.role_name}-read" &&
-      var.bootstrap_access.identity_token_role == "${trimsuffix(var.bootstrap_access.role_name, "-bootstrap")}-identity" &&
+      var.bootstrap_access.identity_token_role == "kubernetes-${var.bootstrap_access.cluster_name}-identity" &&
       var.bootstrap_access.identity_writer_policy == var.bootstrap_access.identity_token_role &&
       length(distinct([for key, value in var.bootstrap_access : value if endswith(key, "_path")])) == 5 &&
       alltrue([for key, value in var.bootstrap_access :

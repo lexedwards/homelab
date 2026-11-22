@@ -47,12 +47,12 @@ def prepare(args):
     fresh = [point for point in after if point['name'] not in {point['name'] for point in before} and point['timestamp'] >= started - 60]
     require(len(fresh) == 1 and fresh[0]['token_hash'] == association, 'Fresh off-node snapshot does not match the independently recovered server token')
     selected = fresh[0]
-    key = 'rke2/' + target['cluster_uid'] + '/' + selected['name']
+    key = 'snapshots/' + selected['name']
     client = NativeS3(target['endpoint'], target['region'], {'AWS_ACCESS_KEY_ID': pair['access_key_id'], 'AWS_SECRET_ACCESS_KEY': pair['secret_access_key']})
     snapshot = output / ('verified-snapshot.zip' if key.endswith('.zip') else 'verified-snapshot')
     downloaded = client.download(object_path(target['bucket'], key), snapshot, args.max_snapshot_bytes)
     point = {
-        'cluster_uid': target['cluster_uid'], 'key': key, 'sha256': downloaded['sha256'], 'size': downloaded['size'],
+        'cluster_name': target['cluster_name'], 'cluster_uid': target['cluster_uid'], 'key': key, 'sha256': downloaded['sha256'], 'size': downloaded['size'],
         'token_hash': association, 'source_node': target['node_name'], 'timestamp': selected['timestamp'],
         'rke2_version': VERSION, 'api_server': args.api_server,
     }

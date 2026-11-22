@@ -17,11 +17,11 @@ variable "approle_mount" {
   }
 }
 
-variable "enrollment_name" {
+variable "cluster_name" {
   type        = string
-  description = "Exact service-owned authorization identity; not a lifecycle selector."
+  description = "Stable friendly name shared with the cluster's two dedicated storage buckets; not a lifecycle selector."
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.enrollment_name))
+    condition     = can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.cluster_name))
     error_message = "Use two to forty service-owned name characters."
   }
 }

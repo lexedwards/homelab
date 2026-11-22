@@ -12,7 +12,7 @@ import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 
-from kubernetes_object_store import NativeS3, OperationError, https_origin, object_path, private_bytes, private_json, require
+from kubernetes_object_store import NativeS3, OperationError, cluster_name, https_origin, object_path, private_bytes, private_json, require
 
 DATA = Path('/var/lib/rancher/rke2')
 STATE = Path('/var/lib/kubernetes-bootstrap')
@@ -96,15 +96,15 @@ def storage(value):
 
 def access(value):
     fields = {'address', 'auth_mount', 'role_name', 'role_id', 'reader_policy', 'config_path', 'identity_path',
-              'server_token_path', 's3_secret_path', 'publication_secret_path', 'identity_token_role', 'identity_writer_policy'}
+              'server_token_path', 's3_secret_path', 'publication_secret_path', 'cluster_name', 'identity_token_role', 'identity_writer_policy'}
     require(set(value) == fields, 'Unexpected bootstrap enrollment fields')
     https_origin(value['address'])
     require(re.fullmatch(r'[a-z][a-z0-9-]*', value['auth_mount']), 'Invalid AppRole mount')
-    require(re.fullmatch(r'kubernetes-[a-z0-9-]+-bootstrap', value['role_name']) and value['reader_policy'] == value['role_name'] + '-read',
+    require(value['role_name'] == 'kubernetes-' + cluster_name(value['cluster_name']) + '-bootstrap' and value['reader_policy'] == value['role_name'] + '-read',
             'Invalid bootstrap role/policy association')
     require(re.fullmatch(r'[A-Za-z0-9-]+', value['role_id']), 'Invalid RoleID')
-    require(value['identity_token_role'] == value['role_name'].removesuffix('-bootstrap') + '-identity' and
-            value['identity_writer_policy'] == value['identity_token_role'], 'Invalid create-only identity writer association')
+    require(value['identity_token_role'] == 'kubernetes-' + value['cluster_name'] + '-identity' and
+            value['identity_writer_policy'] == value['identity_token_role'], 'Invalid first-identity writer association')
     paths = [value[key] for key in fields if key.endswith('_path')]
     require(len(set(paths)) == len(paths), 'Enrollment records must be distinct')
     for path in paths:
@@ -114,14 +114,16 @@ def access(value):
 
 
 def profile(value):
-    require(set(value) == {'api_server', 'registration_server', 'backup', 'publication'}, 'Unexpected runtime profile fields')
+    require(set(value) == {'cluster_name', 'api_server', 'registration_server', 'backup', 'publication'}, 'Unexpected runtime profile fields')
     https_origin(value['api_server'])
     https_origin(value['registration_server'])
     require(urllib.parse.urlsplit(value['api_server']).hostname == urllib.parse.urlsplit(value['registration_server']).hostname,
             'API and registration must use the same published cluster identity')
     storage(value['backup'])
     storage(value['publication'])
-    require(value['backup']['bucket'] != value['publication']['bucket'], 'Snapshot and configuration buckets must differ')
+    name = cluster_name(value['cluster_name'])
+    require(value['backup']['bucket'] == name + '-backups' and value['publication']['bucket'] == name + '-configuration',
+            'Runtime storage must use the named cluster\'s two dedicated buckets')
     return value
 
 
@@ -186,7 +188,7 @@ class BootstrapReader:
         try:
             require(auth['policies'] == [self.enrollment['identity_writer_policy']] and not auth.get('identity_policies') and
                     0 < auth['lease_duration'] <= 60 and auth['renewable'] is False, 'Unexpected identity-writer authority')
-            self.request('POST', self.enrollment['identity_path'], {'options': {'cas': 0}, 'data': identity(value)}, token=auth['client_token'])
+            self.request('POST', self.enrollment['identity_path'], {'options': {'cas': '0'}, 'data': identity(value)}, token=auth['client_token'])
         finally:
             self.request('POST', 'auth/token/revoke-self', {}, token=auth['client_token'])
 
@@ -257,7 +259,7 @@ def objects(client, target, prefix='', versions=False):
 
 def latest_snapshot(client, config, known, token):
     target = config['backup']
-    keys = list(objects(client, target, 'rke2/' + known['cluster_uid'] + '/' if known else ''))
+    keys = list(objects(client, target, 'snapshots/' if known else ''))
     if not known:
         require(not keys, 'Backups exist but cluster identity is missing; do not create')
         list(objects(client, target, versions=True))
@@ -265,7 +267,7 @@ def latest_snapshot(client, config, known, token):
     require(known['token_hash'] == token_hash(token), 'Server token differs from independent cluster identity')
     candidates = []
     for key in keys:
-        match = re.fullmatch('rke2/' + re.escape(known['cluster_uid']) + r'/homelab-scheduled-([a-z0-9-]+)-([0-9]{10,})(\.zip)?', key or '')
+        match = re.fullmatch(r'snapshots/homelab-scheduled-([a-z0-9-]+)-([0-9]{10,})(\.zip)?', key or '')
         if match:
             candidates.append((int(match[2]), key, match[1]))
     require(candidates, 'Known cluster has no usable backup; new-cluster creation is forbidden')

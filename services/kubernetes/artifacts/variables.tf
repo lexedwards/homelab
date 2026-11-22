@@ -19,44 +19,23 @@ variable "s3_region" {
   }
 }
 
-variable "configuration_bucket" {
-  description = "Service-owned private configuration bucket, never the etcd backup bucket."
+variable "cluster_name" {
+  description = "Stable friendly cluster storage/authorization name, optionally including a once-chosen suffix. Renaming is a migration, not VM recovery."
   type        = string
-  sensitive   = true
   validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.configuration_bucket))
-    error_message = "Supply a valid bucket name."
-  }
-}
-
-variable "backup_bucket" {
-  description = "Published existing backup bucket name, used only to enforce separation; this root never manages it."
-  type        = string
-  sensitive   = true
-  validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.backup_bucket))
-    error_message = "Supply the existing backup bucket name."
+    condition     = can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.cluster_name))
+    error_message = "Use two to forty lowercase name characters, ending in a letter or digit."
   }
 }
 
 variable "cluster_uid" {
-  description = "Existing cluster's kube-system namespace UID, exported before replacement."
+  description = "Optional observed namespace UID for standalone publication of an existing cluster; identity evidence only, never storage addressing. Automatic bootstrap discovers it in the guest."
   type        = string
   sensitive   = true
   default     = null
   validation {
     condition     = var.cluster_uid == null ? true : can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.cluster_uid))
     error_message = "Supply the actual canonical cluster UUID, not a hostname or a guessed future identity."
-  }
-}
-
-variable "enrollment_name" {
-  type        = string
-  description = "Service-owned initial publication identity before the namespace UID exists; no VM dependency."
-  default     = "control-plane"
-  validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.enrollment_name))
-    error_message = "Use two to forty service-owned name characters."
   }
 }
 

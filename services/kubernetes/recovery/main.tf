@@ -5,23 +5,55 @@ provider "vault" {
 }
 
 locals {
-  role_name       = "kubernetes-${var.enrollment_name}-bootstrap"
-  identity_writer = "kubernetes-${var.enrollment_name}-identity"
+  role_name       = "kubernetes-${var.cluster_name}-bootstrap"
+  identity_writer = "kubernetes-${var.cluster_name}-identity"
   identity_metadata_path = format("%s/metadata/%s", split("/", var.records.identity_path)[0],
   join("/", slice(split("/", var.records.identity_path), 2, length(split("/", var.records.identity_path)))))
+}
+
+resource "vault_generic_endpoint" "identity_metadata" {
+  path                 = local.identity_metadata_path
+  data_json            = jsonencode({ cas_required = true })
+  ignore_absent_fields = true
+  disable_delete       = true
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+locals {
+  identity_policy = <<-POLICY
+    path ${jsonencode(var.records.identity_path)} {
+      capabilities = ["create", "update"]
+      allowed_parameters = { "data" = [], "options" = [{ "cas" = "0" }] }
+      required_parameters = ["data", "options"]
+    }
+    path "auth/token/revoke-self" { capabilities = ["update"] }
+  POLICY
+  reader_policy = join("\n", concat([
+    for path in values(var.records) : "path ${jsonencode(path)} { capabilities = [\"read\"] }"
+    ], [<<-POLICY
+      path ${jsonencode(local.identity_metadata_path)} { capabilities = ["read"] }
+      path "auth/token/revoke-self" { capabilities = ["update"] }
+      path "auth/token/create/${local.identity_writer}" {
+        capabilities = ["update"]
+        allowed_parameters = {
+          "policies" = [["${local.identity_writer}"]]
+          "ttl" = ["60s"]
+          "explicit_max_ttl" = ["60s"]
+          "renewable" = [false]
+          "no_default_policy" = [true]
+        }
+        required_parameters = ["policies", "ttl", "explicit_max_ttl", "renewable", "no_default_policy"]
+      }
+    POLICY
+  ]))
 }
 
 resource "vault_policy" "identity_writer" {
   name            = local.identity_writer
   allow_overwrite = false
-  policy          = <<-POLICY
-    path ${jsonencode(var.records.identity_path)} {
-      capabilities = ["create", "update"]
-      allowed_parameters = { "data" = [], "options" = [{ "cas" = 0 }] }
-      required_parameters = ["data", "options"]
-    }
-    path "auth/token/revoke-self" { capabilities = ["update"] }
-  POLICY
+  policy          = local.identity_policy
 }
 
 resource "vault_token_auth_backend_role" "identity_writer" {
@@ -38,24 +70,7 @@ resource "vault_token_auth_backend_role" "identity_writer" {
 resource "vault_policy" "reader" {
   name            = "${local.role_name}-read"
   allow_overwrite = false
-  policy = join("\n", concat([
-    for path in values(var.records) : "path ${jsonencode(path)} { capabilities = [\"read\"] }"
-    ], [<<-POLICY
-      path ${jsonencode(local.identity_metadata_path)} { capabilities = ["read"] }
-      path "auth/token/revoke-self" { capabilities = ["update"] }
-      path "auth/token/create/${vault_token_auth_backend_role.identity_writer.role_name}" {
-        capabilities = ["update"]
-        allowed_parameters = {
-          "policies" = [["${vault_policy.identity_writer.name}"]]
-          "ttl" = ["60s"]
-          "explicit_max_ttl" = ["60s"]
-          "renewable" = [false]
-          "no_default_policy" = [true]
-        }
-        required_parameters = ["policies", "ttl", "explicit_max_ttl", "renewable", "no_default_policy"]
-      }
-    POLICY
-  ]))
+  policy          = local.reader_policy
 }
 
 resource "vault_approle_auth_backend_role" "reader" {
@@ -69,6 +84,7 @@ resource "vault_approle_auth_backend_role" "reader" {
   token_ttl               = 900
   token_max_ttl           = 900
   token_type              = "service"
+  depends_on              = [vault_generic_endpoint.identity_metadata, vault_token_auth_backend_role.identity_writer]
 }
 
 resource "vault_policy" "issuer" {
@@ -85,8 +101,15 @@ resource "vault_policy" "issuer" {
 
 module "configuration_access" {
   source       = "../../../modules/openbao-deployment-access"
-  name         = "k8s-profile-${var.enrollment_name}"
+  name         = "k8s-profile-${var.cluster_name}"
   secret_paths = [var.records.config_path]
+}
+
+module "credential_access" {
+  for_each     = toset(["token", "backup"])
+  source       = "../../../modules/openbao-deployment-access"
+  name         = "k8s-${var.cluster_name}-${each.key}"
+  secret_paths = [each.key == "token" ? var.records.server_token_path : var.records.s3_secret_path]
 }
 
 output "enrollment" {
@@ -97,6 +120,7 @@ output "enrollment" {
     role_name              = vault_approle_auth_backend_role.reader.role_name
     role_id                = vault_approle_auth_backend_role.reader.role_id
     reader_policy          = vault_policy.reader.name
+    cluster_name           = var.cluster_name
     identity_token_role    = vault_token_auth_backend_role.identity_writer.role_name
     identity_writer_policy = vault_policy.identity_writer.name
   })
@@ -113,4 +137,15 @@ output "configuration_enrollment" {
     address     = var.openbao_address
     secret_path = var.records.config_path
   })
+}
+
+output "credential_enrollment" {
+  sensitive = true
+  value = {
+    for name, access in module.credential_access : name => merge(access.enrollment, {
+      address     = var.openbao_address
+      secret_path = access.enrollment.secret_paths[0]
+      fields      = name == "token" ? ["server_token"] : ["access_key_id", "secret_access_key"]
+    })
+  }
 }

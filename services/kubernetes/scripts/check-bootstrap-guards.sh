@@ -68,9 +68,9 @@ done
 cat > "$work/base.tfvars.json" <<'JSON'
 {"proxmox_endpoint":"https://proxmox.example.invalid","proxmox_ssh_username":"operator","technitium_server_url":"https://dns.example.invalid","proxmox_nodes":{"compute":{"ssh_address":"compute.example.invalid","snippet_datastore_id":"test-snippets","vm_datastore_id":"test-disks","vm_bridge":"test-bridge"}},"template":{"vm_id":900,"node_name":"compute"},"control_plane":{"vm_id":901,"name":"test-control-plane"},"primary_vlan_id":100,"cloud_user":"operator","cloud_ssh_public_keys":["ssh-ed25519 dGVzdA=="],"api_dns":{"zone":"example.invalid","name":"api.example.invalid"},"cluster_networks":{"pods":"198.18.0.0/16","services":"198.19.0.0/16"}}
 JSON
-jq '. + {publication_enrollment_revision:"changed",publication_ssh_known_hosts_file:"./tests/publication.tftest.hcl",publication_access:{address:"https://bao.example.invalid",auth_mount:"approle",role_name:"kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig-read",secret_path:"secret/data/kubernetes/test/publication",publication:{endpoint:"https://s3.example.invalid",bucket:"test-configuration",region:"us-east-1",cluster_uid:"11111111-2222-4333-8444-555555555555",api_server:"https://api.example.invalid:6443"}}}' \
+jq '. + {publication_enrollment_revision:"changed",publication_ssh_known_hosts_file:"./tests/publication.tftest.hcl",publication_access:{address:"https://bao.example.invalid",auth_mount:"approle",role_name:"kubernetes-test-cluster-kubeconfig",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-test-cluster-kubeconfig-read",secret_path:"secret/data/kubernetes/test/publication",publication:{endpoint:"https://s3.example.invalid",bucket:"test-cluster-configuration",region:"us-east-1",cluster_name:"test-cluster",cluster_uid:"11111111-2222-4333-8444-555555555555",api_server:"https://api.example.invalid:6443"}}}' \
   "$work/base.tfvars.json" > "$work/enrolled.tfvars.json"
-jq '. + {bootstrap_enrollment_revision:"changed-bootstrap",bootstrap_ssh_known_hosts_file:"./tests/publication.tftest.hcl",bootstrap_access:{address:"https://bao.example.invalid",auth_mount:"approle",role_name:"kubernetes-test-server-bootstrap",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-test-server-bootstrap-read",identity_token_role:"kubernetes-test-server-identity",identity_writer_policy:"kubernetes-test-server-identity",config_path:"secret/data/kubernetes/test/config",identity_path:"secret/data/kubernetes/test/identity",server_token_path:"secret/data/kubernetes/test/server-token/0123456789ab",s3_secret_path:"secret/data/kubernetes/test/backup-credentials",publication_secret_path:"secret/data/kubernetes/test/publication-credentials"}}' \
+jq '. + {bootstrap_enrollment_revision:"changed-bootstrap",bootstrap_ssh_known_hosts_file:"./tests/publication.tftest.hcl",bootstrap_access:{address:"https://bao.example.invalid",auth_mount:"approle",cluster_name:"test-server",role_name:"kubernetes-test-server-bootstrap",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-test-server-bootstrap-read",identity_token_role:"kubernetes-test-server-identity",identity_writer_policy:"kubernetes-test-server-identity",config_path:"secret/data/kubernetes/test/config",identity_path:"secret/data/kubernetes/test/identity",server_token_path:"secret/data/kubernetes/test/server-token/0123456789ab",s3_secret_path:"secret/data/kubernetes/test/backup-credentials",publication_secret_path:"secret/data/kubernetes/test/publication-credentials"}}' \
   "$work/base.tfvars.json" > "$work/bootstrap-enrolled.tfvars.json"
 for input in base enrolled bootstrap-enrolled; do
   printf '%s\n' 'base64encode(nonsensitive(local.control_plane_cloud_config))' | \
@@ -81,6 +81,8 @@ cmp "$work/base.rendered" "$work/enrolled.rendered"
 cmp "$work/base.rendered" "$work/bootstrap-enrolled.rendered"
 PYTHONPATH="$source_directory" python3 -B - <<'PY'
 import urllib.error
+import importlib.util
+from pathlib import Path
 import kubernetes_recovery as recovery
 from kubernetes_object_store import OperationError
 
@@ -97,6 +99,43 @@ class Store:
         self.responses = iter(responses)
     def request(self, *args):
         return next(self.responses)
+
+spec = importlib.util.spec_from_file_location('publisher', Path(recovery.__file__).with_name('publish-kubeconfig.py'))
+publisher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(publisher)
+publication = publisher.target({'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1',
+    'bucket': 'test-cluster-configuration', 'cluster_name': 'test-cluster',
+    'cluster_uid': '11111111-2222-4333-8444-555555555555', 'api_server': 'https://api.example.invalid:6443',
+    'initializer': True, 'rke2_config_sha256': 'a' * 64})
+class PublisherStore:
+    def request(self, method, path, data=b'', headers=()):
+        assert path == '/test-cluster-configuration/kubeconfig.yaml', path
+        if method == 'PUT':
+            assert 'If-None-Match: *' in headers
+        return 200, '"synthetic"', b'synthetic-kubeconfig'
+publisher.publish(PublisherStore(), publication, b'synthetic-kubeconfig', None)
+spec = importlib.util.spec_from_file_location('issuer', Path(recovery.__file__).with_name('issue-publication-credentials.py'))
+issuer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(issuer)
+scope = {'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1', 'bucket': 'test-cluster-configuration',
+         'cluster_name': 'test-cluster', 'key': 'kubeconfig.yaml', 'policy': {'Version': '2012-10-17', 'Statement': [
+             {'Effect': 'Allow', 'Action': ['s3:GetObject', 's3:PutObject'],
+              'Resource': ['arn:aws:s3:::test-cluster-configuration/kubeconfig.yaml']}]}}
+issuer.publisher(scope)
+refuses(lambda: issuer.publisher(dict(scope, bucket='other-cluster-configuration')), 'dedicated named-cluster bucket')
+refuses(lambda: issuer.publisher(dict(scope, key='rke2/*/kubeconfig.yaml')), 'exact configuration key')
+spec = importlib.util.spec_from_file_location('backup', Path(recovery.__file__).with_name('etcd-backup.py'))
+backup = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(backup)
+target = {'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1', 'bucket': 'test-cluster-backups',
+          'cluster_name': 'test-cluster', 'cluster_uid': publication['cluster_uid'], 'node_name': 'test-server'}
+def native(arguments, **kwargs):
+    from subprocess import CompletedProcess
+    assert '--s3-folder=snapshots' in arguments
+    assert '--s3-bucket=test-cluster-backups' in arguments
+    assert not any(target['cluster_uid'] in value for value in arguments)
+    return CompletedProcess(arguments, 0, stdout='{"items": []}')
+backup.Native(target, {'access_key_id': 'synthetic', 'secret_access_key': 'synthetic'}, runner=native)('ls')
 
 config = {'backup': {'bucket': 'backup'}}
 empty = (200, '', b'<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>')

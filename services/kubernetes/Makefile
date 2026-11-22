@@ -5,7 +5,7 @@ HELM ?= helm
 ALLOY ?= alloy
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check bootstrap-authorization-check validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -19,6 +19,7 @@ help:
 		'publication-validate Check publication CLI loading and artifacts-root configuration offline' \
 		'bootstrap-validate Check bootstrap/preparation CLI loading and recovery authorization offline' \
 		'bootstrap-guard-check Exercise filesystem startup guards with bubblewrap; no network or native RKE2 execution' \
+		'bootstrap-authorization-check Exercise rendered policy and guest client against disposable OpenBao; requires BAO_BINARY' \
 		'validate         Run all local checks without infrastructure access' \
 		'nfs-chart-validate Render/check a previously downloaded NFS_CHART archive using HELM' \
 		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
@@ -72,6 +73,7 @@ shell-validate:
 	bash -n scripts/bootstrap-credentials.sh
 	bash -n scripts/check-bootstrap-guards.sh
 	bash -n scripts/check-control-plane-enrollment.sh
+	bash -n scripts/check-bootstrap-authorization.sh
 
 publication-validate:
 	$(PYTHON) -B scripts/publish-kubeconfig.py --help >/dev/null
@@ -89,6 +91,9 @@ bootstrap-validate:
 bootstrap-guard-check:
 	bash scripts/check-bootstrap-guards.sh
 	bash scripts/check-control-plane-enrollment.sh
+
+bootstrap-authorization-check:
+	BAO_BINARY="$(BAO_BINARY)" bash scripts/check-bootstrap-authorization.sh
 
 validate: fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check
 	$(MAKE) -C runtime validate

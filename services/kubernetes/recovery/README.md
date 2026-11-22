@@ -22,27 +22,39 @@ apply refuses a missing plan. Review policy/role ownership before creation.
 | `s3_secret_path` | Dedicated backup application `access_key_id`, `secret_access_key` |
 | `publication_secret_path` | Separate publisher `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
 
-The runtime profile contains `api_server`, `registration_server`, `backup` and
+The runtime profile contains `cluster_name`, `api_server`, `registration_server`, `backup` and
 `publication`. Each storage object contains only `endpoint`, `bucket`, `region`.
 Use the same published cluster DNS identity for API and registration, and different
-snapshot/configuration buckets. Populate published endpoint values privately.
+snapshot/configuration buckets named `<cluster-name>-backups` and
+`<cluster-name>-configuration`. Use the same stable friendly name in the storage
+and recovery roots. Populate published endpoint values privately; the storage
+root's `storage` output supplies the name and both bucket targets before first boot.
 Initial snapshot discovery needs authenticated current-object and version-history
 inventory; existing-cluster recovery needs listing and object/metadata retrieval
-in its cluster namespace. Keep backup and publisher credentials application-scoped,
+under `snapshots/` in its dedicated bucket. Keep backup and publisher credentials application-scoped,
 not workstation operator credentials. Existing backup retention permissions remain
 owned by the backup workflow, not this OpenBao authorization root.
 
 `configuration_enrollment` grants a bounded writer access only to the runtime
-profile. Use the shared [protected value helper][writer] and revoke its writer
-after enrollment. Server-token and S3 value custody remain with their existing
-service-owned enrollment procedures. Preserve independent recovery copies.
+profile. `credential_enrollment.token` and `.backup` grant separate bounded writers
+only the server-token and backup-credential records. The storage root owns the
+publisher's value-enrollment grant. Use the shared [protected value helper][writer]
+and revoke each writer after enrollment. Preserve the existing server token and
+independent recovery copies; no value enters OpenTofu state.
 
 The host reads these exact records with short-lived AppRole tokens and attempts
 self-revocation. To record first cluster identity, it can mint only a one-minute
 writer whose ACL requires KV-v2 CAS zero on the identity record. That separate
 token cannot read, rewrite existing identity, or write credential/configuration
 records. The administrative setup cannot populate application values through state.
-The new nested CAS constraint needs live denial/lifetime qualification on `main`.
+The identity record's metadata declares CAS-required without storing its value.
+Both policy and request encode CAS zero as a string: the superficially equivalent
+numeric nested ACL rejected the intended JSON write. The constrained writer stays
+separate because its required write parameters would otherwise block reader GETs.
+`bootstrap-authorization-check` exercises the actual guest client and rendered
+policies against disposable OpenBao, including first success and denied overwrite,
+unsafe CAS, metadata changes and deleted-history replay. Deployed integration
+still requires main-only qualification.
 
 Export `enrollment` privately as the VM root's `bootstrap_access` input; it feeds
 only the apply-time verified-SSH hook, never cloud-init or VM installation assets.

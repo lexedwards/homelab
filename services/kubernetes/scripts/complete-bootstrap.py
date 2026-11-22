@@ -21,6 +21,7 @@ def main():
         return
     with closing(BootstrapReader(private_json(ACCESS))) as reader:
         config = profile(reader.read('config_path'))
+        require(config['cluster_name'] == reader.enrollment['cluster_name'], 'Runtime profile differs from the enrolled cluster name')
         known = identity(reader.read('identity_path'))
         result = subprocess.run(['/var/lib/rancher/rke2/bin/kubectl', '--kubeconfig=/etc/rancher/rke2/rke2.yaml',
                                  '--server=' + config['api_server'], '--insecure-skip-tls-verify=false', '--request-timeout=15s',
@@ -36,7 +37,7 @@ def main():
             reader.record_identity(observed)
         pair = reader.read('publication_secret_path')
         require(set(pair) == {'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'}, 'Unexpected application publisher record')
-        target = dict(config['publication'], cluster_uid=uid, api_server=config['api_server'], initializer=True,
+        target = dict(config['publication'], cluster_name=config['cluster_name'], cluster_uid=uid, api_server=config['api_server'], initializer=True,
                       rke2_config_sha256=hashlib.sha256(private_bytes(CONFIG)).hexdigest())
         staged_pair = Path('/run/kubernetes-bootstrap/publication-credentials.json')
         staged_target = Path('/run/kubernetes-bootstrap/publication.json')

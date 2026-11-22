@@ -20,6 +20,10 @@ As with the warehouse, an apply-time hook owns verified-SSH introduction after
 VM/DNS creation. Its access/host-key/retry inputs affect only enrollment, never
 cloud-init. The issuer is ephemeral; matching credentials are reused on retry.
 
+Name each cluster before deployment and provision its dedicated backup and
+configuration buckets declaratively. Keep the actual Kubernetes UID and CA as
+identity evidence rather than using an unpredictable UID for storage or access.
+
 Preserve initialized local data first. Otherwise join a verified available
 cluster, recover the newest valid matching backup with its independently protected
 token and compatible inputs after the old server has been fenced, or create only
@@ -42,6 +46,8 @@ or failed recovery stops startup rather than selecting a creation fallback.
 - Existing [recovery custody][custody], [credential introduction][enrollment] and
   [artifact separation][artifacts] decisions remain in force. Enrollment or local
   validation does not establish deployed recovery readiness.
+- External OpenBao and RustFS are accepted recovery dependencies. Their outages
+  block recovery without fallback to new-cluster creation or a local-only restore.
 
 [custody]: 007-kubernetes-recovery-custody.md
 [enrollment]: 011-ssh-approle-enrollment.md

@@ -60,6 +60,11 @@ def object_path(bucket, key):
     return '/' + bucket + '/' + quote(key, safe='/')
 
 
+def cluster_name(value):
+    require(isinstance(value, str) and re.fullmatch(r'[a-z][a-z0-9-]{0,38}[a-z0-9]', value), 'Invalid stable cluster name')
+    return value
+
+
 def credentials(value):
     require(set(value) == {'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'}, 'Expected the application S3 credential pair only')
     require(isinstance(value['AWS_ACCESS_KEY_ID'], str) and

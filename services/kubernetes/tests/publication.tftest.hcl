@@ -48,16 +48,17 @@ run "render_installation_with_separate_enrollment" {
     publication_access = {
       address       = "https://bao.example.invalid"
       auth_mount    = "approle"
-      role_name     = "kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig"
+      role_name     = "kubernetes-test-cluster-kubeconfig"
       role_id       = "11111111-2222-4333-8444-555555555555"
-      reader_policy = "kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig-read"
+      reader_policy = "kubernetes-test-cluster-kubeconfig-read"
       secret_path   = "secret/data/kubernetes/test/publication"
       publication = {
-        endpoint    = "https://s3.example.invalid"
-        bucket      = "test-configuration"
-        region      = "us-east-1"
-        cluster_uid = "11111111-2222-4333-8444-555555555555"
-        api_server  = "https://api.example.invalid:6443"
+        endpoint     = "https://s3.example.invalid"
+        bucket       = "test-cluster-configuration"
+        region       = "us-east-1"
+        cluster_uid  = "11111111-2222-4333-8444-555555555555"
+        cluster_name = "test-cluster"
+        api_server   = "https://api.example.invalid:6443"
       }
     }
   }
