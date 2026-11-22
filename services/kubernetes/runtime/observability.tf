@@ -214,7 +214,7 @@ resource "kubernetes_manifest" "observability_chart" {
       chartContent    = data.external.observability_chart[0].result.content
       targetNamespace = kubernetes_namespace_v1.observability[0].metadata[0].name
       timeout         = "10m0s"
-      failurePolicy   = "abort"
+      failurePolicy   = "retry"
       backOffLimit    = 0
       valuesContent   = yamlencode(local.observability_values)
     }
@@ -230,6 +230,8 @@ resource "kubernetes_manifest" "observability_chart" {
     kubernetes_network_policy_v1.observability_scrape,
     kubernetes_network_policy_v1.observability_state_metrics,
     kubernetes_network_policy_v1.observability_export,
+    kubernetes_manifest.observability_api_identity,
+    kubernetes_manifest.observability_node_identities,
   ]
   lifecycle { prevent_destroy = true }
 }
