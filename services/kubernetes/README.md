@@ -41,14 +41,14 @@ describe their qualification results and limits. Recorded results do not replace
 fresh health checks before maintenance.
 
 [Kubeconfig publication](artifacts/README.md) defines a separate configuration
-bucket, application-scoped OpenBao access and opt-in first-boot publication.
+bucket, application-scoped OpenBao access and separately introduced runtime publication.
 It never uses the backup bucket or places operator S3 credentials on the host.
-Changing cloud-init does not install these assets on an existing server.
+The VM installs fixed tools; enrollment metadata never changes those assets.
 
 [Guarded bootstrap and recovery](RECOVERY.md) adds an independent OpenBao
-authorization root and explicit create/join/restore selection. The default
-`existing` lifecycle refuses an empty datastore rather than creating a new
-cluster during replacement. This maintained path is not yet live-qualified;
+authorization root and one automatic discovery procedure, without lifecycle
+switches in Terraform. An empty host waits for SSH/OpenBao enrollment; uncertainty
+or missing backups for a known cluster cannot create a new one. This path is not yet live-qualified;
 deployment and qualification must use canonical `main` after merge and approval.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
@@ -106,8 +106,8 @@ root, configuration-artifacts root and independent recovery-authorization root.
 `make test` checks worker DNS transformations:
 case-insensitive primary-MAC address selection, loopback/link-local filtering,
 and reversed IPv4 PTR names, with the DNS provider mocked. It also checks optional
-publication's YAML/base64 composition, fingerprints and package merging, plus
-recovery-point/hostname/Node-name and join transforms. Those tests target only
+fixed installation's YAML/base64 composition and separate enrollment document.
+Those tests target only
 cloud-config composition with providers
 mocked, not a whole deployment plan. Native variable and lifecycle validation
 retain responsibility for invalid inputs.
@@ -173,9 +173,9 @@ authorized-key file with the reviewed operator keys, disables root/password SSH
 and installs/enables the QEMU guest agent. It writes the API identity,
 internal CIDRs, server taint and managed-Cilium configuration before
 starting the cluster. No Kubernetes token, kubeconfig or private certificate is
-supplied to OpenTofu/cloud-init. Explicit create mode generates them in the guest;
-join/restore obtains the existing server token through the separate enrollment
-boundary. Empty-datastore startup is blocked until its lifecycle gates pass.
+supplied to OpenTofu/cloud-init. The separately introduced AppRole obtains the
+existing or initial server token and application credentials from OpenBao.
+Discovery happens at runtime, not through VM-root operation variables.
 
 Native cloud-init installs the distribution kernel/module prerequisites, audit
 and SELinux tooling; workers also receive NFS client tools. The remaining
@@ -206,10 +206,10 @@ root-only first-boot procedure:
    rejects non-enforcing mode or active swap, loads the required modules for the
    running kernel, and applies the Kubernetes sysctl file. A missing module or
    failed sysctl causes startup to fail rather than continuing without it.
-6. The separate bootstrap pre-start gate preserves initialized data, rejects
-   incomplete resets and selects only the explicitly configured create/join/restore
-   path. Default `existing` mode refuses a new empty VM. Missing enrollment or
-   recovery material blocks startup without changing to new-cluster creation.
+6. The fixed bootstrap pre-start gate preserves initialized data and rejects
+   incomplete resets. An empty host waits for separate enrollment, then discovers
+   whether to join, restore or create using the endpoint, independent identity and
+   S3 evidence. Missing or uncertain inputs never become new-cluster creation.
 
 The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
 first-boot command clears those two repository exclusions while selecting exact

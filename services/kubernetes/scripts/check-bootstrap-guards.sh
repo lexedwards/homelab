@@ -3,17 +3,14 @@ set -euo pipefail
 umask 077
 command -v bwrap >/dev/null
 source_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+service_directory=$(dirname "$source_directory")
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-operation=(--execute)
 
 new_case() {
   case_directory="$work/$1"
   mkdir -p "$case_directory/data" "$case_directory/state" "$case_directory/config"
   chmod 0700 "$case_directory/state"
-  cat > "$case_directory/config/bootstrap.json" <<'JSON'
-{"mode":"existing","configuration_sha256":"0000000000000000000000000000000000000000000000000000000000000000","node_name":"test-server","backup":null,"access":null,"recovery_point":null,"fencing_confirmed":false,"independent_custody_confirmed":false}
-JSON
 }
 
 run_case() {
@@ -24,81 +21,106 @@ run_case() {
     --bind "$case_directory/config" /etc/rancher/rke2 \
     --bind "$case_directory/data" /var/lib/rancher/rke2 \
     --bind "$case_directory/state" /var/lib/kubernetes-bootstrap \
-    /usr/bin/python3 -B /tmp/source/rke2-bootstrap.py "${operation[@]}" "$@" \
+    /usr/bin/python3 -B /tmp/source/rke2-bootstrap.py --execute "$@" \
     > "$case_directory/stdout" 2> "$case_directory/stderr"
 }
 
-new_case empty-default
-if run_case; then
-  echo 'Empty default lifecycle incorrectly allowed initialization.' >&2
-  exit 1
-fi
-grep -q 'Empty datastore requires explicit create, join or restore intent' "$case_directory/stderr"
+new_case unenrolled
+if run_case; then exit 1; fi
+grep -q 'Waiting for verified-SSH OpenBao enrollment' "$case_directory/stderr"
 
 new_case initialized
 mkdir -p "$case_directory/data/server/db/etcd/member/snap"
 printf '%s\n' 'synthetic-database-must-not-change' > "$case_directory/data/server/db/etcd/member/snap/db"
 before=$(sha256sum "$case_directory/data/server/db/etcd/member/snap/db")
-run_case --config /absent-config --approle-file /absent-credential
+run_case --enrollment /absent-config --approle-file /absent-credential
 grep -q 'Initialized datastore preserved' "$case_directory/stdout"
 [[ $(sha256sum "$case_directory/data/server/db/etcd/member/snap/db") == "$before" ]]
 
-new_case partial-datastore
+new_case partial
 mkdir -p "$case_directory/data/server/db/etcd"
-if run_case; then
-  echo 'Partial datastore was incorrectly accepted.' >&2
-  exit 1
-fi
+if run_case; then exit 1; fi
 grep -q 'Existing partial datastore requires inspection' "$case_directory/stderr"
 
 new_case incomplete-reset
 mkdir -p "$case_directory/data/server/db/etcd/member/snap"
-printf '%s\n' 'preserve-failed-reset-evidence' > "$case_directory/data/server/db/etcd/member/snap/db"
-printf '%s\n' '{"intent_sha256":"0000000000000000000000000000000000000000000000000000000000000000","snapshot_sha256":"1111111111111111111111111111111111111111111111111111111111111111"}' > "$case_directory/state/restore-started.json"
-if run_case; then
-  echo 'Incomplete reset allowed native startup.' >&2
-  exit 1
-fi
+printf '%s\n' 'preserve-failed-reset' > "$case_directory/data/server/db/etcd/member/snap/db"
+printf '%s\n' '{"intent_sha256":"test","snapshot_sha256":"test"}' > "$case_directory/state/restore-started.json"
+if run_case; then exit 1; fi
 grep -q 'Incomplete or inconsistent restore attempt blocks startup' "$case_directory/stderr"
 
-new_case completed-reset
-mkdir -p "$case_directory/data/server/db/etcd/member/snap"
-printf '%s\n' 'restored-datastore-must-not-reset-again' > "$case_directory/data/server/db/etcd/member/snap/db"
-printf '%s\n' '{"intent_sha256":"0000000000000000000000000000000000000000000000000000000000000000","snapshot_sha256":"1111111111111111111111111111111111111111111111111111111111111111"}' > "$case_directory/state/restore-started.json"
-cp "$case_directory/state/restore-started.json" "$case_directory/state/restore-complete.json"
-printf '%s\n' '{"successful":true,"returncode":0}' > "$case_directory/state/restore-result.json"
-run_case --config /absent-config --approle-file /absent-credential
-grep -q 'Initialized datastore preserved' "$case_directory/stdout"
-
-new_case missing-restored-data
-printf '%s\n' '{"intent_sha256":"0000000000000000000000000000000000000000000000000000000000000000","snapshot_sha256":"1111111111111111111111111111111111111111111111111111111111111111"}' > "$case_directory/state/restore-started.json"
-cp "$case_directory/state/restore-started.json" "$case_directory/state/restore-complete.json"
-printf '%s\n' '{"successful":true,"returncode":0}' > "$case_directory/state/restore-result.json"
-if run_case; then
-  echo 'Missing previously restored data allowed initialization or reset replay.' >&2
-  exit 1
-fi
-grep -q 'Previously restored datastore is missing' "$case_directory/stderr"
-
-operation=()
-for mode in create join restore; do
-  new_case "plan-$mode"
-  jq --arg mode "$mode" '
-    .mode = $mode |
-    .access = {address:"https://bao.example.invalid",auth_mount:"approle",role_name:"kubernetes-test-bootstrap",role_id:"test-role",reader_policy:"kubernetes-test-bootstrap-read",s3_secret_path:null,server_token_path:null} |
-    if $mode != "join" then
-      .backup = {endpoint:"https://s3.example.invalid",bucket:"test-backups",region:"us-east-1"} |
-      .access.s3_secret_path = "secret/data/kubernetes/test/snapshot-reader"
-    else . end |
-    if $mode != "create" then .access.server_token_path = "secret/data/kubernetes/test/server-token/0123456789ab" else . end |
-    if $mode == "restore" then
-      .node_name = "test-replacement" | .fencing_confirmed = true | .independent_custody_confirmed = true |
-      .recovery_point = {cluster_uid:"11111111-2222-4333-8444-555555555555",key:"rke2/11111111-2222-4333-8444-555555555555/homelab-scheduled-test-source-1730000000.zip",sha256:"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",size:4096,token_hash:"0123456789ab",source_node:"test-source",timestamp:1730000000,rke2_version:"v1.36.6+rke2r1",api_server:"https://api.example.invalid:6443"}
-    else . end
-  ' "$case_directory/config/bootstrap.json" > "$case_directory/config/selected.json"
-  run_case --config /etc/rancher/rke2/selected.json --approle-file /absent-credential
-  grep -q "Plan only: declared $mode lifecycle" "$case_directory/stdout"
-  [[ ! -e $case_directory/state/lock ]]
+for state in completed-reset missing-restored-data; do
+  new_case "$state"
+  printf '%s\n' '{"intent_sha256":"test","snapshot_sha256":"test"}' > "$case_directory/state/restore-started.json"
+  cp "$case_directory/state/restore-started.json" "$case_directory/state/restore-complete.json"
+  printf '%s\n' '{"successful":true,"returncode":0}' > "$case_directory/state/restore-result.json"
+  if [[ $state == completed-reset ]]; then
+    mkdir -p "$case_directory/data/server/db/etcd/member/snap"
+    printf '%s\n' 'do-not-reset-again' > "$case_directory/data/server/db/etcd/member/snap/db"
+    run_case --enrollment /absent-config --approle-file /absent-credential
+    grep -q 'Initialized datastore preserved' "$case_directory/stdout"
+  else
+    if run_case; then exit 1; fi
+    grep -q 'Previously restored datastore is missing' "$case_directory/stderr"
+  fi
 done
 
-printf '%s\n' 'Bootstrap filesystem guards passed in network-isolated user/mount namespaces; no RKE2, OpenBao or S3 operation executed.'
+cat > "$work/base.tfvars.json" <<'JSON'
+{"proxmox_endpoint":"https://proxmox.example.invalid","proxmox_ssh_username":"operator","technitium_server_url":"https://dns.example.invalid","proxmox_nodes":{"compute":{"ssh_address":"compute.example.invalid","snippet_datastore_id":"test-snippets","vm_datastore_id":"test-disks","vm_bridge":"test-bridge"}},"template":{"vm_id":900,"node_name":"compute"},"control_plane":{"vm_id":901,"name":"test-control-plane"},"primary_vlan_id":100,"cloud_user":"operator","cloud_ssh_public_keys":["ssh-ed25519 dGVzdA=="],"api_dns":{"zone":"example.invalid","name":"api.example.invalid"},"cluster_networks":{"pods":"198.18.0.0/16","services":"198.19.0.0/16"}}
+JSON
+jq '. + {publication_enrollment_revision:"changed",publication_ssh_known_hosts_file:"./tests/publication.tftest.hcl",publication_access:{address:"https://bao.example.invalid",auth_mount:"approle",role_name:"kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-11111111-2222-4333-8444-555555555555-kubeconfig-read",secret_path:"secret/data/kubernetes/test/publication",publication:{endpoint:"https://s3.example.invalid",bucket:"test-configuration",region:"us-east-1",cluster_uid:"11111111-2222-4333-8444-555555555555",api_server:"https://api.example.invalid:6443"}}}' \
+  "$work/base.tfvars.json" > "$work/enrolled.tfvars.json"
+for input in base enrolled; do
+  printf '%s\n' 'base64encode(nonsensitive(local.control_plane_cloud_config))' | \
+    tofu -chdir="$service_directory" console -state="$work/console.tfstate" -var-file="$work/$input.tfvars.json" \
+    > "$work/$input.rendered"
+done
+cmp "$work/base.rendered" "$work/enrolled.rendered"
+PYTHONPATH="$source_directory" python3 -B - <<'PY'
+import urllib.error
+import kubernetes_recovery as recovery
+from kubernetes_object_store import OperationError
+
+def refuses(operation, message):
+    try:
+        operation()
+    except OperationError as error:
+        assert message in str(error), str(error)
+    else:
+        raise AssertionError('Unsafe discovery result was accepted')
+
+class Store:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+    def request(self, *args):
+        return next(self.responses)
+
+config = {'backup': {'bucket': 'backup'}}
+empty = (200, '', b'<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>')
+known = {'cluster_uid': '11111111-2222-4333-8444-555555555555',
+         'token_hash': recovery.token_hash('synthetic-password')}
+refuses(lambda: recovery.latest_snapshot(Store([empty]), config, known, 'synthetic-password'),
+        'new-cluster creation is forbidden')
+refuses(lambda: recovery.latest_snapshot(Store([(403, '', b'')]), config, None, 'synthetic-password'),
+        'absence is not established')
+history = (200, '', b'<ListVersionsResult><DeleteMarker/><IsTruncated>false</IsTruncated></ListVersionsResult>')
+refuses(lambda: recovery.latest_snapshot(Store([empty, history]), config, None, 'synthetic-password'),
+        'history prevents')
+clear = (200, '', b'<ListVersionsResult><IsTruncated>false</IsTruncated></ListVersionsResult>')
+assert recovery.latest_snapshot(Store([empty, clear]), config, None, 'synthetic-password') is None
+
+class Endpoint:
+    reason = ConnectionRefusedError()
+    def open(self, *args, **kwargs):
+        raise urllib.error.URLError(self.reason)
+
+endpoint = Endpoint()
+recovery.urllib.request.build_opener = lambda *args: endpoint
+config = {'registration_server': 'https://api.example.invalid:9345'}
+assert recovery.endpoint_available(config, None) is False
+for reason in [TimeoutError(), OSError('DNS unavailable'), recovery.ssl.SSLError()]:
+    endpoint.reason = reason
+    refuses(lambda: recovery.endpoint_available(config, None), 'uncertain')
+print('Discovery boundary fixtures passed: authenticated absence, retained history, missing known backup and transport uncertainty.')
+PY
+printf '%s\n' 'Startup guards passed in isolated namespaces. Native OpenTofu rendering is byte-identical across enrollment changes. No infrastructure operation executed.'

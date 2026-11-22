@@ -32,7 +32,18 @@ def target(value):
 def initializing_server(metadata):
     config = private_bytes(CONFIG)
     require(hashlib.sha256(config).hexdigest() == metadata['rke2_config_sha256'], 'RKE2 configuration differs from the declared initializer')
-    require(not any(CONFIG.with_name(CONFIG.name + '.d').glob('*')), 'Additional RKE2 configuration needs an explicit role review')
+    decision_path = Path('/var/lib/kubernetes-bootstrap/decision.json')
+    fragments = list(CONFIG.with_name(CONFIG.name + '.d').glob('*'))
+    if decision_path.exists():
+        decision = private_json(decision_path)
+        if decision['role'] == 'join':
+            return False
+        overlay = CONFIG.with_name(CONFIG.name + '.d') / '90-bootstrap.yaml'
+        require(fragments == [overlay] and decision['configuration_sha256'] == hashlib.sha256(config).hexdigest() and
+                decision['overlay_sha256'] == hashlib.sha256(private_bytes(overlay)).hexdigest() and
+                not private_json(overlay).get('server'), 'Managed runtime configuration differs from bootstrap result')
+    else:
+        require(not fragments, 'Additional RKE2 configuration needs an explicit role review')
     text = config.decode()
     if text.lstrip().startswith('{'):
         if json.loads(text).get('server'):

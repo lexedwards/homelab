@@ -6,6 +6,9 @@ exec 3>&2 2>/dev/null
 trap 'printf "Kubernetes application credential operation failed; no secret output is available.\n" >&3' ERR
 
 [[ $EUID == 0 && ( $# == 1 || $# == 2 ) ]]
+if [[ $1 == install ]]; then
+  exec /usr/bin/python3 -B /usr/local/libexec/homelab/install-enrollment.py publication "${2:-}"
+fi
 config=/etc/rancher/rke2/publication-openbao.json
 publication=/etc/rancher/rke2/publication.json
 credential=/etc/rancher/rke2/publication-approle.json

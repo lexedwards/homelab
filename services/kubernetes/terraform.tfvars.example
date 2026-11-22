@@ -66,32 +66,18 @@
 # cilium_metrics_enabled = false
 
 # -----------------------------------------------------------------------------
-# Empty-datastore bootstrap
+# Runtime bootstrap enrollment
 # -----------------------------------------------------------------------------
 
-# Optional default: initialized startup only; an empty VM is blocked.
-# cluster_bootstrap = {
-#   mode                         = "existing"
-#   node_name                    = null
-#   access                       = null
-#   backup                       = null
-#   recovery_point               = null
-#   join_server                  = null
-#   fencing_confirmed            = false
-#   independent_custody_confirmed = false
-# }
-# For create/join/restore, use the recovery-root enrollment and RECOVERY.md.
-# No actual server token, S3 credential or SecretID belongs in this object.
-# bootstrap_ssh_known_hosts_file = null
-# bootstrap_issuer_token         = null
-# bootstrap_enrollment_revision  = "1"
-# Inject only the ephemeral exact-role issuer via TF_VAR_bootstrap_issuer_token.
+# No VM-root bootstrap inputs. Install fixed assets, then follow RECOVERY.md
+# to introduce OpenBao access over verified SSH independently of VM state.
+# Discovery, runtime configuration and credentials never enter cloud-init.
 
 # -----------------------------------------------------------------------------
 # Kubeconfig publication
 # -----------------------------------------------------------------------------
 
-# Optional: disabled; enabling adds first-boot assets, not an existing-guest rollout.
+# Optional: disabled; enabling introduces metadata/access over SSH, not cloud-init.
 # publication_access = null
 # Supply the exact artifacts-root enrollment output privately when enabling.
 # publication_ssh_known_hosts_file = null

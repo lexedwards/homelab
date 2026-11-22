@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from kubernetes_object_store import NativeS3, OperationError, https_origin, object_path, private_bytes, private_json, require
-from kubernetes_recovery import VERSION, check_native, recovery_point, token_hash
+from kubernetes_recovery import VERSION, check_native, token_hash
 
 
 def prepare(args):
@@ -51,11 +51,11 @@ def prepare(args):
     client = NativeS3(target['endpoint'], target['region'], {'AWS_ACCESS_KEY_ID': pair['access_key_id'], 'AWS_SECRET_ACCESS_KEY': pair['secret_access_key']})
     snapshot = output / ('verified-snapshot.zip' if key.endswith('.zip') else 'verified-snapshot')
     downloaded = client.download(object_path(target['bucket'], key), snapshot, args.max_snapshot_bytes)
-    point = recovery_point({
+    point = {
         'cluster_uid': target['cluster_uid'], 'key': key, 'sha256': downloaded['sha256'], 'size': downloaded['size'],
         'token_hash': association, 'source_node': target['node_name'], 'timestamp': selected['timestamp'],
         'rke2_version': VERSION, 'api_server': args.api_server,
-    })
+    }
     with (output / 'recovery-point.json').open('x') as destination:
         json.dump(point, destination, indent=2)
         destination.flush()

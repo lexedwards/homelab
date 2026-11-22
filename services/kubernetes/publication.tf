@@ -90,18 +90,16 @@ locals {
     ], [filesha256("${path.module}/scripts/kubernetes_object_store.py")])))
   } : null
   publication_target = local.publication_enabled ? merge(var.publication_access.publication, {
-    initializer        = var.cluster_bootstrap.mode != "join"
+    initializer        = true
     rke2_config_sha256 = sha256(local.rke2_config)
   }) : null
-  publication_files = local.publication_enabled ? concat([
+  publication_files = concat([
     for destination, asset in local.publication_assets : {
       path = destination, mode = asset.mode, content = file("${path.module}/${asset.source}")
     }
     ], [
-    { path = "/etc/rancher/rke2/publication-openbao.json", mode = "0600", content = jsonencode(local.publication_openbao) },
-    { path = "/etc/rancher/rke2/publication.json", mode = "0600", content = jsonencode(local.publication_target) },
     { path = "/etc/tmpfiles.d/kubernetes-publication.conf", mode = "0644", content = "d /run/kubernetes-publication-credentials 0700 root root - -\n" }
-  ]) : []
+  ])
   publication_config_sha256 = sha256(jsonencode({ openbao = local.publication_openbao, publication = local.publication_target }))
 }
 
@@ -124,7 +122,7 @@ resource "terraform_data" "publication_enrollment" {
     var.publication_enrollment_revision,
   ]
 
-  depends_on = [proxmox_virtual_environment_vm.control_plane, technitium_record.api, terraform_data.bootstrap_enrollment]
+  depends_on = [proxmox_virtual_environment_vm.control_plane, technitium_record.api]
   lifecycle {
     replace_triggered_by = [proxmox_virtual_environment_vm.control_plane]
   }
@@ -139,6 +137,7 @@ resource "terraform_data" "publication_enrollment" {
       CONTROL_PLANE_SSH_TARGET  = "${var.cloud_user}@${local.primary_ipv4}"
       CONTROL_PLANE_KNOWN_HOSTS = pathexpand(var.publication_ssh_known_hosts_file)
       PUBLICATION_CONFIG_SHA256 = local.publication_config_sha256
+      PUBLICATION_CONFIGURATION = jsonencode({ openbao = local.publication_openbao, publication = local.publication_target })
     }
   }
 }

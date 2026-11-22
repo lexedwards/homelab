@@ -17,8 +17,8 @@ provider "vault" {
 }
 
 locals {
-  object_key = "rke2/${var.cluster_uid}/kubeconfig.yaml"
-  role_name  = "kubernetes-${var.cluster_uid}-kubeconfig"
+  object_key = "rke2/${var.cluster_uid == null ? "*" : var.cluster_uid}/kubeconfig.yaml"
+  role_name  = "kubernetes-${coalesce(var.cluster_uid, var.enrollment_name)}-kubeconfig"
   publisher_policy = {
     Version = "2012-10-17"
     Statement = [{
@@ -95,7 +95,7 @@ resource "vault_policy" "issuer" {
 
 module "publisher_value_access" {
   source       = "../../../modules/openbao-deployment-access"
-  name         = "kubeconfig-${var.cluster_uid}"
+  name         = "kubeconfig-${coalesce(var.cluster_uid, var.enrollment_name)}"
   secret_paths = [var.publisher_secret_path]
 }
 

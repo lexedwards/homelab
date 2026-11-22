@@ -43,9 +43,20 @@ variable "cluster_uid" {
   description = "Existing cluster's kube-system namespace UID, exported before replacement."
   type        = string
   sensitive   = true
+  default     = null
   validation {
-    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.cluster_uid))
+    condition     = var.cluster_uid == null ? true : can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.cluster_uid))
     error_message = "Supply the actual canonical cluster UUID, not a hostname or a guessed future identity."
+  }
+}
+
+variable "enrollment_name" {
+  type        = string
+  description = "Service-owned initial publication identity before the namespace UID exists; no VM dependency."
+  default     = "control-plane"
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.enrollment_name))
+    error_message = "Use two to forty service-owned name characters."
   }
 }
 

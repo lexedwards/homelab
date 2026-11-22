@@ -1,6 +1,6 @@
 ---
 name: Require explicit intent before empty-datastore bootstrap
-status: accepted
+status: superseded by 016-kubernetes-runtime-bootstrap-discovery
 ---
 
 # Require Explicit Intent Before Empty-Datastore Bootstrap

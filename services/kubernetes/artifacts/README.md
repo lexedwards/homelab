@@ -17,7 +17,7 @@ these definitions alone do not make VM replacement safe.
 | Bounded value writer | Enroll the application credential into one exact OpenBao record; cannot read it |
 | Wrapped-SecretID issuer | Introduce the host to its AppRole; cannot read the application credential |
 | Host AppRole | Read only its application credential record, using short-lived runtime tokens |
-| Application S3 publisher | GetObject and PutObject for one cluster-scoped configuration object only |
+| Application S3 publisher | GetObject/PutObject for the exact cluster key, or only the kubeconfig filename pattern during first creation in its dedicated configuration bucket |
 
 The application account has no backup-bucket, bucket-management, listing or
 deletion grant. Credential issuance and value enrollment happen outside OpenTofu.
@@ -39,8 +39,11 @@ with path-style requests and no IAM/STS discovery. RustFS IAM uses its native AP
 not AWS IAM resources.
 
 Copy `terraform.tfvars.example` to an ignored private `terraform.tfvars`. Fill
-the required inputs, including the existing cluster's actual kube-system UID and
-stable, certificate-covered API identity. The configuration and backup bucket
+the required inputs and stable, certificate-covered API identity. Supply the
+existing cluster's actual kube-system UID when known. A null UID supports first
+creation through only `rke2/*/kubeconfig.yaml` in the dedicated configuration bucket;
+`enrollment_name` names that initial authorization. Tighten to the actual UID
+after it is recorded. The configuration and backup bucket
 names must differ. Use provider-native workstation authentication from
 `homelab-creds`; clear unrelated AWS session/profile/endpoint overrides.
 
@@ -110,11 +113,13 @@ Pass the exact artifacts `enrollment` output as infrastructure
 OpenBao administrator or S3 credential. Enrollment follows [trusted SSH
 introduction][ssh-introduction]; first-contact key scanning is not attestation.
 
-Enabling the feature adds jq, protected metadata, the publisher and systemd units
-to first-boot data. It does not update an existing guest; use the separately
-approved in-place procedure below. Do not rerun cloud-init or replace an
-initialized VM to install these files. The enrollment hook intentionally fails
-if the expected assets/configuration are absent or differ. Changing
+The VM always installs fixed tools/units. Enabling publication does not add
+metadata to first-boot data: the verified-SSH hook installs non-secret enrollment
+metadata separately, then introduces the wrapped SecretID. For the unified
+automatic path use [runtime bootstrap enrollment](../RECOVERY.md); its OpenBao
+profile and distinct publisher record are fetched after startup. Do not rerun
+cloud-init or replace an initialized VM to change operational information.
+Absent tools still require separately approved installation. Changing
 `publication_enrollment_revision` retries introduction; it does not install files,
 rotate an existing SecretID or repair configuration.
 
@@ -149,6 +154,10 @@ test ! -L /etc/rancher/rke2/publication.json
 dnf install -y jq python3 curl
 install -D -o root -g root -m 0644 scripts/kubernetes_object_store.py \
   /usr/local/libexec/homelab/kubernetes_object_store.py
+install -D -o root -g root -m 0644 scripts/kubernetes_recovery.py \
+  /usr/local/libexec/homelab/kubernetes_recovery.py
+install -D -o root -g root -m 0700 scripts/install-enrollment.py \
+  /usr/local/libexec/homelab/install-enrollment.py
 install -D -o root -g root -m 0700 scripts/publish-kubeconfig.py \
   /usr/local/libexec/homelab/publish-kubeconfig.py
 install -D -o root -g root -m 0700 scripts/kubeconfig-credentials.sh \
@@ -191,8 +200,9 @@ credential fallback exists.
 
 The publisher requires SELinux enforcing, the declared initializer configuration,
 a running non-joining RKE2 server, a ready local API and a matching kube-system UID.
-Non-initializers skip before kubeconfig or credential reads. Additional RKE2
-configuration fragments or an unmanaged configuration path fail closed.
+Non-initializers skip before kubeconfig or credential reads. The fixed runtime
+overlay is accepted only when its hash matches the recorded bootstrap decision;
+other RKE2 fragments or an unmanaged configuration path fail closed.
 The exported native certificate-based kubeconfig uses the stable API identity.
 
 Normal writes use `If-None-Match: *`. An identical existing object is downloaded

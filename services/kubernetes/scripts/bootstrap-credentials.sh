@@ -6,8 +6,11 @@ exec 3>&2 2>/dev/null
 trap 'printf "Kubernetes bootstrap introduction failed; preserved credentials and datastore require private inspection.\n" >&3' ERR
 
 [[ $EUID == 0 && $# == 2 && $2 =~ ^[a-f0-9]{64}$ ]]
-[[ $1 == check || $1 == enroll || $1 == activate ]]
-config=/etc/rancher/rke2/bootstrap.json
+[[ $1 == check || $1 == enroll || $1 == activate || $1 == install ]]
+if [[ $1 == install ]]; then
+  exec /usr/bin/python3 -B /usr/local/libexec/homelab/install-enrollment.py bootstrap "$2"
+fi
+config=/etc/rancher/rke2/bootstrap-access.json
 credential=/etc/rancher/rke2/bootstrap-approle.json
 runtime=/run/kubernetes-bootstrap
 private_file() {
@@ -19,12 +22,11 @@ private_file "$config"
 (( (8#$(stat -c %a /etc/rancher/rke2) & 022) == 0 ))
 actual=$(jq -cSj . "$config" | sha256sum)
 [[ ${actual%% *} == "$2" ]]
-/usr/bin/python3 -B /usr/local/libexec/homelab/rke2-bootstrap.py --config "$config" >/dev/null
-jq -e '.mode != "existing" and (.access.role_name | test("^kubernetes-[a-z0-9-]+-bootstrap$"))' "$config" >/dev/null
-address=$(jq -r .access.address "$config")
-auth_mount=$(jq -r .access.auth_mount "$config")
-role_name=$(jq -r .access.role_name "$config")
-role_id=$(jq -r .access.role_id "$config")
+/usr/bin/python3 -B /usr/local/libexec/homelab/rke2-bootstrap.py --enrollment "$config" >/dev/null
+address=$(jq -r .address "$config")
+auth_mount=$(jq -r .auth_mount "$config")
+role_name=$(jq -r .role_name "$config")
+role_id=$(jq -r .role_id "$config")
 creation_path="auth/$auth_mount/role/$role_name/secret-id"
 check_credential() {
   private_file "$credential"

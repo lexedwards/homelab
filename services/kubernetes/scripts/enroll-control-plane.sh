@@ -31,6 +31,10 @@ remote() {
     "sudo -n /usr/local/sbin/$helper $1 $PUBLICATION_CONFIG_SHA256"
 }
 timeout 600 ssh "${ssh_options[@]}" -- "$CONTROL_PLANE_SSH_TARGET" 'sudo -n cloud-init status --wait' >/dev/null
+if [[ -n ${PUBLICATION_CONFIGURATION:-} ]]; then
+  printf '%s' "$PUBLICATION_CONFIGURATION" | remote install
+  unset PUBLICATION_CONFIGURATION
+fi
 status=0
 remote check </dev/null || status=$?
 if [[ $status == 0 ]]; then

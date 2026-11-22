@@ -79,8 +79,11 @@ class NativeS3:
     def request(self, method, path, data=b'', headers=()):
         return self._request(method, path, data, headers)
 
-    def _request(self, method, path, data=b'', headers=(), output=None, max_bytes=131072, timeout=60):
-        require(method in ['GET', 'PUT'] and path.startswith('/') and not path.startswith('//') and
+    def head(self, path):
+        return self._request('HEAD', path, inspect=True, max_bytes=16 * 1024 ** 3)
+
+    def _request(self, method, path, data=b'', headers=(), output=None, max_bytes=131072, timeout=60, inspect=False):
+        require(method in ['GET', 'PUT', 'HEAD'] and path.startswith('/') and not path.startswith('//') and
                 '\r' not in path and '\n' not in path, 'Unsupported object-store request')
         require(isinstance(data, bytes) and len(data) <= 131072, 'Request payload is too large')
         settings = {
@@ -107,6 +110,9 @@ class NativeS3:
                 os.lseek(descriptor, 0, os.SEEK_SET)
                 lines.append('data-binary = ' + json.dumps('@/proc/' + str(os.getpid()) + '/fd/' + str(descriptor)))
             arguments = ['curl', '-q', '--config', '-', '--write-out', '\n%{http_code}\n%header{etag}']
+            if inspect:
+                arguments = ['curl', '-q', '--config', '-', '--head', '--output', '/dev/null', '--write-out',
+                             '%{http_code}\n%header{etag}\n%header{x-amz-meta-rke2-token-hash}\n%header{x-amz-meta-rke2-node-name}\n%header{content-length}']
             if output is not None:
                 arguments += ['--output', '/proc/' + str(os.getpid()) + '/fd/' + str(output)]
             response = subprocess.run(arguments, input=('\n'.join(lines) + '\n').encode(),
@@ -115,11 +121,15 @@ class NativeS3:
         finally:
             if descriptor is not None:
                 os.close(descriptor)
+        if inspect:
+            status, etag, token, node, size = response.stdout.decode('ascii').split('\n')
+            require(status.isdigit(), 'Invalid HTTP result')
+            return int(status), {'etag': etag, 'token_hash': token, 'node_name': node, 'size': size}
         body, status, etag = response.stdout.rsplit(b'\n', 2)
         require(re.fullmatch(rb'[0-9]{3}', status) is not None, 'Invalid HTTP result')
         return int(status), etag.decode('ascii'), body
 
-    def download(self, path, destination, max_bytes):
+    def download(self, path, destination, max_bytes, headers=()):
         destination = Path(destination)
         require(isinstance(max_bytes, int) and 0 < max_bytes <= 16 * 1024 ** 3, 'Invalid snapshot download bound')
         require(not any(item.is_symlink() for item in [destination, *destination.parents]), 'Snapshot custody must not use symlinks')
@@ -129,7 +139,7 @@ class NativeS3:
         descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         complete = False
         try:
-            status, _, _ = self._request('GET', path, output=descriptor, max_bytes=max_bytes, timeout=600)
+            status, _, _ = self._request('GET', path, headers=headers, output=descriptor, max_bytes=max_bytes, timeout=600)
             require(status == 200, 'Snapshot GetObject failed (HTTP ' + str(status) + ')')
             os.fsync(descriptor)
             size = os.fstat(descriptor).st_size

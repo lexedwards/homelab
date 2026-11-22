@@ -32,6 +32,12 @@ data "cloudinit_config" "control_plane" {
   }
 }
 
+output "control_plane_bootstrap_sha256" {
+  description = "Fingerprint of the immutable VM installation asset; enrollment and recovery operations must not change it."
+  sensitive   = true
+  value       = sha256(data.cloudinit_config.control_plane.rendered)
+}
+
 data "cloudinit_config" "worker" {
   for_each      = local.worker_hosts
   gzip          = false
