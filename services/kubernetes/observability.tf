@@ -6,14 +6,14 @@ variable "cilium_metrics_enabled" {
 }
 
 locals {
-  cilium_observability_values = var.cilium_metrics_enabled ? {
+  cilium_observability_values = { for name, value in {
     prometheus        = { enabled = true }
     rollOutCiliumPods = true
     operator = merge(local.cilium_bootstrap_values.operator, try(local.service_exposure_values.operator, {}), {
       prometheus  = { enabled = true }
       rollOutPods = true
     })
-  } : {}
+  } : name => value if var.cilium_metrics_enabled }
 }
 
 output "cilium_metrics_manifest" {
