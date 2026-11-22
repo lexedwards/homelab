@@ -63,6 +63,7 @@
 # }
 # rke2_version         = "1.36.6~rke2r1-0.el10"
 # rke2_selinux_version = "0.24-1.el10"
+# cilium_metrics_enabled = false
 
 # -----------------------------------------------------------------------------
 # Workers

@@ -1,0 +1,265 @@
+global:
+  scrapeInterval: 60s
+  scrapeTimeout: 10s
+
+destinations:
+  warehouse:
+    type: otlp
+    protocol: http
+    timeout: 5s
+    metrics: {enabled: true}
+    logs: {enabled: false}
+    traces: {enabled: false}
+    processors:
+      resourceAttributes:
+        useDefaultRemoveList: false
+      batch:
+        size: 512
+        maxSize: 1024
+        timeout: 2s
+      memoryLimiter:
+        enabled: true
+        limit: 256MiB
+    sendingQueue:
+      queueSize: 100
+      numConsumers: 2
+    retryOnFailure:
+      initialInterval: 5s
+      maxInterval: 30s
+      maxElapsedTime: 5m
+
+clusterMetrics:
+  enabled: true
+  collector: cluster
+  kubelet:
+    nodeAddressFormat: direct
+  kubeletResource:
+    nodeAddressFormat: direct
+  cadvisor:
+    nodeAddressFormat: direct
+  apiServer:
+    enabled: true
+    metricsTuning:
+      includeMetrics:
+        - up
+        - scrape_samples_scraped
+        - apiserver_request_total
+        - apiserver_request_duration_seconds_bucket
+        - apiserver_request_duration_seconds_sum
+        - apiserver_request_duration_seconds_count
+        - apiserver_current_inflight_requests
+
+telemetryServices:
+  kube-state-metrics:
+    deploy: true
+    nodeSelector:
+      homelab.io/role: worker
+    collectors:
+      - nodes
+      - namespaces
+      - pods
+      - deployments
+      - daemonsets
+      - statefulsets
+      - replicasets
+      - jobs
+      - cronjobs
+      - persistentvolumes
+      - persistentvolumeclaims
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {cpu: 250m, memory: 256Mi}
+
+alloy-operator:
+  ownNamespaceOnly: true
+  rbac:
+    createClusterRoles: false
+  nodeSelector:
+    homelab.io/role: worker
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 250m, memory: 256Mi}
+  waitForAlloyRemoval:
+    nodeSelector:
+      homelab.io/role: worker
+
+collectors:
+  cluster:
+    presets: [singleton]
+    fullnameOverride: observability-cluster
+    controller:
+      type: statefulset
+      nodeSelector:
+        homelab.io/role: worker
+      tolerations: []
+      podLabels:
+        homelab.io/telemetry-role: cluster
+        homelab.io/telemetry-exporter: "true"
+    rbac:
+      create: false
+    serviceAccount:
+      name: observability-cluster
+    alloy:
+      enableReporting: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 473
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+          add: []
+        seccompProfile: {type: RuntimeDefault}
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+    extraConfig: |
+      prometheus.exporter.self "collector" {}
+      prometheus.scrape "collector" {
+        targets = prometheus.exporter.self.collector.targets
+        job_name = "integrations/alloy"
+        scrape_interval = "60s"
+        scrape_timeout = "10s"
+        forward_to = [prometheus.relabel.collector.receiver]
+      }
+      prometheus.relabel "collector" {
+        rule {
+          source_labels = ["__name__"]
+          regex = "up|process_.*|go_memstats_.*|otelcol_exporter_.*|otelcol_receiver_.*|otelcol_processor_.*"
+          action = "keep"
+        }
+        forward_to = [otelcol.receiver.prometheus.warehouse.receiver]
+      }
+      discovery.kubernetes "cilium_agents" {
+        role = "pod"
+        namespaces {
+          names = ["kube-system"]
+        }
+        selectors {
+          role = "pod"
+          label = "k8s-app=cilium"
+        }
+      }
+      discovery.kubernetes "cilium_operator" {
+        role = "pod"
+        namespaces {
+          names = ["kube-system"]
+        }
+        selectors {
+          role = "pod"
+          label = "name=cilium-operator"
+        }
+      }
+      discovery.relabel "cilium" {
+        targets = array.concat(discovery.kubernetes.cilium_agents.targets, discovery.kubernetes.cilium_operator.targets)
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_port_name"]
+          regex = "prometheus"
+          action = "keep"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label = "node"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label = "component"
+        }
+      }
+      prometheus.scrape "cilium" {
+        targets = discovery.relabel.cilium.output
+        job_name = "integrations/cilium"
+        scrape_interval = "60s"
+        scrape_timeout = "10s"
+        forward_to = [prometheus.relabel.cilium.receiver]
+      }
+      prometheus.relabel "cilium" {
+        rule {
+          source_labels = ["__name__"]
+          regex = "up|scrape_samples_scraped|cilium_agent_api_process_time_seconds.*|cilium_drop_count_total|cilium_forward_count_total|cilium_unreachable_nodes|cilium_unreachable_health_endpoints|cilium_endpoint_state|cilium_operator_.*"
+          action = "keep"
+        }
+        forward_to = [otelcol.receiver.prometheus.warehouse.receiver]
+      }
+
+selfReporting:
+  enabled: false
+
+replaceComponent:
+  - type: prometheus.scrape
+    name: kubelet
+    module: cluster_metrics
+    content: |
+      targets = discovery.relabel.kubelet.output
+      job_name = "integrations/kubernetes/kubelet"
+      scheme = "https"
+      scrape_interval = "60s"
+      scrape_timeout = "10s"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        insecure_skip_verify = false
+      }
+      forward_to = [prometheus.relabel.kubelet.receiver]
+  - type: prometheus.scrape
+    name: kubelet_resources
+    module: cluster_metrics
+    content: |
+      targets = discovery.relabel.kubelet_resources.output
+      job_name = "integrations/kubernetes/resources"
+      scheme = "https"
+      scrape_interval = "60s"
+      scrape_timeout = "10s"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        insecure_skip_verify = false
+      }
+      forward_to = [prometheus.relabel.kubelet_resources.receiver]
+  - type: prometheus.scrape
+    name: cadvisor
+    module: cluster_metrics
+    content: |
+      targets = discovery.relabel.cadvisor.output
+      job_name = "integrations/kubernetes/cadvisor"
+      scheme = "https"
+      scrape_interval = "60s"
+      scrape_timeout = "10s"
+      bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_config {
+        ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        insecure_skip_verify = false
+      }
+      forward_to = [prometheus.relabel.cadvisor.receiver]
+
+extraObjects:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: observability-cluster
+    rules:
+      - apiGroups: [""]
+        resources: [nodes, namespaces, pods, services, endpoints]
+        verbs: [get, list, watch]
+      - apiGroups: [discovery.k8s.io]
+        resources: [endpointslices]
+        verbs: [get, list, watch]
+      - apiGroups: [apps]
+        resources: [replicasets]
+        verbs: [get, list, watch]
+      - apiGroups: [""]
+        resources: [nodes/metrics]
+        verbs: [get]
+      - nonResourceURLs: [/metrics]
+        verbs: [get]
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: observability-cluster
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: observability-cluster
+    subjects:
+      - kind: ServiceAccount
+        name: observability-cluster
+        namespace: "{{ .Release.Namespace }}"

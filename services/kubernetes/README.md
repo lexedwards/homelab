@@ -8,6 +8,10 @@ and NFS storage retain their explicit rollout boundaries. OpenBao workload-secre
 delivery has a separately enabled [API runtime root](runtime/README.md) alongside it.
 Durable rationale is in the [ADRs][adrs].
 
+[Observability](OBSERVABILITY.md) defines opt-in chart-managed metrics collection
+and native Cilium metrics enablement. Local configuration checks do not establish
+warehouse ingestion or authorize a rollout.
+
 [Workload network policy](NETWORK-POLICY.md) provides an explicitly scoped
 namespace baseline, synthetic examples and bounded direct-peer checks. It is not
 automatically applied by infrastructure provisioning.

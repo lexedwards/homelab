@@ -31,6 +31,24 @@
 #   resolver =
 # }
 # -----------------------------------------------------------------------------
+# Observability (optional; credentials stay in the protected kubeconfig)
+# -----------------------------------------------------------------------------
+# cluster_api = null
+# cluster_api = {
+#   kubeconfig_path =
+# }
+# observability = null
+# observability = {
+#   cluster_name        =
+#   warehouse_url       =
+#   warehouse_ipv4      =
+#   warehouse_port      =
+#   dns_ipv4            =
+#   node_ipv4_addresses = []
+#   api_ipv4_addresses  = []
+#   allow_plaintext     = false
+# }
+# -----------------------------------------------------------------------------
 # Qualification (optional; enable only after the platform CRDs are installed)
 # -----------------------------------------------------------------------------
 # secrets_qualification = null

@@ -13,6 +13,12 @@ the earlier API rollout was paused before creating any managed runtime objects.
 Never copy a feature-worktree state into production or apply the parent VM plan
 from this directory.
 
+Optional `cluster_api` supplies a protected kubeconfig independently of OpenBao
+integration. Without it, the existing `secrets_platform` connection is unchanged.
+Optional `observability` owns the native metrics release and explicit network
+policies; see [collection operations](../OBSERVABILITY.md). It does not enroll
+credentials or consume warehouse state.
+
 Run `make init` then `make validate` locally. These initialize providers and check
 OpenTofu formatting/validation and literal service boundaries, not deployments.
 Parent `make init`/`make validate`

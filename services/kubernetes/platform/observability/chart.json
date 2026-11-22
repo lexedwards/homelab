@@ -1,0 +1,6 @@
+{
+  "version": "4.6.1",
+  "url": "https://github.com/grafana/helm-charts/releases/download/k8s-monitoring-4.6.1/k8s-monitoring-4.6.1.tgz",
+  "sha256": "7596e92f7347d4965c4ce1e0a181fbeaa295002842ff8a15894371de3eb90ea4",
+  "alloy_version": "1.21.3"
+}
