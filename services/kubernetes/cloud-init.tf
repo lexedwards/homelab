@@ -7,6 +7,18 @@ locals {
   worker_configs = {
     for host, config in local.worker_cloud_init : host => yamldecode(config)
   }
+  control_plane_cloud_config = "#cloud-config\n${yamlencode(merge(local.node_baseline, local.server_config, {
+    packages = concat(local.node_baseline.packages, local.publication_enabled ? ["jq"] : [])
+    write_files = concat(local.node_baseline.write_files, local.server_config.write_files, [
+      for item in local.publication_files : {
+        path        = item.path
+        owner       = "root:root"
+        permissions = item.mode
+        encoding    = "b64"
+        content     = base64encode(item.content)
+      }
+    ])
+  }))}"
 }
 
 data "cloudinit_config" "control_plane" {
@@ -16,9 +28,7 @@ data "cloudinit_config" "control_plane" {
   part {
     filename     = "kubernetes-control-plane.yaml"
     content_type = "text/cloud-config"
-    content = "#cloud-config\n${yamlencode(merge(local.node_baseline, local.server_config, {
-      write_files = concat(local.node_baseline.write_files, local.server_config.write_files)
-    }))}"
+    content      = local.control_plane_cloud_config
   }
 }
 

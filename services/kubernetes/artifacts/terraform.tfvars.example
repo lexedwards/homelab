@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars, fill required inputs privately, and never commit it.
+# Provider credentials: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and VAULT_TOKEN.
+# Clear unrelated AWS_SESSION_TOKEN, profile and endpoint overrides before use.
+
+# -----------------------------------------------------------------------------
+# Provider — Required
+# -----------------------------------------------------------------------------
+# s3_endpoint     =
+# openbao_address =
+
+# Provider — Optional
+# s3_region = "us-east-1"
+
+# -----------------------------------------------------------------------------
+# Cluster artifacts — Required
+# -----------------------------------------------------------------------------
+# configuration_bucket =
+# backup_bucket        =
+# cluster_uid          =
+# api_server           =
+# approle_mount        =
+# publisher_secret_path =
