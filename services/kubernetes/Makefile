@@ -5,7 +5,7 @@ HELM ?= helm
 ALLOY ?= alloy
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate publication-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -13,9 +13,10 @@ help:
 		'fmt              Format OpenTofu configuration' \
 		'fmt-check        Check formatting' \
 		'tofu-validate    Validate the initialized root offline' \
-		'test             Check primary-address selection and PTR-name transformations offline' \
+		'test             Check worker DNS and optional publication composition offline' \
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
+		'publication-validate Check publication CLI loading and artifacts-root configuration offline' \
 		'validate         Run all local checks without infrastructure access' \
 		'nfs-chart-validate Render/check a previously downloaded NFS_CHART archive using HELM' \
 		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
@@ -28,6 +29,7 @@ help:
 init:
 	$(TOFU) init
 	$(MAKE) -C runtime init
+	$(MAKE) -C artifacts init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -62,8 +64,15 @@ shell-validate:
 	bash -n cloud-init/install-server.sh
 	bash -n config/node-preflight.sh
 	bash -n cloud-init/install-agent.sh
+	bash -n scripts/kubeconfig-credentials.sh
+	bash -n scripts/enroll-control-plane.sh
 
-validate: fmt-check tofu-validate test yaml-validate shell-validate
+publication-validate:
+	$(PYTHON) -B scripts/publish-kubeconfig.py --help >/dev/null
+	$(PYTHON) -B scripts/issue-publication-credentials.py --help >/dev/null
+	$(MAKE) -C artifacts validate
+
+validate: fmt-check tofu-validate test yaml-validate shell-validate publication-validate
 	$(MAKE) -C runtime validate
 
 nfs-chart-validate:

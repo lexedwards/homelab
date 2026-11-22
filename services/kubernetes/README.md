@@ -40,6 +40,11 @@ The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
 describe their qualification results and limits. Recorded results do not replace
 fresh health checks before maintenance.
 
+[Kubeconfig publication](artifacts/README.md) defines a separate configuration
+bucket, application-scoped OpenBao access and opt-in first-boot publication.
+It never uses the backup bucket or places operator S3 credentials on the host.
+Changing cloud-init does not install these assets on an existing server.
+
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
 workflow, protected recovery-custody boundary and six-hour timer. They do not
 modify VM/bootstrap state. See [lifecycle runbooks][lifecycle] for maintenance,
@@ -58,8 +63,8 @@ verified evidence distinguished from unrehearsed procedures and accepted risks.
 - Existing Technitium zone and service-owned API/worker A records that are not
   already owned elsewhere. Optional worker PTR ownership needs an approved
   existing reverse zone. The API name stays stable through future HA expansion.
-- OpenTofu 1.9+ for infrastructure, 1.11+ for the runtime's ephemeral setup
-  credentials, Python 3, and yamllint. Providers are pinned by the lock file.
+- OpenTofu 1.11+ for ephemeral enrollment credentials, Python 3, and yamllint.
+  Providers are pinned by the lock file.
   Optional chart inspection helpers additionally require PyYAML and Helm.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
@@ -89,10 +94,13 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
 checks and the repository's literal service-boundary check, including the runtime
-root. `make test` checks only the worker DNS transformations:
+root and configuration-artifacts root. `make test` checks worker DNS transformations:
 case-insensitive primary-MAC address selection, loopback/link-local filtering,
-and reversed IPv4 PTR names, with the DNS provider mocked. Native variable and
-lifecycle validation retain responsibility for invalid inputs.
+and reversed IPv4 PTR names, with the DNS provider mocked. It also checks optional
+publication's YAML/base64 composition, fingerprints, package merging and unchanged
+disabled behavior. Those tests target only cloud-config composition with providers
+mocked, not a whole deployment plan. Native variable and lifecycle validation
+retain responsibility for invalid inputs.
 
 These checks do not exercise RPM installation, kernel boot, SELinux policy,
 authenticated DNS publication or runtime readiness. No infrastructure is created
@@ -314,11 +322,13 @@ corresponding RKE2 recovery material.
 
 The backup policy is six-hour snapshots retained fourteen days
 in a dedicated off-node bucket, verified TLS and independent credential custody.
-Approximately four hours is a planning recovery target, not an SLA or tested
-restore duration. Off-node backup and scheduled execution were verified, but the
-isolated restore experiment failed and its implementation has been retired.
-No automated control-plane restore procedure is maintained. Do not call this server
-restore-qualified or assume a snapshot is a proven rollback path.
+Approximately four hours is a planning recovery target, not an SLA or a qualified
+production restore duration. Off-node backup and scheduled execution were verified.
+An earlier isolated restore experiment failed and its implementation was retired;
+a later synthetic new-VM exercise restored the original cluster identity and an
+unchanged worker using a separate matching token. That proof does not provide a
+maintained automated restore bootstrap or qualify production replacement. Do not
+call this server restore-qualified or assume a snapshot is a generic rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 
 ## Restart, expansion and troubleshooting

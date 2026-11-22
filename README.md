@@ -139,7 +139,7 @@ observability's NFS destination still need confirming.
 [Kubernetes](services/kubernetes/README.md) defines an RKE2 control-plane VM on
 `compute`, optional workers on `compute` and `store`, Cilium networking, and
 opt-in NFS and OpenBao integration. The lifecycle runbooks record operating
-evidence and limitations; snapshot restoration remains unproven.
+evidence and limitations; production control-plane replacement remains unqualified.
 
 ### Service Proxy
 

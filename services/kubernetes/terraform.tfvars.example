@@ -66,6 +66,19 @@
 # cilium_metrics_enabled = false
 
 # -----------------------------------------------------------------------------
+# Kubeconfig publication
+# -----------------------------------------------------------------------------
+
+# Optional: disabled; enabling adds first-boot assets, not an existing-guest rollout.
+# publication_access = null
+# Supply the exact artifacts-root enrollment output privately when enabling.
+# publication_ssh_known_hosts_file = null
+# publication_enrollment_revision = "1"
+# publication_issuer_token = null
+# Inject the ephemeral wrapped-SecretID issuer via TF_VAR_publication_issuer_token.
+# Never put an application S3 credential or SecretID here.
+
+# -----------------------------------------------------------------------------
 # Workers
 # -----------------------------------------------------------------------------
 

@@ -14,12 +14,13 @@ worker on each Proxmox host. The control plane is not highly available.
 | --- | --- |
 | Backups | Native off-node upload, independent credential custody, freshness/failure reporting and a natural six-hour timer run verified. |
 | Worker maintenance | Replacement and planned drained reboot checks passed; do not repeat them merely to complete documentation. |
-| Control-plane recovery | Earlier isolated restore experiment failed; its implementation has been retired. Recovery remains unproven, with no maintained automated restore procedure. |
+| Control-plane recovery | An earlier failed experiment was retired. A later synthetic new-VM native restore preserved cluster identity and an unchanged worker, with a new server Node name. Maintained restore bootstrap and production replacement remain unqualified. |
+| Kubeconfig publication | Separate-bucket synthetic OpenBao enrollment, first publication, conditional refresh, administrator download and native timer recovery passed. Production rollout remains a separate operation; see the [artifact procedure](artifacts/README.md). |
 | Server-first upgrade and bounded host-loss exercises | Procedures below are unrehearsed, not runtime acceptance evidence. |
 | Three-server expansion | Future design only; no extra server or HA frontend is deployed by this runbook. |
 
 Unrehearsed procedures remain unverified. The loose four-hour restore target is
-a planning objective; restoration has not demonstrated that recovery time and
+a planning objective; production restoration has not demonstrated that recovery time and
 there is no recovery-time SLA.
 
 ## Before any maintenance
@@ -145,7 +146,7 @@ owner; do not delete Helm release state or reinstall the cluster as a repair.
 An RPM downgrade or VM snapshot rollback is not a generic safe rollback after
 datastore changes. Review the release-specific rollback procedure and data-loss
 implications separately. Production `cluster-reset`, datastore restoration and
-VM replacement need new explicit authorization. Restoration remains unproven.
+VM replacement need new explicit authorization. Production restoration remains unqualified.
 If etcd quorum/identity is unclear, preserve the
 original server and escalate rather than initializing another cluster.
 
