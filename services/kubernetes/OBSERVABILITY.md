@@ -3,12 +3,55 @@
 The opt-in API runtime defines a pinned Grafana Kubernetes Monitoring release.
 Its worker-hosted collector scrapes kubelet, resource, cAdvisor, API-server,
 kube-state-metrics and Cilium endpoints and exports cumulative OTLP metrics to
-warehouse Alloy. This is collection configuration, not deployed acceptance.
+warehouse Alloy. The same collector watches Kubernetes events and collects
+stdout/stderr from all pods through the API, then exports logs over OTLP. This is
+collection configuration, not deployed acceptance.
 
 Node CPU/memory and readiness/pressure coverage does not require Node Exporter,
 host mounts or a control-plane collector. Full host-device monitoring and
 scheduler/controller-manager/etcd metrics are outside this pass. The
 [collection decision][decision] explains the boundaries.
+
+## Pod logs and events
+
+Pod discovery covers all namespaces. The collector has read-only log access,
+not host filesystem access or an ability to mutate workloads. All-pod collection
+is intentional; it does not grant application pods access to the collector or
+warehouse APIs. The event reader remains a singleton. Neither path collects
+audit logs, arbitrary host journals or Kata guest-internal logs.
+
+The OTLP destination maps node identity into `k8s.node.name`. Kubernetes namespace,
+pod and container metadata use the chart's standard mappings. Controller name and
+kind remain `workload` and `workload_kind` attributes; a ReplicaSet controller name
+is not silently relabelled as a Deployment. Event object/timestamp details remain
+in the JSON event body. A cluster-scoped event need not have namespace/node data.
+
+The destination replaces incoming Loki label hints with a bounded list: service,
+environment, host and Kubernetes cluster/namespace/node identities. The existing
+warehouse's insert-only hint processor preserves that list, so a warehouse reload
+is not required. Native local conversion with the warehouse-matching Alloy version
+confirmed those Kubernetes labels, while pod name/UID and workload attributes
+remain in the JSON entry. Trace/span IDs remain unindexed fields when emitted.
+This local conversion check is not proof of live Kubernetes log delivery.
+
+Example LogQL selectors after verifying the actual ingested fields:
+
+```logql
+{k8s_cluster_name="<cluster>",k8s_namespace_name="<namespace>"}
+{k8s_cluster_name="<cluster>",k8s_node_name="<node>"} | json
+{k8s_cluster_name="<cluster>"} | json workload="attributes.workload" | workload="<controller>"
+{k8s_cluster_name="<cluster>"} | json pod=`resources["k8s.pod.name"]` | pod="<pod>"
+```
+
+API log streaming is best effort. There is no claimed persistent file checkpoint.
+Rotation, reader reconnect, container replacement, API unavailability and collector
+restart can lose or replay records. Queues are shared with the configured export
+pipeline and are lost on restart. Observe failures and compare synthetic sequence
+numbers before/after approved tests; do not infer continuity from a Ready pod.
+
+Applications must not disclose secrets. Optional collection redaction is separate
+defence in depth, not a way to hide unsafe logging. Do not emit real credentials
+as a smoke test or export the same event through both SDK logs and stdout.
 
 ## Inputs and ownership
 
@@ -94,6 +137,11 @@ the command. It does not establish collector authorization or network enforcemen
 6. Under an approved bounded test, observe collector restart and warehouse export
    failure/recovery. Inspect failed sends, queue saturation and dropped data.
    Do not manufacture a warehouse outage by restarting unrelated services.
+7. For logs, emit numbered synthetic stdout/stderr records from ordinary and Kata
+   pods on each worker. Query their node/namespace/workload identity and event
+   object/timestamp fields in Loki. Exercise container restart, bounded rotation
+   and collector reconnect; record gaps/replay and recovery rather than claiming
+   lossless delivery. Use only owned fixtures and preserve runtime selection.
 
 Use the supplied query API access privately. Expected PromQL starting points are
 below; verify translated names and labels against real ingestion before recording
