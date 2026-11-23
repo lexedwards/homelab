@@ -59,7 +59,6 @@
 # }
 
 # Optional
-# control_plane_mac_address = null
 # control_plane_protection = true
 # control_plane_resources = {
 #   cpu_cores    = 2

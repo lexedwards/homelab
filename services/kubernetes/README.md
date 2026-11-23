@@ -69,9 +69,9 @@ verified evidence distinguished from unrehearsed procedures and accepted risks.
   primary bridge on `compute`.
 - DHCP on the primary VLAN. A reservation is not needed before initial deployment;
   reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
-  `control_plane_mac_address` may preserve an existing unicast MAC during an
-  explicitly approved destroy-before-create replacement. It does not reserve an
-  address or authorize concurrent guests with the same MAC.
+  Reservations are lease management, not a cluster-persistence requirement.
+  Replacement may allocate a new MAC/address; the managed API DNS record follows
+  the discovered primary address while the API/registration name remains stable.
 - DHCP-provided DNS must resolve the private API name without cluster DNS.
 - Existing Technitium zone and service-owned API/worker A records that are not
   already owned elsewhere. Optional worker PTR ownership needs an approved
@@ -117,11 +117,12 @@ network-data filenames for the server and workers without changing their content
 Changing it on an existing deployment changes VM initialization references and
 may replace guests; it is not an in-place rollout mechanism.
 
-`control_plane_mac_address` defaults to `null` for provider allocation.
 `control_plane_protection` defaults to `true`. Setting protection to `false`
 requires an approved saved-plan apply before replacing an already protected
-server. Restore protection after the approved operation. Neither input changes
-worker MACs or protection, manages DHCP reservations, nor authorizes destruction.
+server. Restore protection after the approved operation. This input does not
+change worker protection or authorize destruction. Proxmox allocates MACs;
+cluster continuity depends on stable DNS and restored Kubernetes identity, not
+on retaining a server MAC or IP address.
 
 For retained guests, follow the [server-only ownership handoff](RECOVERY.md#retained-server-ownership-handoff)
 before generating a replacement plan. Never use a copied experimental root or

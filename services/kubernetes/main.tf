@@ -174,10 +174,9 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
     network_data_file_id = proxmox_virtual_environment_file.control_plane_network.id
   }
   network_device {
-    bridge      = local.compute.vm_bridge
-    vlan_id     = var.primary_vlan_id
-    model       = "virtio"
-    mac_address = var.control_plane_mac_address
+    bridge  = local.compute.vm_bridge
+    vlan_id = var.primary_vlan_id
+    model   = "virtio"
   }
   operating_system {
     type = "l26"

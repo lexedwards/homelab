@@ -202,10 +202,23 @@ backups before any retry or apply. State backups are not datastore rollback.
 Only then generate a fresh saved plan from the canonical server-owning workspace
 with explicit qualification inputs and `workers = {}`. New namespaced snippets
 must not take ownership of the old worker's backing files. Review a same-slot
-server replacement as destroy-before-create, preserving its approved primary MAC
-and verified upstream address reservation. Never run two guests with that MAC.
-The namespace, MAC and deletion-protection inputs do not bypass the independent
-SSH trust, stable endpoint, custody, fresh snapshot, fencing or replacement
+server replacement as destroy-before-create when reusing its VM slot. Proxmox
+may allocate a new MAC and DHCP address. The existing managed API DNS record must
+follow the discovered replacement address before enrollment, preserving the
+API/registration name and its TLS SAN. Verify resolution from the worker and
+administrator paths without hosts-file or transport overrides. No preserved MAC
+or IP address is required for cluster persistence.
+
+Correct legacy test-fixture endpoint overrides before qualification through a
+separately reviewed and approved change. Replace an address-based runtime profile
+with the stable DNS name, reconcile any worker hosts-file override and verify
+that its registration configuration uses that name. Preserve worker identity,
+token and datastore; do not rebuild or re-enroll it to repair the fixture.
+Review any required explicit conditional kubeconfig refresh as well. Do not
+change maintained infrastructure to preserve a fixture's hard-coded address.
+
+The namespace and deletion-protection inputs do not bypass the independent
+SSH trust, stable DNS endpoint, custody, fresh snapshot, fencing or replacement
 approval gates. The exact replacement plan needs its own approval before apply.
 
 ## Validation

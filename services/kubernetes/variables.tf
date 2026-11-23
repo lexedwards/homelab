@@ -72,21 +72,6 @@ variable "snippet_namespace" {
   }
 }
 
-variable "control_plane_mac_address" {
-  description = "Optional existing unicast primary MAC for an explicitly approved address-preserving server replacement. Null leaves allocation to Proxmox; verify the upstream reservation separately."
-  type        = string
-  default     = null
-  sensitive   = true
-  validation {
-    condition = var.control_plane_mac_address == null ? true : (
-      can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.control_plane_mac_address)) &&
-      try(parseint(substr(var.control_plane_mac_address, 0, 2), 16) % 2 == 0, false) &&
-      var.control_plane_mac_address != "00:00:00:00:00:00"
-    )
-    error_message = "Supply a nonzero unicast MAC in six colon-separated hexadecimal octets, or null for provider allocation."
-  }
-}
-
 variable "control_plane_protection" {
   description = "Proxmox deletion protection for the server. Disable only through a separately reviewed operation before an approved replacement; this does not authorize destruction."
   type        = bool
@@ -95,7 +80,7 @@ variable "control_plane_protection" {
 }
 
 variable "control_plane" {
-  description = "Initial server VM ID/name. Reserve its observed primary MAC/address upstream before normal use or maintenance."
+  description = "Initial server VM ID/name. Proxmox allocates its NIC MAC; the managed API DNS record follows its observed primary address."
   type = object({
     vm_id = number
     name  = string
