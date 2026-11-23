@@ -146,8 +146,12 @@ def snapshot_options(config):
     return value
 
 
+def snapshot_settings(config):
+    return snapshot_options(config) | {'etcd-snapshot-compress': True, 'etcd-s3': True, 'etcd-s3-config-secret': SNAPSHOT_SECRET}
+
+
 def snapshot_configuration(config):
-    value = snapshot_options(config) | {'etcd-snapshot-compress': True, 'etcd-s3': True, 'etcd-s3-config-secret': SNAPSHOT_SECRET}
+    value = snapshot_settings(config)
     SNAPSHOTS.parent.mkdir(mode=0o700, exist_ok=True)
     if SNAPSHOTS.exists():
         require(set(private_json(SNAPSHOTS)) == set(value), 'Unrecognized native snapshot overlay; inspect before replacing')

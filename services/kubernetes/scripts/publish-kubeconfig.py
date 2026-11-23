@@ -40,7 +40,16 @@ def initializing_server(metadata):
         if decision['role'] == 'join':
             return False
         overlay = CONFIG.with_name(CONFIG.name + '.d') / '90-bootstrap.yaml'
-        require(fragments == [overlay] and decision['configuration_sha256'] == hashlib.sha256(config).hexdigest() and
+        allowed = {overlay}
+        snapshots = overlay.with_name('80-snapshots.yaml')
+        if snapshots.exists():
+            from kubernetes_recovery import snapshot_options, snapshot_settings
+
+            native = private_json(snapshots)
+            options = {key: native.get(key) for key in snapshot_options({})}
+            require(native == snapshot_settings({'snapshots': options}), 'Unrecognized native snapshot configuration')
+            allowed.add(snapshots)
+        require(set(fragments) == allowed and decision['configuration_sha256'] == hashlib.sha256(config).hexdigest() and
                 decision['overlay_sha256'] == hashlib.sha256(private_bytes(overlay)).hexdigest() and
                 not private_json(overlay).get('server'), 'Managed runtime configuration differs from bootstrap result')
     else:
