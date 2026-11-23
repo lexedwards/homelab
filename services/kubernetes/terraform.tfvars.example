@@ -66,10 +66,24 @@
 # cilium_metrics_enabled = false
 
 # -----------------------------------------------------------------------------
+# Runtime bootstrap enrollment
+# -----------------------------------------------------------------------------
+
+# Optional: null skips apply-time enrollment; empty hosts wait for access.
+# bootstrap_access = null
+# Supply the recovery root's unchanged non-secret enrollment output privately.
+# bootstrap_ssh_known_hosts_file = null
+# bootstrap_enrollment_revision = "1"
+# bootstrap_issuer_token = null
+# Inject the exact-role issuer through ephemeral TF_VAR_bootstrap_issuer_token.
+# Keep publication_access null when bootstrap_access owns publication.
+# Discovery, runtime configuration and credentials never enter cloud-init.
+
+# -----------------------------------------------------------------------------
 # Kubeconfig publication
 # -----------------------------------------------------------------------------
 
-# Optional: disabled; enabling adds first-boot assets, not an existing-guest rollout.
+# Optional: disabled; enabling introduces metadata/access over SSH, not cloud-init.
 # publication_access = null
 # Supply the exact artifacts-root enrollment output privately when enabling.
 # publication_ssh_known_hosts_file = null

@@ -25,6 +25,7 @@ locals {
   compute = var.proxmox_nodes["compute"]
   rke2_config = yamlencode({
     "node-name"             = var.control_plane.name
+    "with-node-id"          = true
     "tls-san"               = [var.api_dns.name]
     "selinux"               = true
     "write-kubeconfig-mode" = "0600"

@@ -8,9 +8,9 @@ locals {
     for host, config in local.worker_cloud_init : host => yamldecode(config)
   }
   control_plane_cloud_config = "#cloud-config\n${yamlencode(merge(local.node_baseline, local.server_config, {
-    packages = concat(local.node_baseline.packages, local.publication_enabled ? ["jq"] : [])
+    packages = concat(local.node_baseline.packages, ["jq", "python3-pyyaml"])
     write_files = concat(local.node_baseline.write_files, local.server_config.write_files, [
-      for item in local.publication_files : {
+      for item in concat(local.bootstrap_files, local.publication_files) : {
         path        = item.path
         owner       = "root:root"
         permissions = item.mode
@@ -30,6 +30,12 @@ data "cloudinit_config" "control_plane" {
     content_type = "text/cloud-config"
     content      = local.control_plane_cloud_config
   }
+}
+
+output "control_plane_bootstrap_sha256" {
+  description = "Fingerprint of the immutable VM installation asset; enrollment and recovery operations must not change it."
+  sensitive   = true
+  value       = sha256(data.cloudinit_config.control_plane.rendered)
 }
 
 data "cloudinit_config" "worker" {

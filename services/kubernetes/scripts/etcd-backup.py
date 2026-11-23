@@ -14,6 +14,8 @@ import time
 from urllib.parse import urlsplit
 import uuid
 
+from kubernetes_object_store import cluster_name
+
 
 RKE2 = '/usr/bin/rke2'
 VERSION = 'v1.36.6+rke2r1'
@@ -53,7 +55,7 @@ def private_json(path):
 
 
 def validate_target(target):
-    require(set(target) == {'endpoint', 'bucket', 'region', 'node_name', 'cluster_uid'}, 'Unexpected target fields')
+    require(set(target) == {'endpoint', 'bucket', 'region', 'node_name', 'cluster_name', 'cluster_uid'}, 'Unexpected target fields')
     require(all(isinstance(value, str) and value for value in target.values()), 'Target values must be nonempty strings')
     endpoint = urlsplit(target['endpoint'])
     require(endpoint.scheme == 'https' and endpoint.hostname and not endpoint.username and not endpoint.password and
@@ -61,6 +63,7 @@ def validate_target(target):
             re.fullmatch(r'[a-z0-9.-]+(?::[0-9]{1,5})?', endpoint.netloc) and 0 < (endpoint.port or 443) <= 65535,
             'Target requires a verified HTTPS origin')
     require(re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]', target['bucket']), 'Invalid bucket')
+    require(target['bucket'] == cluster_name(target['cluster_name']) + '-backups', 'Backup bucket differs from the named cluster')
     require(re.fullmatch(r'[a-z0-9-]+', target['region']), 'Invalid region')
     require(re.fullmatch(r'[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?', target['node_name']), 'Invalid server node name')
     require(str(uuid.UUID(target['cluster_uid'])) == target['cluster_uid'], 'Invalid stable cluster UID')
@@ -115,7 +118,7 @@ def inventory(document, target, now):
         if remote is None:
             continue
         require(remote.get('endpoint') == authority and remote.get('bucket') == target['bucket'] and
-                remote.get('prefix') == 'rke2/' + target['cluster_uid'] and remote.get('region') == target['region'] and
+                remote.get('prefix') == 'snapshots' and remote.get('region') == target['region'] and
                 remote.get('insecure', False) is False and remote.get('skipSSLVerify', False) is False and
                 spec.get('nodeName') == target['node_name'] and item.get('status', {}).get('readyToUse') is True,
                 'Owned snapshot target, identity or readiness differs')
@@ -140,7 +143,7 @@ class Native:
         args = [RKE2, 'etcd-snapshot', operation, '--config=/dev/null', '--data-dir=' + str(DATA),
                 '--etcd-server=https://127.0.0.1:9345', '--node-name=' + self.target['node_name'], '--debug=false',
                 '--s3', '--s3-endpoint=' + endpoint.hostname + ':' + str(endpoint.port or 443),
-                '--s3-bucket=' + self.target['bucket'], '--s3-folder=rke2/' + self.target['cluster_uid'],
+                '--s3-bucket=' + self.target['bucket'], '--s3-folder=snapshots',
                 '--s3-region=' + self.target['region'], '--s3-bucket-lookup-type=path', '--s3-timeout=5m',
                 '--s3-insecure=false', '--s3-skip-ssl-verify=false', '--s3-retention=0']
         if operation == 'ls':

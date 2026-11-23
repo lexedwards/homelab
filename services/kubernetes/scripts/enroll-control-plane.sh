@@ -3,11 +3,17 @@ set +x
 set -Eeuo pipefail
 umask 077
 exec 3>&2 2>/dev/null
-trap 'printf "Kubernetes publication enrollment failed; inspect host identity/access privately.\n" >&3' ERR
+trap 'printf "Control-plane enrollment failed; inspect host identity/access privately.\n" >&3' ERR
 
 [[ ${BAO_ADDR:-} =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
 [[ ${BAO_AUTH_MOUNT:-} =~ ^[a-z][a-z0-9-]*$ ]]
-[[ ${PUBLICATION_ROLE:-} =~ ^kubernetes-[a-z0-9-]+-kubeconfig$ ]]
+helper=${CONTROL_PLANE_CREDENTIAL_HELPER:-kubeconfig-credentials}
+[[ $helper == kubeconfig-credentials || $helper == bootstrap-credentials ]]
+if [[ $helper == bootstrap-credentials ]]; then
+  [[ ${PUBLICATION_ROLE:-} =~ ^kubernetes-[a-z0-9-]+-bootstrap$ ]]
+else
+  [[ ${PUBLICATION_ROLE:-} =~ ^kubernetes-[a-z0-9-]+-kubeconfig$ ]]
+fi
 [[ ${CONTROL_PLANE_SSH_TARGET:-} =~ ^[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+$ ]]
 [[ ${PUBLICATION_CONFIG_SHA256:-} =~ ^[a-f0-9]{64}$ ]]
 [[ -f ${CONTROL_PLANE_KNOWN_HOSTS:-} && ! -L $CONTROL_PLANE_KNOWN_HOSTS ]]
@@ -22,9 +28,13 @@ ssh_options=(-T -o BatchMode=yes -o StrictHostKeyChecking=yes
   -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=2)
 remote() {
   timeout 1000 ssh "${ssh_options[@]}" -- "$CONTROL_PLANE_SSH_TARGET" \
-    "sudo -n /usr/local/sbin/kubeconfig-credentials $1 $PUBLICATION_CONFIG_SHA256"
+    "sudo -n /usr/local/sbin/$helper $1 $PUBLICATION_CONFIG_SHA256"
 }
 timeout 600 ssh "${ssh_options[@]}" -- "$CONTROL_PLANE_SSH_TARGET" 'sudo -n cloud-init status --wait' >/dev/null
+if [[ -n ${PUBLICATION_CONFIGURATION:-} ]]; then
+  printf '%s' "$PUBLICATION_CONFIGURATION" | remote install
+  unset PUBLICATION_CONFIGURATION
+fi
 status=0
 remote check </dev/null || status=$?
 if [[ $status == 0 ]]; then

@@ -14,9 +14,11 @@
 # -----------------------------------------------------------------------------
 # Cluster artifacts — Required
 # -----------------------------------------------------------------------------
-# configuration_bucket =
-# backup_bucket        =
-# cluster_uid          =
+# cluster_name         =
 # api_server           =
 # approle_mount        =
 # publisher_secret_path =
+
+# Cluster artifacts — Optional
+# cluster_uid     = null
+# UID is identity evidence for standalone publication only; never a bucket/key.

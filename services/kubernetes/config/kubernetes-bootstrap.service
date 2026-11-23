@@ -1,0 +1,19 @@
+[Unit]
+Description=Retry credential-gated native Kubernetes startup
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/rancher/rke2/bootstrap-approle.json
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Environment=HOME=/run/kubernetes-bootstrap
+ExecStart=/usr/bin/systemctl start rke2-server.service
+ExecStart=/usr/bin/python3 -B /usr/local/libexec/homelab/complete-bootstrap.py --execute
+TimeoutStartSec=1250
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/rancher/rke2 /var/lib/kubernetes-bootstrap /run/kubernetes-bootstrap

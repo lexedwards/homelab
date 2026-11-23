@@ -8,11 +8,12 @@ variable "publication_access" {
     reader_policy = string
     secret_path   = string
     publication = object({
-      endpoint    = string
-      bucket      = string
-      region      = string
-      cluster_uid = string
-      api_server  = string
+      endpoint     = string
+      bucket       = string
+      region       = string
+      cluster_uid  = string
+      cluster_name = string
+      api_server   = string
     })
   })
   default   = null
@@ -21,7 +22,7 @@ variable "publication_access" {
     condition = var.publication_access == null ? true : try(
       can(regex("^https://[A-Za-z0-9.-]+(:[0-9]+)?$", var.publication_access.address)) &&
       can(regex("^[a-z][a-z0-9-]*$", var.publication_access.auth_mount)) &&
-      var.publication_access.role_name == "kubernetes-${var.publication_access.publication.cluster_uid}-kubeconfig" &&
+      var.publication_access.role_name == "kubernetes-${var.publication_access.publication.cluster_name}-kubeconfig" &&
       var.publication_access.reader_policy == "${var.publication_access.role_name}-read" &&
       can(regex("^[A-Za-z0-9-]+$", var.publication_access.role_id)) &&
       can(regex("^[a-z][a-z0-9-]*/data/[A-Za-z0-9_/-]+$", var.publication_access.secret_path)) &&
@@ -31,6 +32,8 @@ variable "publication_access" {
       can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.publication_access.publication.bucket)) &&
       can(regex("^[a-z0-9-]+$", var.publication_access.publication.region)) &&
       can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.publication_access.publication.cluster_uid)) &&
+      can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.publication_access.publication.cluster_name)) &&
+      var.publication_access.publication.bucket == "${var.publication_access.publication.cluster_name}-configuration" &&
       var.publication_access.publication.api_server == "https://${var.api_dns.name}:6443",
     false)
     error_message = "Supply the unchanged artifacts-root enrollment export for this cluster and the infrastructure's stable API identity; never supply credential values."
@@ -66,9 +69,8 @@ variable "publication_enrollment_revision" {
 locals {
   publication_enabled = nonsensitive(var.publication_access != null)
   publication_assets = {
-    "/usr/local/libexec/homelab/kubernetes_object_store.py" = { source = "scripts/kubernetes_object_store.py", mode = "0644" }
-    "/usr/local/libexec/homelab/publish-kubeconfig.py"      = { source = "scripts/publish-kubeconfig.py", mode = "0700" }
-    "/usr/local/sbin/kubeconfig-credentials"                = { source = "scripts/kubeconfig-credentials.sh", mode = "0700" }
+    "/usr/local/libexec/homelab/publish-kubeconfig.py" = { source = "scripts/publish-kubeconfig.py", mode = "0700" }
+    "/usr/local/sbin/kubeconfig-credentials"           = { source = "scripts/kubeconfig-credentials.sh", mode = "0700" }
     "/etc/systemd/system/kubernetes-publication-credentials.service" = {
       source = "config/kubernetes-publication-credentials.service", mode = "0644"
     }
@@ -86,23 +88,21 @@ locals {
     role_id       = var.publication_access.role_id
     reader_policy = var.publication_access.reader_policy
     secret_path   = var.publication_access.secret_path
-    implementation_sha256 = sha256(join("", [
+    implementation_sha256 = sha256(join("", concat([
       for destination in sort(keys(local.publication_assets)) : filesha256("${path.module}/${local.publication_assets[destination].source}")
-    ]))
+    ], [filesha256("${path.module}/scripts/kubernetes_object_store.py")])))
   } : null
   publication_target = local.publication_enabled ? merge(var.publication_access.publication, {
     initializer        = true
     rke2_config_sha256 = sha256(local.rke2_config)
   }) : null
-  publication_files = local.publication_enabled ? concat([
+  publication_files = concat([
     for destination, asset in local.publication_assets : {
       path = destination, mode = asset.mode, content = file("${path.module}/${asset.source}")
     }
     ], [
-    { path = "/etc/rancher/rke2/publication-openbao.json", mode = "0600", content = jsonencode(local.publication_openbao) },
-    { path = "/etc/rancher/rke2/publication.json", mode = "0600", content = jsonencode(local.publication_target) },
     { path = "/etc/tmpfiles.d/kubernetes-publication.conf", mode = "0644", content = "d /run/kubernetes-publication-credentials 0700 root root - -\n" }
-  ]) : []
+  ])
   publication_config_sha256 = sha256(jsonencode({ openbao = local.publication_openbao, publication = local.publication_target }))
 }
 
@@ -140,6 +140,7 @@ resource "terraform_data" "publication_enrollment" {
       CONTROL_PLANE_SSH_TARGET  = "${var.cloud_user}@${local.primary_ipv4}"
       CONTROL_PLANE_KNOWN_HOSTS = pathexpand(var.publication_ssh_known_hosts_file)
       PUBLICATION_CONFIG_SHA256 = local.publication_config_sha256
+      PUBLICATION_CONFIGURATION = jsonencode({ openbao = local.publication_openbao, publication = local.publication_target })
     }
   }
 }

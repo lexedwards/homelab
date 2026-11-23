@@ -9,16 +9,15 @@ import secrets
 import stat
 import subprocess
 from urllib.parse import quote
-import uuid
 
-from kubernetes_object_store import NativeS3, OperationError, https_origin, object_path, private_json, require
+from kubernetes_object_store import NativeS3, OperationError, cluster_name, https_origin, object_path, private_json, require
 
 
 def publisher(value):
-    require(set(value) == {'endpoint', 'region', 'bucket', 'cluster_uid', 'key', 'policy'}, 'Unexpected publisher scope fields')
+    require(set(value) == {'endpoint', 'region', 'bucket', 'cluster_name', 'key', 'policy'}, 'Unexpected publisher scope fields')
     https_origin(value['endpoint'])
-    require(str(uuid.UUID(value['cluster_uid'])) == value['cluster_uid'], 'Invalid cluster identity')
-    require(value['key'] == 'rke2/' + value['cluster_uid'] + '/kubeconfig.yaml', 'Unexpected publisher object key')
+    require(value['bucket'] == cluster_name(value['cluster_name']) + '-configuration' and value['key'] == 'kubeconfig.yaml',
+            'Publisher needs its dedicated named-cluster bucket and exact configuration key')
     object_path(value['bucket'], value['key'])
     expected = {
         'Version': '2012-10-17',
@@ -29,6 +28,25 @@ def publisher(value):
         }],
     }
     require(value['policy'] == expected, 'Publisher policy must allow only content download/upload of its exact configuration object')
+    return value
+
+
+def backup(value):
+    require(set(value) == {'endpoint', 'region', 'bucket', 'cluster_name', 'key', 'policy'}, 'Unexpected backup scope fields')
+    https_origin(value['endpoint'])
+    require(value['bucket'] == cluster_name(value['cluster_name']) + '-backups' and value['key'] == 'snapshots/*',
+            'Backup access needs its dedicated named-cluster bucket and native snapshot folder')
+    object_path(value['bucket'], 'snapshots')
+    expected = {
+        'Version': '2012-10-17',
+        'Statement': [
+            {'Effect': 'Allow', 'Action': ['s3:ListBucket', 's3:ListBucketVersions'],
+             'Resource': ['arn:aws:s3:::' + value['bucket']]},
+            {'Effect': 'Allow', 'Action': ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
+             'Resource': ['arn:aws:s3:::' + value['bucket'] + '/snapshots/*']},
+        ],
+    }
+    require(value['policy'] == expected, 'Backup policy must exclude configuration objects, bucket administration and version purge')
     return value
 
 
@@ -48,7 +66,7 @@ def write_new(path, value):
         os.fsync(output.fileno())
 
 
-def issue(scope, expiration, output, helper):
+def issue(scope, expiration, output, helper, purpose):
     require(expiration > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5),
             'Credential expiry must leave at least five minutes for enrollment')
     result = subprocess.run([helper, '--operator', 's3', '--output', 'json'], capture_output=True, timeout=60)
@@ -59,14 +77,15 @@ def issue(scope, expiration, output, helper):
     output = private_directory(output.parent) / output.name
     output.mkdir(mode=0o700)
     values = {'AWS_ACCESS_KEY_ID': 'K8S' + secrets.token_hex(9).upper(), 'AWS_SECRET_ACCESS_KEY': secrets.token_urlsafe(30)}
-    write_new(output / 'credentials.json', values)
+    stored = values if purpose == 'publication' else {'access_key_id': values['AWS_ACCESS_KEY_ID'], 'secret_access_key': values['AWS_SECRET_ACCESS_KEY']}
+    write_new(output / 'credentials.json', stored)
     expiration_text = expiration.isoformat(timespec='seconds').replace('+00:00', 'Z')
     write_new(output / 'issuance-started.json', {'expiration': expiration_text, 'policy_sha256': hashlib.sha256(json.dumps(scope['policy'], sort_keys=True).encode()).hexdigest()})
     request = {
         'accessKey': values['AWS_ACCESS_KEY_ID'],
         'secretKey': values['AWS_SECRET_ACCESS_KEY'],
-        'name': 'k8s-kubeconfig-' + hashlib.sha256(scope['cluster_uid'].encode()).hexdigest()[:12],
-        'description': 'Kubernetes configuration-object publisher; no backup-bucket access',
+        'name': ('k8s-kubeconfig-' if purpose == 'publication' else 'k8s-backup-') + hashlib.sha256(scope['cluster_name'].encode()).hexdigest()[:12],
+        'description': 'Kubernetes ' + purpose + ' application credential; no other cluster or bucket access',
         'expiration': expiration_text,
         'expiry': False,
         'impliedPolicy': False,
@@ -87,11 +106,13 @@ def issue(scope, expiration, output, helper):
         policy = json.loads(policy)
     require(policy == scope['policy'] and actual.get('impliedPolicy') is False, 'Issued publisher scope differs from the exact application policy')
     require(actual.get('expiration') == expiration_text, 'Issued publisher expiry differs from the approved time')
-    write_new(output / 'scope-verified.json', {'successful': True, 'expiration': expiration_text, 'object_keys': 1, 'implied_policy': False})
+    write_new(output / 'scope-verified.json', {'successful': True, 'expiration': expiration_text,
+                                             'purpose': purpose, 'implied_policy': False})
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Issue a separate RustFS kubeconfig publisher using workstation operator credentials, outside OpenTofu state.')
+    parser = argparse.ArgumentParser(description='Issue separate named-cluster RustFS application credentials using workstation operator access, outside OpenTofu state.')
+    parser.add_argument('--purpose', choices=['publication', 'backup'], default='publication')
     parser.add_argument('--scope', required=True, help='Protected artifacts-root publisher output.')
     parser.add_argument('--expires-at', required=True, help='Operator-approved UTC expiry, in ISO-8601 format.')
     parser.add_argument('--output-directory', required=True, type=Path, help='New custody directory under an existing private parent; never reused.')
@@ -100,13 +121,13 @@ def main():
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        scope = publisher(private_json(args.scope))
+        scope = {'publication': publisher, 'backup': backup}[args.purpose](private_json(args.scope))
         expiration = datetime.datetime.fromisoformat(args.expires_at.replace('Z', '+00:00'))
         require(expiration.tzinfo is not None and expiration.utcoffset() == datetime.timedelta(0), 'Use an explicit UTC expiration')
         if not args.execute:
-            print('Plan only: one exact-object application credential; no operator lookup, API calls or custody writes.')
+            print('Plan only: one declared-scope application credential; no operator lookup, API calls or custody writes.')
             return
-        issue(scope, expiration, args.output_directory, args.credential_helper)
+        issue(scope, expiration, args.output_directory, args.credential_helper, args.purpose)
         print('Application credential issued and scope verified. Enroll credentials.json into its exact OpenBao record using the bounded writer; never deliver the operator credential to the host.')
     except OperationError as error:
         parser.exit(1, str(error) + '. No credential contents displayed.\n')

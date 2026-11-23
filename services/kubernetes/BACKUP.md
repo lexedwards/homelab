@@ -1,12 +1,14 @@
 # Off-node etcd Backups
 
-Control-plane recovery remains unproven. The earlier isolated restore experiment
-failed and its implementation has been retired; no automated restore procedure is
-maintained. See the [lifecycle runbooks](LIFECYCLE.md) for upgrade, outage and
-recovery-decision gates. A backup does not guarantee rollback.
+An earlier isolated restore experiment failed and was retired. A later synthetic
+native new-VM restore preserved the original cluster and worker identity, but the
+new [guarded bootstrap](RECOVERY.md) still needs live qualification from canonical
+`main` after merge and approval. Production replacement remains unqualified.
+See the [lifecycle runbooks](LIFECYCLE.md) for upgrade, outage and recovery-decision
+gates. A backup does not guarantee rollback.
 
 This workflow creates native RKE2 snapshots on the existing control-plane host
-and uploads them to the operator-owned RustFS bucket over verified HTTPS. It
+and uploads them to the cluster's dedicated RustFS bucket over verified HTTPS. It
 does not back up application volumes, create a bucket, administer TrueNAS, restore
 a datastore or upgrade a node. Local validation is not live backup evidence.
 
@@ -25,9 +27,8 @@ a datastore or upgrade a node. Local validation is not live backup evidence.
   Private-CA distribution needs separate review; neither plaintext nor TLS
   verification bypass is supported. Use a dedicated bucket-scoped credential.
 - Encrypted RustFS snapshot retrieval also depends on its external OpenBao KMS.
-  Independent backup credentials do not remove that dependency. Independent
-  OpenBao/key recovery remains deferred; a working-KMS download is not proof of
-  recovery while OpenBao is unavailable.
+   OpenBao and RustFS are accepted recovery dependencies. An outage blocks recovery
+   safely until they return. No local-only restore workflow is supported.
 - Preserve the RKE2 server token corresponding to every retained recovery point.
   Enroll it and the backup credential in external OpenBao through an independently
   reviewed, service-owned enrollment boundary, plus protected Proton Pass copies.
@@ -56,7 +57,7 @@ administrative authorization through the shared deployment-access module. It
 checks the actual `kube-system` UID, then grants a separate bounded writer access
 to exactly these two records in an explicitly approved existing KV-v2 engine:
 
-| Record suffix under `kubernetes/recovery/<cluster_uid>/` | Fields |
+| Record suffix under `kubernetes/recovery/<cluster_name>/` | Fields |
 | --- | --- |
 | `server-token/<native_token_hash>` | `server_token` |
 | `s3-credentials/<credential_sha256>` | `access_key_id`, `secret_access_key` |
@@ -64,7 +65,7 @@ to exactly these two records in an explicitly approved existing KV-v2 engine:
 The fingerprints are protected metadata, not values. The native token hash is a
 correlation identifier, not an authentication or collision-resistant custody
 proof. Authorization planning needs the available API/OpenBao services; ordinary
-backup/restore credentials do not depend on that planning path being available.
+backup operation does not depend on this Kubernetes API planning path being available.
 No root-host or workload read policy is granted, no KV engine is created, and
 OpenTofu neither mints a token nor writes/reads the values. The ordinary writer
 cannot read records or manage authorization; its separate issuer can mint only
@@ -93,7 +94,7 @@ reviewed copies root-owned with mode `0600` under `/etc/rancher/rke2/`:
 
 | File | Schema |
 | --- | --- |
-| `backup-target.json` | `endpoint`, `bucket`, `region`, `node_name`, `cluster_uid`; see `backup/target.json.example` |
+| `backup-target.json` | `endpoint`, `bucket`, `region`, `node_name`, `cluster_name`, `cluster_uid`; see `backup/target.json.example` |
 | `backup-credentials.json` | `access_key_id`, `secret_access_key`; see `backup/credentials.json.example` |
 | `backup-recovery-custody.json` | Stable cluster UID, current credential fingerprint and retained server-token fingerprints from the attestation helper |
 
@@ -101,8 +102,11 @@ Generate the endpoint/bucket fields from the producer's published export, not a
 second independently maintained endpoint declaration. Obtain `node_name` from the
 owning cluster and use the `cluster_uid` in its verified recovery enrollment
 export. Verify those identities against the initialized cluster before installing
-inputs. The UID namespaces objects under `rke2/<cluster_uid>`; it is not a
-credential. Republish and review the host inputs after a producer-interface change.
+inputs. The stable friendly name selects `<cluster-name>-backups`; snapshots use
+the fixed `snapshots/` folder. The UID remains verification evidence, not storage
+addressing or a credential. Republish and review inputs after an interface change.
+UID-prefixed historical objects are not moved or retired automatically; follow
+the [explicit storage migration boundary](artifacts/README.md#existing-storage-is-not-migrated-automatically).
 
 For custody attestation, use independently recovered private files, never the
 live server-token file. The helper rejects the live default path, but the operator
@@ -135,7 +139,8 @@ wrapper neither prints nor exports it. Keep CLI/server debug logging disabled.
 1. Review an approved deployment's host/cluster identity, bucket scope, existing
    object namespace, custody and TLS evidence. Stop on an ownership conflict.
 2. Copy `scripts/etcd-backup.py` to
-   `/usr/local/libexec/homelab/etcd-backup.py`, root-owned mode `0755`. Copy the two
+   `/usr/local/libexec/homelab/etcd-backup.py`, root-owned mode `0755`, and its shared
+   `scripts/kubernetes_object_store.py` alongside it, mode `0644`. Copy the two
    reviewed units from `backup/` to `/etc/systemd/system/`. Do not enable the timer
    yet. Install only the three reviewed private inputs; never copy credential
    values through a terminal or put them in a unit.

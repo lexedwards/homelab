@@ -9,14 +9,14 @@ import subprocess
 import time
 import uuid
 
-from kubernetes_object_store import NativeS3, OperationError, https_origin, object_path, private_bytes, private_json, require
+from kubernetes_object_store import NativeS3, OperationError, cluster_name, https_origin, object_path, private_bytes, private_json, require
 
 
 CONFIG = Path('/etc/rancher/rke2/config.yaml')
 
 
 def target(value):
-    require(set(value) == {'endpoint', 'region', 'bucket', 'cluster_uid', 'api_server', 'initializer', 'rke2_config_sha256'},
+    require(set(value) == {'endpoint', 'region', 'bucket', 'cluster_name', 'cluster_uid', 'api_server', 'initializer', 'rke2_config_sha256'},
             'Unexpected publication metadata fields')
     https_origin(value['endpoint'])
     https_origin(value['api_server'])
@@ -24,7 +24,8 @@ def target(value):
     require(type(value['initializer']) is bool, 'Initializer eligibility must be explicit')
     require(isinstance(value['rke2_config_sha256'], str) and re.fullmatch(r'[0-9a-f]{64}', value['rke2_config_sha256']),
             'Expected the declared RKE2 configuration fingerprint')
-    object_path(value['bucket'], 'rke2/' + value['cluster_uid'] + '/kubeconfig.yaml')
+    require(value['bucket'] == cluster_name(value['cluster_name']) + '-configuration', 'Publication bucket differs from the named cluster')
+    object_path(value['bucket'], 'kubeconfig.yaml')
     require(isinstance(value['region'], str) and re.fullmatch(r'[a-z0-9-]+', value['region']), 'Invalid S3 region')
     return value
 
@@ -32,7 +33,18 @@ def target(value):
 def initializing_server(metadata):
     config = private_bytes(CONFIG)
     require(hashlib.sha256(config).hexdigest() == metadata['rke2_config_sha256'], 'RKE2 configuration differs from the declared initializer')
-    require(not any(CONFIG.with_name(CONFIG.name + '.d').glob('*')), 'Additional RKE2 configuration needs an explicit role review')
+    decision_path = Path('/var/lib/kubernetes-bootstrap/decision.json')
+    fragments = list(CONFIG.with_name(CONFIG.name + '.d').glob('*'))
+    if decision_path.exists():
+        decision = private_json(decision_path)
+        if decision['role'] == 'join':
+            return False
+        overlay = CONFIG.with_name(CONFIG.name + '.d') / '90-bootstrap.yaml'
+        require(fragments == [overlay] and decision['configuration_sha256'] == hashlib.sha256(config).hexdigest() and
+                decision['overlay_sha256'] == hashlib.sha256(private_bytes(overlay)).hexdigest() and
+                not private_json(overlay).get('server'), 'Managed runtime configuration differs from bootstrap result')
+    else:
+        require(not fragments, 'Additional RKE2 configuration needs an explicit role review')
     text = config.decode()
     if text.lstrip().startswith('{'):
         if json.loads(text).get('server'):
@@ -95,7 +107,7 @@ def export_config(kubectl, kubeconfig, metadata, deadline):
 
 
 def publish(client, metadata, payload, previous_sha256):
-    path = object_path(metadata['bucket'], 'rke2/' + metadata['cluster_uid'] + '/kubeconfig.yaml')
+    path = object_path(metadata['bucket'], 'kubeconfig.yaml')
     if previous_sha256 is not None:
         status, etag, previous = client.request('GET', path)
         require(status == 200, 'Cannot retrieve the existing object for explicit refresh')

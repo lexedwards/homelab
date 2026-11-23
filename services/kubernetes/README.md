@@ -40,10 +40,20 @@ The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
 describe their qualification results and limits. Recorded results do not replace
 fresh health checks before maintenance.
 
-[Kubeconfig publication](artifacts/README.md) defines a separate configuration
-bucket, application-scoped OpenBao access and opt-in first-boot publication.
-It never uses the backup bucket or places operator S3 credentials on the host.
-Changing cloud-init does not install these assets on an existing server.
+[Cluster storage and publication](artifacts/README.md) declares separate backup
+and configuration buckets for a stable friendly cluster name. Publisher access
+is exactly `kubeconfig.yaml` from the outset; UID/CA remain identity evidence.
+Publication never uses the backup bucket or places operator S3 credentials on the host.
+The VM installs fixed tools; enrollment metadata never changes those assets.
+
+[Guarded bootstrap and recovery](RECOVERY.md) adds an independent OpenBao
+authorization root and one automatic discovery procedure, without lifecycle
+switches in Terraform. With `bootstrap_access`, apply automatically introduces
+OpenBao access over verified SSH after VM/DNS creation. An empty host waits for
+that enrollment; uncertainty or missing backups for a known cluster cannot create
+a new one. External OpenBao and RustFS are accepted recovery dependencies; no
+local-only restore route is required. This path is not yet live-qualified;
+deployment and qualification must use canonical `main` after merge and approval.
 
 [Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
 workflow, protected recovery-custody boundary and six-hour timer. They do not
@@ -65,6 +75,8 @@ verified evidence distinguished from unrehearsed procedures and accepted risks.
   existing reverse zone. The API name stays stable through future HA expansion.
 - OpenTofu 1.11+ for ephemeral enrollment credentials, Python 3, and yamllint.
   Providers are pinned by the lock file.
+  Offline bootstrap filesystem checks also need Linux bubblewrap and enabled
+  unprivileged user namespaces; they make no network or RKE2 calls.
   Optional chart inspection helpers additionally require PyYAML and Helm.
 - Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
   node SSH identity loaded into the local SSH agent for snippet upload.
@@ -94,11 +106,13 @@ on unless a separately approved exception explicitly overrides it.
 
 `make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
 checks and the repository's literal service-boundary check, including the runtime
-root and configuration-artifacts root. `make test` checks worker DNS transformations:
+root, configuration-artifacts root and independent recovery-authorization root.
+`make test` checks worker DNS transformations:
 case-insensitive primary-MAC address selection, loopback/link-local filtering,
 and reversed IPv4 PTR names, with the DNS provider mocked. It also checks optional
-publication's YAML/base64 composition, fingerprints, package merging and unchanged
-disabled behavior. Those tests target only cloud-config composition with providers
+fixed installation's YAML/base64 composition and separate enrollment document.
+Those tests target only
+cloud-config composition with providers
 mocked, not a whole deployment plan. Native variable and lifecycle validation
 retain responsibility for invalid inputs.
 
@@ -163,7 +177,9 @@ authorized-key file with the reviewed operator keys, disables root/password SSH
 and installs/enables the QEMU guest agent. It writes the API identity,
 internal CIDRs, server taint and managed-Cilium configuration before
 starting the cluster. No Kubernetes token, kubeconfig or private certificate is
-supplied to OpenTofu/cloud-init; initial RKE2 startup generates them in the guest.
+supplied to OpenTofu/cloud-init. The separately introduced AppRole obtains the
+existing or initial server token and application credentials from OpenBao.
+Discovery happens at runtime, not through VM-root operation variables.
 
 Native cloud-init installs the distribution kernel/module prerequisites, audit
 and SELinux tooling; workers also receive NFS client tools. The remaining
@@ -194,6 +210,10 @@ root-only first-boot procedure:
    rejects non-enforcing mode or active swap, loads the required modules for the
    running kernel, and applies the Kubernetes sysctl file. A missing module or
    failed sysctl causes startup to fail rather than continuing without it.
+6. The fixed bootstrap pre-start gate preserves initialized data and rejects
+   incomplete resets. An empty host waits for separate enrollment, then discovers
+   whether to join, restore or create using the endpoint, independent identity and
+   S3 evidence. Missing or uncertain inputs never become new-cluster creation.
 
 The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
 first-boot command clears those two repository exclusions while selecting exact
@@ -326,8 +346,9 @@ Approximately four hours is a planning recovery target, not an SLA or a qualifie
 production restore duration. Off-node backup and scheduled execution were verified.
 An earlier isolated restore experiment failed and its implementation was retired;
 a later synthetic new-VM exercise restored the original cluster identity and an
-unchanged worker using a separate matching token. That proof does not provide a
-maintained automated restore bootstrap or qualify production replacement. Do not
+unchanged worker using a separate matching token. The maintained guarded bootstrap
+is locally checked but still needs live qualification from canonical `main`;
+that earlier proof does not qualify this implementation or production replacement. Do not
 call this server restore-qualified or assume a snapshot is a generic rollback path.
 Application-volume backup, storage HA and notification decisions are separate.
 

@@ -64,6 +64,7 @@
 # recovery_custody = {
 #   kv_v2_mount              =
 #   cluster_uid              =
+#   cluster_name             =
 #   server_token_hash        =
 #   backup_credential_sha256 =
 # }

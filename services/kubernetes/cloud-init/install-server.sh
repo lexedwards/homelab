@@ -33,6 +33,7 @@ restorecon -RF /etc/rancher/rke2 /var/lib/rancher/rke2 \
   /etc/yum.repos.d/rancher-rke2-common-stable.repo \
   "/etc/yum.repos.d/rancher-rke2-$minor-stable.repo" \
   /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher-rke2 /usr/local/sbin/kubernetes-node-preflight \
+  /usr/local/sbin/bootstrap-credentials /usr/local/libexec/homelab \
   /etc/systemd/system/rke2-server.service.d
 nmcli general reload
 sshd -t

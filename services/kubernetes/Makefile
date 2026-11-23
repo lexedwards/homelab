@@ -5,7 +5,7 @@ HELM ?= helm
 ALLOY ?= alloy
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate publication-validate validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
+.PHONY: help init fmt fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check bootstrap-authorization-check validate nfs-chart-validate nfs-prepare secrets-csi-validate secrets-csi-prepare observability-chart-validate plan apply
 
 help:
 	@printf '%s\n' \
@@ -17,6 +17,9 @@ help:
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'publication-validate Check publication CLI loading and artifacts-root configuration offline' \
+		'bootstrap-validate Check bootstrap/preparation CLI loading and recovery authorization offline' \
+		'bootstrap-guard-check Exercise filesystem startup guards with bubblewrap; no network or native RKE2 execution' \
+		'bootstrap-authorization-check Exercise rendered policy and guest client against disposable OpenBao; requires BAO_BINARY' \
 		'validate         Run all local checks without infrastructure access' \
 		'nfs-chart-validate Render/check a previously downloaded NFS_CHART archive using HELM' \
 		'nfs-prepare      Verify/render NFS_CHART and emit a new embedded-chart NFS_MANIFEST' \
@@ -30,6 +33,7 @@ init:
 	$(TOFU) init
 	$(MAKE) -C runtime init
 	$(MAKE) -C artifacts init
+	$(MAKE) -C recovery init
 
 fmt:
 	$(TOFU) fmt -recursive
@@ -66,13 +70,32 @@ shell-validate:
 	bash -n cloud-init/install-agent.sh
 	bash -n scripts/kubeconfig-credentials.sh
 	bash -n scripts/enroll-control-plane.sh
+	bash -n scripts/bootstrap-credentials.sh
+	bash -n scripts/check-bootstrap-guards.sh
+	bash -n scripts/check-control-plane-enrollment.sh
+	bash -n scripts/check-bootstrap-authorization.sh
 
 publication-validate:
 	$(PYTHON) -B scripts/publish-kubeconfig.py --help >/dev/null
 	$(PYTHON) -B scripts/issue-publication-credentials.py --help >/dev/null
 	$(MAKE) -C artifacts validate
 
-validate: fmt-check tofu-validate test yaml-validate shell-validate publication-validate
+bootstrap-validate:
+	$(PYTHON) -B scripts/rke2-bootstrap.py --help >/dev/null
+	$(PYTHON) -B scripts/prepare-recovery.py --help >/dev/null
+	$(PYTHON) -B scripts/enroll-bootstrap.py --help >/dev/null
+	$(PYTHON) -B scripts/complete-bootstrap.py --help >/dev/null
+	$(PYTHON) -B scripts/install-enrollment.py --help >/dev/null
+	$(MAKE) -C recovery validate
+
+bootstrap-guard-check:
+	bash scripts/check-bootstrap-guards.sh
+	bash scripts/check-control-plane-enrollment.sh
+
+bootstrap-authorization-check:
+	BAO_BINARY="$(BAO_BINARY)" bash scripts/check-bootstrap-authorization.sh
+
+validate: fmt-check tofu-validate test yaml-validate shell-validate publication-validate bootstrap-validate bootstrap-guard-check
 	$(MAKE) -C runtime validate
 
 nfs-chart-validate:

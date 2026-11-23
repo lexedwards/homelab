@@ -1,9 +1,11 @@
-# Kubernetes configuration artifacts
+# Per-cluster backup and configuration storage
 
-This administrative root owns a configuration bucket and the OpenBao access
-definitions for publishing one cluster's admin kubeconfig. It does not own etcd
-snapshots, application credential values, DNS, or the VM. It needs no live
-Kubernetes API to manage those definitions.
+This administrative root owns two buckets for a stable `cluster_name`:
+`<cluster-name>-backups` for native snapshots under `snapshots/`, and
+`<cluster-name>-configuration` for the single `kubeconfig.yaml` object. It also owns
+the standalone publisher's OpenBao authorization. It does not create snapshots,
+store application credential values, manage DNS or own the VM. It needs no live
+Kubernetes API to provision storage or exact application scopes before first boot.
 
 Publication is the first ALE-63 slice. Guarded snapshot restoration is separate;
 these definitions alone do not make VM replacement safe.
@@ -12,22 +14,23 @@ these definitions alone do not make VM replacement safe.
 
 | Identity | Purpose |
 | --- | --- |
-| Workstation S3 operator | Provision the bucket and issue a separate RustFS service account through `homelab-creds` |
+| Workstation S3 operator | Provision both buckets and issue separate RustFS application accounts through `homelab-creds` |
 | Trusted OpenBao configuration operator | Manage reader, issuer and bounded-writer authorization |
 | Bounded value writer | Enroll the application credential into one exact OpenBao record; cannot read it |
 | Wrapped-SecretID issuer | Introduce the host to its AppRole; cannot read the application credential |
 | Host AppRole | Read only its application credential record, using short-lived runtime tokens |
-| Application S3 publisher | GetObject and PutObject for one cluster-scoped configuration object only |
+| Application S3 publisher | GetObject/PutObject for exactly `kubeconfig.yaml` in this cluster's configuration bucket |
+| Application backup account | Inventory its dedicated backup bucket and read/write/logically retire only `snapshots/*`; no version purge |
 
-The application account has no backup-bucket, bucket-management, listing or
+The publisher account has no backup-bucket, bucket-management, listing or
 deletion grant. Credential issuance and value enrollment happen outside OpenTofu.
 Neither credential values nor the kubeconfig belong in state, plans or cloud-init.
 The host receives no operator credential.
 
-The bucket uses versioning and default AES256 server-side encryption. It has no
+Both buckets use versioning and default AES256 server-side encryption. Neither has an
 anonymous access grant. Verify anonymous denial and an actual administrator
 content download during qualification; listing or metadata access is not enough.
-The bucket is protected against managed destruction. Versioning is not a backup
+Both are protected against managed destruction. Versioning is not a backup
 of the RKE2 server token; retain that token separately in its existing recovery
 custody. Treat every kubeconfig version as an administrator credential.
 
@@ -39,9 +42,13 @@ with path-style requests and no IAM/STS discovery. RustFS IAM uses its native AP
 not AWS IAM resources.
 
 Copy `terraform.tfvars.example` to an ignored private `terraform.tfvars`. Fill
-the required inputs, including the existing cluster's actual kube-system UID and
-stable, certificate-covered API identity. The configuration and backup bucket
-names must differ. Use provider-native workstation authentication from
+the required stable `cluster_name` and certificate-covered API identity. Use two
+to forty lowercase name characters, starting with a letter and ending in a letter
+or digit. If a suffix is needed for uniqueness, choose it once and retain it.
+Do not generate a new name during VM replacement. `cluster_uid` is optional
+observed identity evidence for standalone existing-server publication; automatic
+bootstrap obtains it from Kubernetes in the guest. It never affects storage names
+or credential scope. Use provider-native workstation authentication from
 `homelab-creds`; clear unrelated AWS session/profile/endpoint overrides.
 
 ```bash
@@ -59,7 +66,7 @@ elsewhere without a separately reviewed ownership change.
 before running `make apply`. Both targets accept `PLAN_FILE` overrides. The apply
 target requires an existing saved plan and never creates one implicitly.
 
-Export the sensitive `publisher`, `publisher_value_enrollment` and `enrollment`
+Export the sensitive `publisher`, `backup`, `storage`, `publisher_value_enrollment` and `enrollment`
 outputs into private files with `umask 077`. They contain scope and enrollment
 metadata, not credentials. Keep exact deployment locators out of shared logs.
 
@@ -77,6 +84,9 @@ python3 -B scripts/issue-publication-credentials.py \
 - Default behavior is plan-only: no operator lookup, API calls or custody writes.
 - `--execute` issues the credential through native RustFS service-account APIs.
 - `--credential-helper` selects the executable; default: `homelab-creds`.
+- `--purpose backup` consumes the `backup` scope instead and writes the lower-case
+  backup credential schema. The default `publication` purpose consumes `publisher`.
+  Always issue two different accounts; the helper rejects cross-bucket scopes.
 - The custody directory must be new, under an owned private directory. The helper
   saves the generated pair before issuance, then records the HTTP result and
   verifies the account's exact explicit policy. It never overwrites custody.
@@ -97,24 +107,45 @@ Do not enroll the operator pair. Keep the custody pair protected until enrollmen
 and host access are verified, then handle it under the operator's secret-retention
 policy. Deleting a local file does not revoke its RustFS account.
 
+For backup values, use the recovery root's `credential_enrollment.backup` bounded
+writer and its `s3_secret_path`. Enroll the separately protected existing server
+token with `credential_enrollment.token`. Neither needs the Kubernetes API.
+Enroll the `storage` fields with the stable API/registration endpoints in the
+recovery runtime profile. The same cluster name must be used in both roots.
+
+### Existing storage is not migrated automatically
+
+Changing `cluster_name`, moving from UID-prefixed storage or adopting a bucket
+owned elsewhere is an explicit migration. Existing bucket addresses retain their
+destruction guards; a plan that would replace an enrolled bucket must stop.
+Do not import, rename, copy or delete old buckets/objects as part of ordinary
+bootstrap. Retain their state, contents and token associations. Before adopting
+the new target, separately approve and verify either fresh native backups or a
+reviewed object transfer into `snapshots/`, including actual retrieval, version
+history and token association. A known cluster with no usable backup still stops.
+
 Expiry requires an explicit rotation before that time: issue and verify a new
 account, enroll its pair, verify host refresh and publication, then revoke the
 old account. This helper does not perform rotation or automatic revocation.
 
 ## Host introduction and publication
 
-Pass the exact artifacts `enrollment` output as infrastructure
-`publication_access`. Supply an independently verified guest host-key/CA file as
+For standalone publication on an existing initialized server, supply its observed
+`cluster_uid` and pass the exact artifacts `enrollment` output as infrastructure
+`publication_access`. First creation instead uses [automatic bootstrap](../RECOVERY.md),
+which discovers UID in the guest without changing storage scope. Supply an independently verified guest host-key/CA file as
 `publication_ssh_known_hosts_file`. The optional
 `TF_VAR_publication_issuer_token` is an ephemeral wrapped-SecretID issuer, not an
 OpenBao administrator or S3 credential. Enrollment follows [trusted SSH
 introduction][ssh-introduction]; first-contact key scanning is not attestation.
 
-Enabling the feature adds jq, protected metadata, the publisher and systemd units
-to first-boot data. It does not update an existing guest; use the separately
-approved in-place procedure below. Do not rerun cloud-init or replace an
-initialized VM to install these files. The enrollment hook intentionally fails
-if the expected assets/configuration are absent or differ. Changing
+The VM always installs fixed tools/units. Enabling publication does not add
+metadata to first-boot data: the verified-SSH hook installs non-secret enrollment
+metadata separately, then introduces the wrapped SecretID. For the unified
+automatic path use [runtime bootstrap enrollment](../RECOVERY.md); its OpenBao
+profile and distinct publisher record are fetched after startup. Do not rerun
+cloud-init or replace an initialized VM to change operational information.
+Absent tools still require separately approved installation. Changing
 `publication_enrollment_revision` retries introduction; it does not install files,
 rotate an existing SecretID or repair configuration.
 
@@ -149,6 +180,10 @@ test ! -L /etc/rancher/rke2/publication.json
 dnf install -y jq python3 curl
 install -D -o root -g root -m 0644 scripts/kubernetes_object_store.py \
   /usr/local/libexec/homelab/kubernetes_object_store.py
+install -D -o root -g root -m 0644 scripts/kubernetes_recovery.py \
+  /usr/local/libexec/homelab/kubernetes_recovery.py
+install -D -o root -g root -m 0700 scripts/install-enrollment.py \
+  /usr/local/libexec/homelab/install-enrollment.py
 install -D -o root -g root -m 0700 scripts/publish-kubeconfig.py \
   /usr/local/libexec/homelab/publish-kubeconfig.py
 install -D -o root -g root -m 0700 scripts/kubeconfig-credentials.sh \
@@ -191,8 +226,9 @@ credential fallback exists.
 
 The publisher requires SELinux enforcing, the declared initializer configuration,
 a running non-joining RKE2 server, a ready local API and a matching kube-system UID.
-Non-initializers skip before kubeconfig or credential reads. Additional RKE2
-configuration fragments or an unmanaged configuration path fail closed.
+Non-initializers skip before kubeconfig or credential reads. The fixed runtime
+overlay is accepted only when its hash matches the recorded bootstrap decision;
+other RKE2 fragments or an unmanaged configuration path fail closed.
 The exported native certificate-based kubeconfig uses the stable API identity.
 
 Normal writes use `If-None-Match: *`. An identical existing object is downloaded

@@ -17,28 +17,50 @@ provider "vault" {
 }
 
 locals {
-  object_key = "rke2/${var.cluster_uid}/kubeconfig.yaml"
-  role_name  = "kubernetes-${var.cluster_uid}-kubeconfig"
+  object_key           = "kubeconfig.yaml"
+  configuration_bucket = "${var.cluster_name}-configuration"
+  backup_bucket        = "${var.cluster_name}-backups"
+  role_name            = "kubernetes-${var.cluster_name}-kubeconfig"
   publisher_policy = {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
       Action   = ["s3:GetObject", "s3:PutObject"]
-      Resource = ["arn:aws:s3:::${var.configuration_bucket}/${local.object_key}"]
+      Resource = ["arn:aws:s3:::${local.configuration_bucket}/${local.object_key}"]
     }]
   }
 }
 
 resource "aws_s3_bucket" "configuration" {
-  bucket        = var.configuration_bucket
+  bucket        = local.configuration_bucket
   force_destroy = false
 
   lifecycle {
     prevent_destroy = true
-    precondition {
-      condition     = var.configuration_bucket != var.backup_bucket
-      error_message = "Configuration artifacts must use a different bucket from etcd backups."
+  }
+}
+
+resource "aws_s3_bucket" "backup" {
+  bucket        = local.backup_bucket
+  force_destroy = false
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "backup" {
+  bucket = aws_s3_bucket.backup.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
     }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "backup" {
+  bucket = aws_s3_bucket.backup.id
+  versioning_configuration {
+    status = "Enabled"
   }
 }
 
@@ -95,7 +117,7 @@ resource "vault_policy" "issuer" {
 
 module "publisher_value_access" {
   source       = "../../../modules/openbao-deployment-access"
-  name         = "kubeconfig-${var.cluster_uid}"
+  name         = "kubeconfig-${var.cluster_name}"
   secret_paths = [var.publisher_secret_path]
 }
 
@@ -103,12 +125,12 @@ output "publisher" {
   description = "Protected non-secret scope for out-of-band publisher credential issuance; no credential values."
   sensitive   = true
   value = {
-    endpoint    = var.s3_endpoint
-    region      = var.s3_region
-    bucket      = aws_s3_bucket.configuration.bucket
-    cluster_uid = var.cluster_uid
-    key         = local.object_key
-    policy      = local.publisher_policy
+    endpoint     = var.s3_endpoint
+    region       = var.s3_region
+    bucket       = aws_s3_bucket.configuration.bucket
+    cluster_name = var.cluster_name
+    key          = local.object_key
+    policy       = local.publisher_policy
   }
 }
 
@@ -123,12 +145,50 @@ output "enrollment" {
     reader_policy = vault_policy.reader.name
     secret_path   = var.publisher_secret_path
     publication = {
-      endpoint    = var.s3_endpoint
-      bucket      = aws_s3_bucket.configuration.bucket
-      region      = var.s3_region
-      cluster_uid = var.cluster_uid
-      api_server  = var.api_server
+      endpoint     = var.s3_endpoint
+      bucket       = aws_s3_bucket.configuration.bucket
+      region       = var.s3_region
+      cluster_uid  = var.cluster_uid
+      cluster_name = var.cluster_name
+      api_server   = var.api_server
     }
+  }
+}
+
+output "backup" {
+  description = "Application backup scope for native snapshot write, discovery, retrieval and logical retirement; no configuration-bucket or version-purge access."
+  sensitive   = true
+  value = {
+    endpoint     = var.s3_endpoint
+    region       = var.s3_region
+    bucket       = aws_s3_bucket.backup.bucket
+    cluster_name = var.cluster_name
+    key          = "snapshots/*"
+    policy = {
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Effect   = "Allow"
+          Action   = ["s3:ListBucket", "s3:ListBucketVersions"]
+          Resource = ["arn:aws:s3:::${local.backup_bucket}"]
+        },
+        {
+          Effect   = "Allow"
+          Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+          Resource = ["arn:aws:s3:::${local.backup_bucket}/snapshots/*"]
+        }
+      ]
+    }
+  }
+}
+
+output "storage" {
+  description = "Non-secret runtime-profile storage fields; enroll alongside the stable API/registration endpoints."
+  sensitive   = true
+  value = {
+    cluster_name = var.cluster_name
+    backup       = { endpoint = var.s3_endpoint, bucket = aws_s3_bucket.backup.bucket, region = var.s3_region }
+    publication  = { endpoint = var.s3_endpoint, bucket = aws_s3_bucket.configuration.bucket, region = var.s3_region }
   }
 }
 

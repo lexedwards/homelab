@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars, fill required inputs privately, and never commit it.
+
+# -----------------------------------------------------------------------------
+# Provider — Required
+# -----------------------------------------------------------------------------
+# Inject trusted administrative authentication through VAULT_TOKEN.
+# openbao_address =
+# approle_mount   =
+
+# -----------------------------------------------------------------------------
+# Runtime access — Required
+# -----------------------------------------------------------------------------
+# cluster_name =
+# records = {
+#   config_path             =
+#   identity_path           =
+#   server_token_path       =
+#   s3_secret_path          =
+#   publication_secret_path =
+# }
