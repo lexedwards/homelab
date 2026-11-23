@@ -81,7 +81,7 @@ directions. Never substitute a Service that might route back to the source pod.
 ### Probe Command
 
 ```bash
-python3 scripts/check-policy-probe.py \
+python3 scripts/checks/check-policy-probe.py \
   --source 'policy-check/<client-pod>' \
   --destination 'policy-check/<server-pod>' \
   --port '<reviewed-fixture-listener>' --expect allow \

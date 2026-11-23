@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars, fill required inputs privately, and never commit it.
+
+# -----------------------------------------------------------------------------
+# Provider — Required
+# -----------------------------------------------------------------------------
+# Inject trusted administrative authentication through VAULT_TOKEN.
+# openbao_address =
+# approle_mount   =
+# Inject S3 authentication through AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.
+# s3_endpoint =
+# Optional
+# s3_region = "us-east-1"
+
+# -----------------------------------------------------------------------------
+# Runtime access — Required
+# -----------------------------------------------------------------------------
+# cluster_name =
+# records = {
+#   config_path             =
+#   identity_path           =
+#   server_token_path       =
+#   s3_secret_path          =
+#   publication_secret_path =
+# }

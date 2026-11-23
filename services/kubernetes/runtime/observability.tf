@@ -15,7 +15,7 @@ locals {
 
 data "external" "observability_chart" {
   count   = local.observability_enabled ? 1 : 0
-  program = ["python3", "-B", "${path.module}/../scripts/download-secret-chart.py"]
+  program = ["python3", "-B", "${path.module}/../scripts/charts/download-chart.py"]
   query = {
     url    = local.observability_chart.url
     sha256 = local.observability_chart.sha256

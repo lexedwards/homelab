@@ -11,7 +11,7 @@ backup evidence.
 
 ## Configuration and credentials
 
-The external OpenBao runtime profile described in [recovery/README.md](recovery/README.md)
+The external OpenBao runtime profile described in [bootstrap/README.md](bootstrap/README.md)
 supplies the dedicated `<cluster-name>-backups` target. Its optional `snapshots`
 object accepts these native settings:
 
@@ -61,10 +61,10 @@ history. Fingerprints only correlate recovery points; they are not replacement
 token material. Preserve independently recoverable application credentials too.
 See [the custody decision][custody].
 
-The runtime root's optional recovery-custody grant still owns exact administrative
-authorization for fingerprint-addressed token and backup-credential records. It
-does not write values or grant a Kubernetes controller recovery access. Preserve
-historical records on credential/token rotation.
+The bootstrap root owns exact value-enrollment authorization for the token and
+backup-credential records. Runtime has no second custody-writer grant. Actual
+values are enrolled out of band, never through Terraform or a Kubernetes
+controller. Preserve historical records on credential/token rotation.
 
 ## Existing-server migration
 
@@ -109,7 +109,7 @@ cluster UID and current source Node as verification evidence, never storage nami
 Attest independently recovered copies without printing values:
 
 ```text
-python3 -B scripts/backup-recovery-custody.py \
+python3 -B scripts/bootstrap/backup-recovery-custody.py \
   --config <private-preparation-target> \
   --credentials-file <independently-recovered-backup-pair> \
   --server-token-file <independently-recovered-server-token> \

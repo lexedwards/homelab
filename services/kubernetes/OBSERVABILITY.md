@@ -71,8 +71,9 @@ as a smoke test or export the same event through both SDK logs and stdout.
 
 Use the canonical `services/kubernetes/runtime` root and its existing protected
 state for persistent operations. Set `cluster_api.kubeconfig_path` to an absolute
-protected kubeconfig path, or retain the existing enabled `secrets_platform`
-connection. Neither input enrolls credentials. Keep kubeconfig owner-readable.
+protected kubeconfig path and `cluster_api.api_host` to the inspected stable API
+origin. This connection is independent of workload-secret enablement and enrolls
+no credentials. Keep kubeconfig owner-readable.
 
 Set `observability` in ignored runtime inputs:
 

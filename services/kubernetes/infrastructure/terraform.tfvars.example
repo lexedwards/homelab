@@ -1,0 +1,156 @@
+# Copy to terraform.tfvars, fill required values, and keep the populated file private.
+# Never commit credentials or deployment locators.
+
+# -----------------------------------------------------------------------------
+# Provider
+# -----------------------------------------------------------------------------
+
+# Inject PROXMOX_VE_API_TOKEN and TECHNITIUM_API_TOKEN privately; no token variables.
+# Load the approved node SSH key into the local agent before snippet uploads.
+# Required
+# proxmox_endpoint     =
+# proxmox_ssh_username =
+# technitium_server_url =
+
+# Optional
+# proxmox_insecure = false
+
+# -----------------------------------------------------------------------------
+# Core
+# -----------------------------------------------------------------------------
+
+# Required
+# proxmox_nodes = {
+#   compute = {
+#     ssh_address          =
+#     snippet_datastore_id =
+#     vm_datastore_id      =
+#     vm_bridge            =
+#   }
+# }
+# template = {
+#   vm_id     =
+#   node_name =
+# }
+# cloud_user            =
+# cloud_ssh_public_keys = []
+
+# Optional: null preserves the existing remote snippet filenames.
+# snippet_namespace = null
+
+# -----------------------------------------------------------------------------
+# Control plane
+# -----------------------------------------------------------------------------
+
+# Required
+# control_plane = {
+#   vm_id =
+#   name  =
+# }
+# primary_vlan_id =
+# api_dns = {
+#   zone =
+#   name =
+#   ttl  = 300
+# }
+# cluster_networks = {
+#   pods     =
+#   services =
+# }
+
+# Optional
+# control_plane_protection = true
+# control_plane_resources = {
+#   cpu_cores    = 2
+#   memory_mb    = 4096
+#   disk_size_gb = 32
+# }
+# rke2_version         = "1.36.6~rke2r1-0.el10"
+# rke2_selinux_version = "0.24-1.el10"
+# cilium_metrics_enabled = false
+
+# -----------------------------------------------------------------------------
+# Runtime bootstrap enrollment
+# -----------------------------------------------------------------------------
+
+# Optional: null skips apply-time enrollment; empty hosts wait for access.
+# bootstrap_access = null
+# Supply the bootstrap root's unchanged non-secret enrollment output privately.
+# bootstrap_ssh_known_hosts_file = null
+# bootstrap_enrollment_revision = "1"
+# bootstrap_issuer_token = null
+# Inject the exact-role issuer through ephemeral TF_VAR_bootstrap_issuer_token.
+# Discovery, runtime configuration and credentials never enter cloud-init.
+
+# -----------------------------------------------------------------------------
+# Workers
+# -----------------------------------------------------------------------------
+
+# Optional: disabled until both physical-host entries are supplied.
+# workers = {}
+# When enabling workers, fill both entries privately:
+# workers = {
+#   compute = {
+#     vm_id          =
+#     name           =
+#     fqdn           =
+#     service_bridge =
+#   }
+#   store = {
+#     vm_id          =
+#     name           =
+#     fqdn           =
+#     service_bridge =
+#   }
+# }
+# Also add store to proxmox_nodes using the same fields as compute.
+# Worker A records use api_dns.zone and api_dns.ttl.
+# Set an approved existing reverse zone only when this root may own worker PTRs.
+# worker_reverse_dns_zone = null
+# service_vlan_id = null
+# worker_resources = {
+#   cpu_cores    = 4
+#   memory_mb    = 8192
+#   disk_size_gb = 64
+# }
+
+# -----------------------------------------------------------------------------
+# Optional workload service exposure
+# -----------------------------------------------------------------------------
+
+# Null preserves current Cilium bootstrap settings; this is not a live rollout.
+# Use reviewed pool and exact Linux device inputs, not node DHCP addresses.
+# One pool can be added first; adding another later need not replace the first.
+# service_exposure = {
+#   devices = []
+#   pools = {
+#     primary = {
+#       subnet    =
+#       start     =
+#       stop      =
+#       interface =
+#     }
+#     secondary = {
+#       subnet    =
+#       start     =
+#       stop      =
+#       interface =
+#     }
+#   }
+# }
+
+# -----------------------------------------------------------------------------
+# Optional retained NFS storage
+# -----------------------------------------------------------------------------
+
+# nfs_storage = null
+# Replace null with the reviewed private backend/identity; this only renders YAML.
+# nfs_storage = {
+#   server             =
+#   share              =
+#   storage_class_name =
+#   qualification_identity = {
+#     uid =
+#     gid =
+#   }
+# }

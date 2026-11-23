@@ -1,16 +1,3 @@
-variable "cluster_api" {
-  description = "Optional protected kubeconfig for API-managed configuration independent of OpenBao integration. Null preserves secrets_platform's existing connection."
-  type = object({
-    kubeconfig_path = string
-  })
-  sensitive = true
-  default   = null
-  validation {
-    condition     = var.cluster_api == null ? true : startswith(var.cluster_api.kubeconfig_path, "/")
-    error_message = "Supply an absolute protected kubeconfig path."
-  }
-}
-
 variable "observability" {
   description = "Opt-in metrics collection. Published ingestion origin, exact collector IPv4/port, DNS resolver and reviewed node/API networks are private inputs, not cross-service state reads."
   type = object({
@@ -28,7 +15,7 @@ variable "observability" {
 
   validation {
     condition = var.observability == null ? true : (
-      (var.cluster_api != null || var.secrets_platform != null) &&
+      var.cluster_api != null &&
       can(regex("^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$", var.observability.cluster_name)) &&
       can(regex("^https?://[a-z0-9]([a-z0-9.-]*[a-z0-9])?:[0-9]{1,5}$", var.observability.warehouse_url)) &&
       (startswith(var.observability.warehouse_url, "https://") || var.observability.allow_plaintext) &&

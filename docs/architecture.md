@@ -136,8 +136,9 @@ flowchart LR
 ```
 
 Observability relationships follow its definitions; deployment has not been
-rechecked. Kubernetes telemetry export to Alloy remains unverified. Grafana's
-local database and NFS data need their own backups.
+rechecked. Kubernetes collection had historical delivery qualification, but the
+old cluster is retired. A clean rebuild needs fresh collection/ingestion checks.
+Grafana's local database and NFS data need their own backups.
 
 ## Deployment and network
 
@@ -155,8 +156,8 @@ flowchart TB
             hello["Hello World Incus instance<br/>Defined demo; live status unverified"]
         end
         subgraph compute["compute — physical Proxmox host"]
-            cp["RKE2 control-plane VM<br/>API server + etcd<br/>Defined; deployment evidence recorded"]
-            cw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
+            cp["RKE2 control-plane VM<br/>API server + etcd<br/>Defined; previous cluster retired"]
+            cw["RKE2 worker VM<br/>Worker runtime<br/>Defined; previous cluster retired"]
             collector["Collector VM<br/>Alloy<br/>Defined default placement"]
             grafana["Visualization VM<br/>Grafana<br/>Defined default placement"]
             ha["Home Assistant / Zigbee integration<br/>Operator-confirmed; guest type unverified"]
@@ -164,7 +165,7 @@ flowchart TB
         end
         subgraph store["store — physical Proxmox host"]
             storage["TrueNAS VM / NFS / SMB<br/>Kubernetes volumes, Jellyfin media, Roon music<br/>Placement recorded"]
-            sw["RKE2 worker VM<br/>Worker runtime<br/>Defined; worker evidence recorded"]
+            sw["RKE2 worker VM<br/>Worker runtime<br/>Defined; previous cluster retired"]
             warehouse["Warehouse VM / Docker Compose<br/>Mimir, Loki, Tempo<br/>Defined default placement"]
             images["Image Catalogue<br/>Defined VM templates; not applications"]
             jellyfin["Jellyfin<br/>Operator-confirmed; guest type unverified"]

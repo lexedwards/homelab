@@ -1,10 +1,16 @@
 TOFU ?= tofu
 PLAN_FILE ?= deployment.tfplan
 
-.PHONY: init fmt-check tofu-validate validate plan apply
+.PHONY: init fmt fmt-check tofu-validate test validate plan apply
 
 init:
 	$(TOFU) init
+
+fmt:
+	$(TOFU) fmt -recursive
+
+test:
+	$(TOFU) test
 
 fmt-check:
 	$(TOFU) fmt -check -recursive
@@ -13,7 +19,7 @@ fmt-check:
 tofu-validate:
 	$(TOFU) validate
 
-validate: fmt-check tofu-validate
+validate: fmt-check tofu-validate test
 	$(MAKE) -C ../../../modules/openbao-deployment-access validate
 
 plan:
