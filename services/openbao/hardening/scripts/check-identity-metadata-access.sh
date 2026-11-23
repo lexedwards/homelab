@@ -37,9 +37,7 @@ for attempt in $(seq 1 100); do
 done
 bao status >/dev/null
 bao secrets enable -path=kv -version=2 kv > /tmp/fixture/mount-result
-for cluster in test-cluster other-cluster; do
-  bao kv put "kv/kubernetes/$cluster/identity" uid=synthetic > /tmp/fixture/seed-result
-done
+bao kv put kv/kubernetes/other-cluster/identity uid=synthetic > /tmp/fixture/seed-result
 bao policy write fixture-administrator /tmp/fixture/default.hcl > /tmp/fixture/policy-result
 operator=$(bao token create -policy=fixture-administrator -no-default-policy -field=token)
 deny() {
@@ -51,10 +49,11 @@ deny() {
 deny read kv/metadata/kubernetes/test-cluster/identity
 deny write kv/metadata/kubernetes/test-cluster/identity cas_required=true
 bao policy write fixture-administrator /tmp/fixture/exact.hcl > /tmp/fixture/policy-result
-BAO_TOKEN="$operator" bao read -format=json kv/metadata/kubernetes/test-cluster/identity > /tmp/fixture/read-result.json
 BAO_TOKEN="$operator" bao write kv/metadata/kubernetes/test-cluster/identity cas_required=true > /tmp/fixture/write-result
 BAO_TOKEN="$operator" bao read -format=json kv/metadata/kubernetes/test-cluster/identity | \
-  jq -e '.data.cas_required == true' >/dev/null
+  jq -e '.data.cas_required == true and .data.current_version == 0' >/dev/null
+bao kv put -cas=0 kv/kubernetes/test-cluster/identity uid=synthetic > /tmp/fixture/identity-value-result
+BAO_TOKEN="$operator" bao write kv/metadata/kubernetes/test-cluster/identity cas_required=true > /tmp/fixture/update-result
 deny delete kv/metadata/kubernetes/test-cluster/identity
 deny read kv/metadata/kubernetes/other-cluster/identity
 deny write kv/metadata/kubernetes/other-cluster/identity cas_required=true
@@ -62,4 +61,4 @@ deny read kv/data/kubernetes/test-cluster/identity
 deny write kv/data/kubernetes/test-cluster/identity uid=different
 bao policy write fixture-administrator /tmp/fixture/default.hcl > /tmp/fixture/policy-result
 deny read kv/metadata/kubernetes/test-cluster/identity
-printf '%s\n' 'Exact metadata grant passed over local TLS: default/grant-removal denial, permitted read/update, denied deletion, other-record and secret-value access. No production credentials or API used.'
+printf '%s\n' 'Exact metadata grant passed over local TLS: default/grant-removal denial, permitted missing-record creation/read/update, denied deletion, other-record and secret-value access. No production credentials or API used.'
