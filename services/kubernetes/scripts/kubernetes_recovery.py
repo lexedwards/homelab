@@ -76,6 +76,25 @@ def initialized():
     return True
 
 
+def check_empty_bootstrap():
+    db, tls = DATA / 'server/db', DATA / 'server/tls'
+    require(not any(path.is_symlink() for path in [db, tls, *db.parents]), 'Bootstrap paths must not use symlinks')
+    require(not tls.exists(), 'Existing TLS material requires inspection; no overwrite')
+    if not db.exists():
+        return
+    require(db.is_dir(), 'Unexpected datastore path; no overwrite')
+    info = db.stat()
+    require(info.st_uid == 0 and not info.st_mode & 0o022, 'Datastore scaffolding must remain root-controlled')
+    entries = list(db.iterdir())
+    require(all(path.name == 'snapshots' for path in entries), 'Existing datastore material requires inspection; no overwrite')
+    if entries:
+        snapshots = entries[0]
+        require(not snapshots.is_symlink() and snapshots.is_dir(), 'Unexpected snapshot scaffolding; no overwrite')
+        info = snapshots.stat()
+        require(info.st_uid == 0 and not info.st_mode & 0o022 and not any(snapshots.iterdir()),
+                'Snapshot scaffolding must be root-controlled and empty; preserve retained material')
+
+
 def check_receipts():
     started, complete = STATE / 'restore-started.json', STATE / 'restore-complete.json'
     require(not any(p.is_symlink() for p in [started, complete, STATE / 'restore-result.json']), 'Restore receipts must not use symlinks')

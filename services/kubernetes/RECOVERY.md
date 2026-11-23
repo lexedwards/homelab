@@ -29,6 +29,14 @@ not absence. A joining server does not read backup or publication credentials,
 restore a snapshot, or publish a kubeconfig. Existing local data takes precedence
 over all discovery and needs no OpenBao or S3 access to start.
 
+Native package installation creates an empty `server/db/snapshots` directory.
+That root-controlled scaffolding is not an initialized datastore. Bootstrap allows
+only an absent database directory, an empty root-controlled database directory,
+or that directory containing only an empty root-controlled `snapshots` directory.
+Symlinks, unsafe permissions, retained snapshots, unknown database contents and
+TLS material still stop bootstrap for inspection. The same check runs again after
+snapshot download, before native reset. It never deletes or renames these paths.
+
 Automatic recovery assumes the single control-plane VM slot has exclusive
 ownership. Before enrolling a replacement, verify the old VM is stopped/destroyed
 and cannot return. A failed endpoint probe is not fencing. Never enroll another
