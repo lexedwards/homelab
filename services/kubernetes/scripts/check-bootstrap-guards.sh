@@ -39,8 +39,28 @@ grep -q 'Initialized datastore preserved' "$case_directory/stdout"
 
 new_case partial
 mkdir -p "$case_directory/data/server/db/etcd"
+printf '%s\n' 'preserve-partial-data' > "$case_directory/data/server/db/etcd/partial"
 if run_case; then exit 1; fi
 grep -q 'Existing partial datastore requires inspection' "$case_directory/stderr"
+[[ $(< "$case_directory/data/server/db/etcd/partial") == preserve-partial-data ]]
+
+for state in empty-tree file symlink unsafe-directory; do
+  new_case "$state"
+  directory="$case_directory/data/server/db/scaffold/nested"
+  mkdir -p "$directory"
+  case "$state" in
+    file) printf '%s\n' 'preserve' > "$directory/data" ;;
+    symlink) ln -s /tmp "$directory/link" ;;
+    unsafe-directory) chmod 0777 "$directory" ;;
+  esac
+  if run_case; then exit 1; fi
+  if [[ $state == empty-tree ]]; then
+    grep -q 'Waiting for verified-SSH OpenBao enrollment' "$case_directory/stderr"
+  else
+    grep -q 'Existing partial datastore requires inspection' "$case_directory/stderr"
+  fi
+  if [[ $state == file ]]; then [[ $(< "$directory/data") == preserve ]]; fi
+done
 
 new_case incomplete-reset
 mkdir -p "$case_directory/data/server/db/etcd/member/snap"

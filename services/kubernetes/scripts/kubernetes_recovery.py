@@ -70,29 +70,14 @@ def lock_state():
 def initialized():
     path = DATA / 'server/db/etcd/member/snap/db'
     require(not any(p.is_symlink() for p in [path, *path.parents]), 'Datastore paths must not use symlinks')
-    if not (DATA / 'server/db/etcd').exists():
+    if not path.is_file():
+        db, tls = DATA / 'server/db', DATA / 'server/tls'
+        require(not tls.exists() and not tls.is_symlink(), 'Existing TLS material requires inspection; no overwrite')
+        for entry in [db, *db.rglob('*')] if db.exists() else []:
+            require(entry.is_dir() and not entry.is_symlink() and entry.stat().st_uid == 0 and not entry.stat().st_mode & 0o022,
+                    'Existing partial datastore requires inspection; no initialization or overwrite')
         return False
-    require(path.is_file(), 'Existing partial datastore requires inspection; no initialization or overwrite')
     return True
-
-
-def check_empty_bootstrap():
-    db, tls = DATA / 'server/db', DATA / 'server/tls'
-    require(not any(path.is_symlink() for path in [db, tls, *db.parents]), 'Bootstrap paths must not use symlinks')
-    require(not tls.exists(), 'Existing TLS material requires inspection; no overwrite')
-    if not db.exists():
-        return
-    require(db.is_dir(), 'Unexpected datastore path; no overwrite')
-    info = db.stat()
-    require(info.st_uid == 0 and not info.st_mode & 0o022, 'Datastore scaffolding must remain root-controlled')
-    entries = list(db.iterdir())
-    require(all(path.name == 'snapshots' for path in entries), 'Existing datastore material requires inspection; no overwrite')
-    if entries:
-        snapshots = entries[0]
-        require(not snapshots.is_symlink() and snapshots.is_dir(), 'Unexpected snapshot scaffolding; no overwrite')
-        info = snapshots.stat()
-        require(info.st_uid == 0 and not info.st_mode & 0o022 and not any(snapshots.iterdir()),
-                'Snapshot scaffolding must be root-controlled and empty; preserve retained material')
 
 
 def check_receipts():

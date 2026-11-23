@@ -72,7 +72,6 @@ shell-validate:
 	bash -n scripts/enroll-control-plane.sh
 	bash -n scripts/bootstrap-credentials.sh
 	bash -n scripts/check-bootstrap-guards.sh
-	bash -n scripts/check-bootstrap-scaffolding.sh
 	bash -n scripts/check-control-plane-enrollment.sh
 	bash -n scripts/check-bootstrap-authorization.sh
 
@@ -91,7 +90,6 @@ bootstrap-validate:
 
 bootstrap-guard-check:
 	bash scripts/check-bootstrap-guards.sh
-	bash scripts/check-bootstrap-scaffolding.sh
 	bash scripts/check-control-plane-enrollment.sh
 
 bootstrap-authorization-check:

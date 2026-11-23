@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 
 from kubernetes_object_store import NativeS3, OperationError, object_path, private_bytes, private_json, require
-from kubernetes_recovery import ACCESS, APPROLE, CONFIG, DATA, STATE, BootstrapReader, access, check_empty_bootstrap, check_native, check_receipts, configuration, digest, endpoint_available, identity, initialized, install_token, latest_snapshot, lock_state, profile, save, token_hash
+from kubernetes_recovery import ACCESS, APPROLE, CONFIG, DATA, STATE, BootstrapReader, access, check_native, check_receipts, configuration, digest, endpoint_available, identity, initialized, install_token, latest_snapshot, lock_state, profile, save, token_hash
 
 
 def restore(config, known, point, client, token):
@@ -23,7 +23,7 @@ def restore(config, known, point, client, token):
         require(downloaded['size'] == point['size'], 'Snapshot size changed during download')
         recorded = dict(point, sha256=downloaded['sha256'])
         save(selected, recorded, exclusive=True)
-    check_empty_bootstrap()
+    require(not initialized(), 'Datastore appeared before reset; no overwrite')
     receipt = {'intent_sha256': digest({'identity': known, 'snapshot': recorded}), 'snapshot_sha256': recorded['sha256']}
     save(STATE / 'restore-started.json', receipt, exclusive=True)
     try:
@@ -48,7 +48,7 @@ def execute(enrollment, approle):
         require(not (STATE / 'restore-complete.json').exists(), 'Previously restored datastore is missing; no replay or creation')
         require(enrollment.exists(), 'Waiting for verified-SSH OpenBao enrollment; empty-datastore startup blocked')
         check_native()
-        check_empty_bootstrap()
+        require(not initialized(), 'Datastore appeared before discovery; no overwrite')
         with closing(BootstrapReader(private_json(enrollment), approle)) as reader:
             config = profile(reader.read('config_path'))
             require(config['cluster_name'] == reader.enrollment['cluster_name'], 'Runtime profile differs from the enrolled cluster name')
