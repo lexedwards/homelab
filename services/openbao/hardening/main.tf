@@ -9,7 +9,7 @@ variable "openbao_address" {
 }
 
 variable "identity_metadata_paths" {
-  description = "Opt-in exact KV-v2 Kubernetes identity metadata records the administrator may read/update. No wildcards, deletion or secret-value permissions."
+  description = "Opt-in exact KV-v2 Kubernetes identity metadata records the administrator may create/read/update. No wildcards, deletion or secret-value permissions."
   type        = set(string)
   default     = []
   sensitive   = true
@@ -25,7 +25,7 @@ variable "identity_metadata_paths" {
 locals {
   administrator_policy = join("\n", concat([file("${path.module}/administrator.hcl")], [
     for path in sort(tolist(var.identity_metadata_paths)) :
-    "path ${jsonencode(path)} { capabilities = [\"read\", \"update\"] }"
+    "path ${jsonencode(path)} { capabilities = [\"create\", \"read\", \"update\"] }"
   ]))
 }
 

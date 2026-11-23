@@ -96,9 +96,11 @@ declarations. Preserve independent unseal custody and emergency recovery access.
 
 `identity_metadata_paths` defaults to an empty set and leaves the base policy
 unchanged. An approved exact KV-v2 Kubernetes identity metadata record can be added
-through private inputs to grant only `read` and `update` on that record. This lets
+through private inputs to grant only `create`, `read` and `update` on that record. This lets
 the owning consumer root manage CAS-required metadata without granting the
-administrator direct secret-value reads or metadata deletion. Wildcards, data
+administrator direct secret-value reads or metadata deletion. OpenBao requires
+`create` for the first metadata write when the record is absent; `update` alone
+only manages existing records. Wildcards, data
 paths and unrelated metadata records are rejected.
 
 Review and apply this policy change from canonical `main` using the hardening
@@ -111,7 +113,7 @@ it already controls ACL policies and can deliberately grant further authority.
 `make identity-metadata-check BAO_BINARY=<reviewed-local-binary>` renders both
 default and exact-record policies, then exercises them against disposable OpenBao
 over verified local TLS in an isolated network namespace. It checks default
-denial, allowed metadata read/update, denied deletion, denied other-record/value
+denial, allowed metadata creation/read/update, denied deletion, denied other-record/value
 access and grant removal. Use a reviewed OpenBao 2.7.2 binary and enabled user
 namespaces. No production credentials or API are used.
 
