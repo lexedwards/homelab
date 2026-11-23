@@ -92,6 +92,29 @@ Disabling a mount can revoke consumer leases; removing the policy can lock out
 administrators. These guards do not protect against direct API writes or deleting
 declarations. Preserve independent unseal custody and emergency recovery access.
 
+### Exact identity-metadata management
+
+`identity_metadata_paths` defaults to an empty set and leaves the base policy
+unchanged. An approved exact KV-v2 Kubernetes identity metadata record can be added
+through private inputs to grant only `read` and `update` on that record. This lets
+the owning consumer root manage CAS-required metadata without granting the
+administrator direct secret-value reads or metadata deletion. Wildcards, data
+paths and unrelated metadata records are rejected.
+
+Review and apply this policy change from canonical `main` using the hardening
+root's existing state, before resuming the consumer's deployment. Keep unrelated
+grants in the private set; adding one record must not drop another approved entry.
+Removing a grant revokes that metadata-management access but does not delete the
+record or change its CAS setting. This remains a trusted administrative identity:
+it already controls ACL policies and can deliberately grant further authority.
+
+`make identity-metadata-check BAO_BINARY=<reviewed-local-binary>` renders both
+default and exact-record policies, then exercises them against disposable OpenBao
+over verified local TLS in an isolated network namespace. It checks default
+denial, allowed metadata read/update, denied deletion, denied other-record/value
+access and grant removal. Use a reviewed OpenBao 2.7.2 binary and enabled user
+namespaces. No production credentials or API are used.
+
 [init root]: ../init/README.md
 [accounts]: ../accounts/README.md
 [layout migration]: ../README.md#preserve-existing-local-state

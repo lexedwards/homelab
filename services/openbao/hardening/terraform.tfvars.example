@@ -1,3 +1,5 @@
 # Copy to ignored terraform.tfvars. Never commit the populated file.
 # Supply the administrative token through protected VAULT_TOKEN injection.
 # openbao_address =
+# identity_metadata_paths = []
+# Add only explicitly approved exact Kubernetes identity metadata record paths.
