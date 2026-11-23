@@ -13,7 +13,7 @@ help:
 		'fmt              Format OpenTofu configuration' \
 		'fmt-check        Check formatting' \
 		'tofu-validate    Validate the initialized root offline' \
-		'test             Check worker DNS and optional publication composition offline' \
+		'test             Check worker DNS, installation composition and snippet isolation offline' \
 		'yaml-validate    Lint cloud-init' \
 		'shell-validate   Check guest script syntax' \
 		'publication-validate Check publication CLI loading and artifacts-root configuration offline' \

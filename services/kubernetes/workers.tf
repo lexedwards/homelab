@@ -32,7 +32,7 @@ resource "proxmox_virtual_environment_file" "worker" {
   content_type = "snippets"
   source_raw {
     data      = data.cloudinit_config.worker[each.key].rendered
-    file_name = "kubernetes-worker-cloud-config.yaml"
+    file_name = "${local.snippet_prefix}kubernetes-worker-cloud-config.yaml"
   }
 }
 
@@ -43,7 +43,7 @@ resource "proxmox_virtual_environment_file" "worker_network" {
   content_type = "snippets"
   source_raw {
     data      = file("${path.module}/cloud-init/worker-network-data.yaml")
-    file_name = "kubernetes-worker-network-config.yaml"
+    file_name = "${local.snippet_prefix}kubernetes-worker-network-config.yaml"
   }
 }
 

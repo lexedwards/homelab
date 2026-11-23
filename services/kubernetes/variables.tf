@@ -61,8 +61,41 @@ variable "template" {
   }
 }
 
+variable "snippet_namespace" {
+  description = "Optional remote snippet filename namespace for an independently owned deployment. Null preserves existing paths; a workspace alone does not isolate remote files."
+  type        = string
+  default     = null
+  sensitive   = true
+  validation {
+    condition     = var.snippet_namespace == null ? true : can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.snippet_namespace))
+    error_message = "Use a 2–40 character lowercase name with letters, digits or hyphens and alphanumeric ends."
+  }
+}
+
+variable "control_plane_mac_address" {
+  description = "Optional existing unicast primary MAC for an explicitly approved address-preserving server replacement. Null leaves allocation to Proxmox; verify the upstream reservation separately."
+  type        = string
+  default     = null
+  sensitive   = true
+  validation {
+    condition = var.control_plane_mac_address == null ? true : (
+      can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.control_plane_mac_address)) &&
+      try(parseint(substr(var.control_plane_mac_address, 0, 2), 16) % 2 == 0, false) &&
+      var.control_plane_mac_address != "00:00:00:00:00:00"
+    )
+    error_message = "Supply a nonzero unicast MAC in six colon-separated hexadecimal octets, or null for provider allocation."
+  }
+}
+
+variable "control_plane_protection" {
+  description = "Proxmox deletion protection for the server. Disable only through a separately reviewed operation before an approved replacement; this does not authorize destruction."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
 variable "control_plane" {
-  description = "Initial server VM ID/name. Proxmox manages its NIC MAC; reserve the observed DHCP lease upstream."
+  description = "Initial server VM ID/name. Reserve its observed primary MAC/address upstream before normal use or maintenance."
   type = object({
     vm_id = number
     name  = string

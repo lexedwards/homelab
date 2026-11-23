@@ -35,6 +35,9 @@
 # cloud_user            =
 # cloud_ssh_public_keys = []
 
+# Optional: null preserves the existing remote snippet filenames.
+# snippet_namespace = null
+
 # -----------------------------------------------------------------------------
 # Control plane
 # -----------------------------------------------------------------------------
@@ -56,6 +59,8 @@
 # }
 
 # Optional
+# control_plane_mac_address = null
+# control_plane_protection = true
 # control_plane_resources = {
 #   cpu_cores    = 2
 #   memory_mb    = 4096

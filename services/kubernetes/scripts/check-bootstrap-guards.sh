@@ -72,13 +72,16 @@ jq '. + {publication_enrollment_revision:"changed",publication_ssh_known_hosts_f
   "$work/base.tfvars.json" > "$work/enrolled.tfvars.json"
 jq '. + {bootstrap_enrollment_revision:"changed-bootstrap",bootstrap_ssh_known_hosts_file:"./tests/publication.tftest.hcl",bootstrap_access:{address:"https://bao.example.invalid",auth_mount:"approle",cluster_name:"test-server",role_name:"kubernetes-test-server-bootstrap",role_id:"11111111-2222-4333-8444-555555555555",reader_policy:"kubernetes-test-server-bootstrap-read",identity_token_role:"kubernetes-test-server-identity",identity_writer_policy:"kubernetes-test-server-identity",config_path:"secret/data/kubernetes/test/config",identity_path:"secret/data/kubernetes/test/identity",server_token_path:"secret/data/kubernetes/test/server-token/0123456789ab",s3_secret_path:"secret/data/kubernetes/test/backup-credentials",publication_secret_path:"secret/data/kubernetes/test/publication-credentials"}}' \
   "$work/base.tfvars.json" > "$work/bootstrap-enrolled.tfvars.json"
-for input in base enrolled bootstrap-enrolled; do
+jq '. + {snippet_namespace:"test-isolated",control_plane_mac_address:"02:00:00:00:00:aa",control_plane_protection:false}' \
+  "$work/base.tfvars.json" > "$work/isolated.tfvars.json"
+for input in base enrolled bootstrap-enrolled isolated; do
   printf '%s\n' 'base64encode(nonsensitive(local.control_plane_cloud_config))' | \
     tofu -chdir="$service_directory" console -state="$work/console.tfstate" -var-file="$work/$input.tfvars.json" \
     > "$work/$input.rendered"
 done
 cmp "$work/base.rendered" "$work/enrolled.rendered"
 cmp "$work/base.rendered" "$work/bootstrap-enrolled.rendered"
+cmp "$work/base.rendered" "$work/isolated.rendered"
 PYTHONPATH="$source_directory" python3 -B - <<'PY'
 import urllib.error
 import importlib.util
