@@ -352,8 +352,9 @@ on an in-cluster controller. Retain the token material associated with retained
 snapshots; the newest token is not assumed sufficient for every recovery point.
 OpenBao HTTPS delivery precedes real secret enrollment. The separate API runtime
 root owns OpenBao workload authorization. NFS and service-exposure outputs have
-their own native deployment procedures; off-node snapshots use the separately
-installed backup workflow. Alert delivery remains undecided.
+their own native deployment procedures. RKE2 owns scheduled off-node snapshots
+and retention; bootstrap completion enrolls its native S3 Secret from OpenBao.
+Alert delivery remains undecided.
 
 Irreplaceable control-plane data, bootstrap/certificate material and the token
 live on the VM OS disk. VM protection prevents ordinary destroy, not storage
@@ -364,10 +365,15 @@ The source template remains separately owned; unreferenced disks are not opted
 into blanket deletion. Back up OpenTofu state independently and protect the
 corresponding RKE2 recovery material.
 
-The backup policy is six-hour snapshots retained fourteen days
-in a dedicated off-node bucket, verified TLS and independent credential custody.
+The native backup defaults are six-hour snapshots, five local copies and 56
+remote copies in the dedicated off-node bucket, with verified TLS and independent
+token/credential custody. Override the native cron expression and retention counts
+in the external runtime profile; see [BACKUP.md](BACKUP.md). Count retention is not
+a guaranteed fourteen-day window, and versioned objects are not permanently purged.
 Approximately four hours is a planning recovery target, not an SLA or a qualified
-production restore duration. Off-node backup and scheduled execution were verified.
+production restore duration. Earlier off-node backup evidence used the retired
+external timer; native scheduler integration needs its own approved live rollout
+and observed scheduled upload.
 An earlier isolated restore experiment failed and its implementation was retired;
 a later synthetic new-VM exercise restored the original cluster identity and an
 unchanged worker using a separate matching token. The maintained guarded bootstrap

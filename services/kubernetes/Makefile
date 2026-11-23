@@ -83,6 +83,7 @@ publication-validate:
 bootstrap-validate:
 	$(PYTHON) -B scripts/rke2-bootstrap.py --help >/dev/null
 	$(PYTHON) -B scripts/prepare-recovery.py --help >/dev/null
+	$(PYTHON) -B scripts/backup-recovery-custody.py --help >/dev/null
 	$(PYTHON) -B scripts/enroll-bootstrap.py --help >/dev/null
 	$(PYTHON) -B scripts/complete-bootstrap.py --help >/dev/null
 	$(PYTHON) -B scripts/install-enrollment.py --help >/dev/null

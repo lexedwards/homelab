@@ -25,6 +25,10 @@ token material associated with retained recovery points.
 
 ## Consequences
 
+Scheduling and age-based retention are superseded by
+[native RKE2 snapshot lifecycle](016-native-rke2-snapshot-lifecycle.md).
+Independent server-token/credential custody remains required.
+
 - Approximately four hours is the initial control-plane recovery planning
   target, not an SLA or a measured restore time.
 - Off-node snapshots are not off-site backups or backups of application volumes.

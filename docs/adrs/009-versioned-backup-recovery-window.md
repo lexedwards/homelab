@@ -1,6 +1,6 @@
 ---
 name: Interpret versioned backup retention as a recovery window
-status: accepted
+status: superseded by 016-native-rke2-snapshot-lifecycle
 ---
 
 # Interpret Versioned Backup Retention as a Recovery Window

@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 from kubernetes_object_store import OperationError, private_bytes, private_json, require
-from kubernetes_recovery import ACCESS, CONFIG, DATA, STATE, VERSION, BootstrapReader, check_native, identity, initialized, profile, save, token_hash
+from kubernetes_recovery import ACCESS, CONFIG, DATA, STATE, VERSION, BootstrapReader, check_native, enroll_snapshot_secret, identity, initialized, profile, save, snapshot_configuration, token_hash
 
 
 def main():
@@ -35,6 +35,10 @@ def main():
         else:
             require(decision['role'] == 'create', 'An existing cluster requires independent identity enrollment, not automatic adoption')
             reader.record_identity(observed)
+        changed = snapshot_configuration(config)
+        enroll_snapshot_secret(config, reader.read('s3_secret_path'))
+        if changed:
+            print('Native snapshot settings staged; an existing server needs a separately approved RKE2 restart to load them.')
         pair = reader.read('publication_secret_path')
         require(set(pair) == {'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'}, 'Unexpected application publisher record')
         target = dict(config['publication'], cluster_name=config['cluster_name'], cluster_uid=uid, api_server=config['api_server'], initializer=True,

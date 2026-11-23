@@ -107,7 +107,8 @@ credential updates are OpenBao operations, not VM redeployment inputs.
 
 ## Discovery and preservation
 
-Discovery selects the newest maintained `homelab-scheduled` snapshot in the
+Discovery selects the newest native `etcd-snapshot` or retained legacy
+`homelab-scheduled` snapshot in the
 recorded cluster namespace. It verifies native S3 Node/token metadata and a bounded
 size, then downloads conditionally against that object's ETag. It preserves the
 download checksum, token association and native ZIP suffix. Invalid or ambiguous
@@ -122,8 +123,8 @@ inputs or a manually selected boot mode. Record the recovery-point age and agree
 data-loss window before fencing/destruction. Existing schedules and retention are
 unchanged; this helper does not retire old snapshots.
 
-The gate writes one fixed runtime overlay after discovery, never rewriting the
-base installation file. Native `with-node-id` separates a replacement Kubernetes
+The gate writes the runtime token/join overlay and native snapshot configuration
+after discovery, never rewriting the base installation file. Native `with-node-id` separates a replacement Kubernetes
 Node name from the preserved VM hostname. Normal restart keeps local identity.
 Native restore receives the matching server token only in its child environment;
 the native token-file setting alone was insufficient in the earlier proof.
@@ -143,6 +144,13 @@ write server-token/credential records. Any CAS collision stops for inspection.
 Keep independent identity custody protected; deletion of its OpenBao record is
 not a supported reset operation.
 
+The host first enrolls the application backup pair in RKE2's native S3 configuration
+Secret. Native RKE2 owns the snapshot schedule, upload and count-based retention;
+the runtime profile can customize its cron expression and local/remote counts.
+No second backup timer or age-pruning wrapper is installed. The Secret is only for
+normal snapshots: restore still obtains the original server token and backup pair
+directly from external OpenBao without Kubernetes. See [BACKUP.md](BACKUP.md).
+
 The host then obtains the separate application publisher pair and renders its
 publication metadata locally. Use the dedicated configuration bucket and the
 predeclared exact `kubeconfig.yaml` grant, even on first creation. Publication remains create-only;
@@ -150,12 +158,13 @@ changed retained contents need the [explicit conditional refresh](artifacts/READ
 Credentials and operational metadata never enter cloud-init or VM state.
 
 Acceptance still requires original CA/namespace/object identity, healthy
-single-member etcd, unchanged workers/Node UIDs/client certificates, fresh workload
+single-member etcd, retained worker/Node identity and valid kubelet credentials, fresh workload
 and exec, healthy Cilium, and an actual administrator kubeconfig download/login.
 Remove only the explicitly fenced old server Node through the approved procedure.
-Reinstall/check the separately owned backup runner for the actual replacement
-Node using [BACKUP.md](BACKUP.md); its independent custody and retention gates are
-not bypassed by successful bootstrap. Application volumes and OpenBao/KMS loss
+Verify a real native scheduled off-node snapshot and actual retrieval using
+[BACKUP.md](BACKUP.md); independent token/credential custody is not bypassed by
+successful bootstrap. Existing-server scheduling configuration needs an approved
+RKE2 restart to load, never an automatic healthy-server restart. Application volumes and OpenBao/KMS loss
 recovery remain separate concerns.
 
 ## Retained-server ownership handoff

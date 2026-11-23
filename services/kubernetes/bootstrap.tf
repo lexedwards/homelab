@@ -4,6 +4,8 @@ locals {
     "/usr/local/libexec/homelab/kubernetes_recovery.py"           = { source = "scripts/kubernetes_recovery.py", mode = "0644" }
     "/usr/local/libexec/homelab/rke2-bootstrap.py"                = { source = "scripts/rke2-bootstrap.py", mode = "0700" }
     "/usr/local/libexec/homelab/complete-bootstrap.py"            = { source = "scripts/complete-bootstrap.py", mode = "0700" }
+    "/usr/local/libexec/homelab/prepare-recovery.py"              = { source = "scripts/prepare-recovery.py", mode = "0700" }
+    "/usr/local/libexec/homelab/backup-recovery-custody.py"       = { source = "scripts/backup-recovery-custody.py", mode = "0700" }
     "/usr/local/libexec/homelab/install-enrollment.py"            = { source = "scripts/install-enrollment.py", mode = "0700" }
     "/usr/local/sbin/bootstrap-credentials"                       = { source = "scripts/bootstrap-credentials.sh", mode = "0700" }
     "/etc/systemd/system/kubernetes-bootstrap.service"            = { source = "config/kubernetes-bootstrap.service", mode = "0644" }
