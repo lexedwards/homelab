@@ -1,9 +1,8 @@
 variable "secrets_platform" {
   description = "Opt-in API runtime ownership in its canonical state after cluster enrollment. Credentials stay out of state; public host keys and approved node UIDs bind worker preparation."
   type = object({
-    kubeconfig_path = string
-    auth_mount      = string
-    api_audience    = string
+    auth_mount   = string
+    api_audience = string
     workers = map(object({
       node_uid = string
       host_key = string
@@ -13,17 +12,19 @@ variable "secrets_platform" {
   default   = null
 
   validation {
-    condition = var.secrets_platform == null ? true : (
-      startswith(var.secrets_platform.kubeconfig_path, "/") &&
+    condition = var.secrets_platform == null ? true : try(
+      var.cluster_api != null &&
+      can(regex("^[a-z_][a-z0-9_-]*$", var.cluster_api.ssh_user)) &&
       can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.secrets_platform.auth_mount)) &&
       can(regex("^[^[:space:]]{1,256}$", var.secrets_platform.api_audience)) &&
-      length(var.secrets_platform.workers) == 2 &&
+      length(var.secrets_platform.workers) > 0 &&
+      toset(keys(var.secrets_platform.workers)) == var.cluster_api.workers &&
       alltrue([for worker in var.secrets_platform.workers :
         length(worker.node_uid) > 0 &&
         can(regex("^(ssh-ed25519|ecdsa-sha2-nistp256|ssh-rsa) [A-Za-z0-9+/=]+$", worker.host_key))
-      ])
-    )
-    error_message = "Supply an absolute protected kubeconfig path, exact auth mount/API audience and both configured workers' approved node UIDs and pinned public SSH host keys."
+      ]),
+    false)
+    error_message = "Supply common API/SSH metadata, an exact auth mount/audience and the full nonempty worker cohort's approved node UIDs and pinned SSH host keys."
   }
 }
 
@@ -38,24 +39,5 @@ variable "openbao_endpoint_file" {
       can(regex("^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$", jsondecode(file(var.openbao_endpoint_file)))), false
     )
     error_message = "Supply a published JSON api_endpoint file containing only a verified HTTPS origin without credentials, path or query. Do not point at another service's state."
-  }
-}
-
-variable "secrets_qualification" {
-  description = "Owned synthetic service definition only: exact KV-v2 record path and zero/two replicas per runtime. Actual values are populated outside OpenTofu. Enable only after the driver CRDs are installed."
-  type = object({
-    secret_path = string
-    replicas    = optional(number, 0)
-  })
-  sensitive = true
-  default   = null
-
-  validation {
-    condition = var.secrets_qualification == null ? true : (
-      var.secrets_platform != null && contains([0, 2], var.secrets_qualification.replicas) &&
-      can(regex("^[a-z0-9][a-z0-9-]*/data/[A-Za-z0-9._/-]+$", var.secrets_qualification.secret_path)) &&
-      alltrue([for part in split("/", var.secrets_qualification.secret_path) : !contains(["", ".", ".."], part)])
-    )
-    error_message = "Qualification needs the enabled platform, an exact KV-v2 record path without wildcard/query/traversal, and replicas of zero or two."
   }
 }

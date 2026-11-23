@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars, fill required inputs privately, and never commit it.
+# -----------------------------------------------------------------------------
+# Provider — Required
+# -----------------------------------------------------------------------------
+# Inject trusted OpenBao administrative authentication through VAULT_TOKEN.
+# cluster_api = {
+#   kubeconfig_path =
+#   api_host        =
+# }
+# -----------------------------------------------------------------------------
+# Synthetic qualification — Required
+# -----------------------------------------------------------------------------
+# qualification = {
+#   openbao_address =
+#   auth_mount      =
+#   api_audience    =
+#   secret_path     =
+#   replicas        = 0
+# }

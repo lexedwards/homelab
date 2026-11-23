@@ -8,7 +8,7 @@ Intel/AMD peers. Their OS disks are replaceable; application data belongs off-no
 
 ## Ownership And Inputs
 
-`workers.tf` owns VMs and snippets in the existing cluster root/state. The empty
+`infrastructure/workers.tf` owns VMs and snippets in the infrastructure root/state. The empty
 `workers` default preserves the server-only deployment. Enable both physical-host
 entries using the input example: unique VM IDs/short names, explicit OS FQDNs,
 secondary bridges and a service VLAN distinct from the primary VLAN. Supply
@@ -124,7 +124,7 @@ workload Secret synchronization.
 After authorized provisioning and reservations, run from a trusted workstation:
 
 ```bash
-python3 scripts/enroll-worker.py \
+python3 scripts/workers/enroll-worker.py \
   --server-ssh '<admin>@<server-address>' \
   --worker-ssh '<admin>@<worker-primary-address>' \
   --identity-file '<approved-private-key>' \

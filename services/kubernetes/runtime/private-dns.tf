@@ -9,7 +9,7 @@ variable "private_dns_forwarding" {
 
   validation {
     condition = var.private_dns_forwarding == null ? true : (
-      var.secrets_platform != null &&
+      var.cluster_api != null &&
       length(var.private_dns_forwarding.zone) <= 253 &&
       length(split(".", var.private_dns_forwarding.zone)) >= 2 &&
       alltrue([for label in split(".", var.private_dns_forwarding.zone) : can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", label))]) &&

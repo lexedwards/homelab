@@ -1,6 +1,6 @@
 ---
 name: Separate Kubernetes API runtime state from VM provisioning
-status: accepted
+status: superseded by 017-kubernetes-deployment-roots
 ---
 
 # Separate Kubernetes API Runtime State From VM Provisioning

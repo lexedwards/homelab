@@ -39,11 +39,12 @@ See [ADR 008][decision] for the refresh/security trade-off and Kubernetes limits
 ## Protected Credential Operations
 
 After an authorized administrative apply, export the consuming root's enrollment
-output into a private file. For Kubernetes qualification, from its canonical runtime root:
+output into a private file. For Kubernetes qualification, use its canonical
+`services/kubernetes/examples/secret-delivery` root:
 
 ```bash
 umask 077
-tofu output -json secrets_qualification_enrollment > /protected/enrollment.json
+tofu output -json value_enrollment > /protected/enrollment.json
 ```
 
 An administrator can mint a writer directly through the named token role, or

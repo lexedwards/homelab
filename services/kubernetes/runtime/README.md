@@ -1,85 +1,64 @@
-# Kubernetes API Runtime
+# Kubernetes API runtime
 
-This OpenTofu root owns API-managed cluster configuration separately from the
-parent VM/provisioning state. Kubernetes or OpenBao API outages therefore do not
-prevent planning VM recovery in the parent root. See [the decision][decision] and
-[mounted-secret operations][secrets] for ownership, inputs and apply phases.
+This OpenTofu root owns post-boot platform configuration, independently of
+[infrastructure](../infrastructure/README.md). Its API providers must never be a
+dependency of VM recovery planning.
 
-All persisted operations run from the canonical checkout's
-`services/kubernetes/runtime` directory on `main`. This root has
-its own protected `terraform.tfstate`; preserve the existing parent Kubernetes
-and sibling OpenBao states. Nothing is migrated or split out of those states:
-the earlier API rollout was paused before creating any managed runtime objects.
-Never copy a feature-worktree state into production or apply the parent VM plan
-from this directory.
+## Shared connection
 
-Optional `cluster_api` supplies a protected kubeconfig independently of OpenBao
-integration. Without it, the existing `secrets_platform` connection is unchanged.
-Optional `observability` owns the native metrics release and explicit network
-policies; see [collection operations](../OBSERVABILITY.md). It does not enroll
-credentials or consume warehouse state.
+Supply `cluster_api` with a protected administrator `kubeconfig_path` and the
+reviewed stable `api_host`. For worker prerequisites, also supply `ssh_user` and
+the full `workers` cohort. The latter fields come from infrastructure's privately
+exported `runtime_connection`; inspect that export before use. There is no
+remote-state read and no authentication fallback tied to workload-secret enablement.
 
-Run `make init` then `make validate` locally. These initialize providers and check
-OpenTofu formatting/validation and literal service boundaries, not deployments.
-Parent `make init`/`make validate`
-include this root. Live plans require the previously applied non-secret metadata
-output from the parent infrastructure root, a privately published OpenBao endpoint
-export (`openbao_endpoint_file`), protected Kubernetes credentials,
-non-root OpenBao administration through native `VAULT_TOKEN` and reviewed worker trust. Review a
-saved runtime plan before applying it. A native chart object is not Ready proof;
-wait for real CRDs/releases before enabling service definitions.
+Each feature is independently optional:
 
-This is a privileged platform/authorization root, not an ordinary app deployment
-identity. Its qualification definition also enrolls a separate exact-record
-writer token role and bounded issuer policy. `secrets_qualification_enrollment`
-exports only non-secret issuance metadata. Mint tokens and populate values through
-the protected OpenBao helper, never through OpenTofu. That writer cannot manage
-or refresh this root's auth resources; authorization remains administrative.
+| Input | Owned configuration |
+| --- | --- |
+| `observability` | Pinned monitoring chart, namespace and bounded Kubernetes/Cilium policies; metrics/logs/events export to the warehouse |
+| `secrets_platform` | CSI/provider charts, verified worker SELinux preparation/readiness labels, TokenReview role and OpenBao Kubernetes auth |
+| `private_dns_forwarding` | Native CoreDNS conditional forwarding for one exact private suffix |
 
-Optional `recovery_custody` similarly defines only two fingerprint-addressed
-recovery records and their separate bounded writer/issuer, after checking the
-initialized cluster UID. Paths and authorization names use the stable friendly
-`cluster_name`, not that UID. It grants no workload read access and populates nothing.
-See [backup custody and host operations](../BACKUP.md); six-hour native backups do
-not depend on this API-managed authorization stage being available.
+Telemetry and private DNS need only the common API connection, not CSI/OpenBao
+workload integration. The secret platform accepts a nonempty reviewed worker
+cohort, not a fixed two-worker topology. Its additional `openbao_endpoint_file`
+is the published JSON endpoint, never another service's state; administration
+uses native `VAULT_TOKEN`. Worker preparation requires approved SSH trust and
+checks node UIDs before/after changing only the provider directory.
 
-Reusable implementations live in repository-level `modules/`; this root imports
-no module, script or state from another service. OpenBao publishes its endpoint
-as a JSON output export, not access to its hosting state. Republish after endpoint
-changes. The parent Kubernetes state remains a same-service metadata interface.
+## Deployment and ownership
 
-Enabled runtime plans fetch pinned charts over HTTPS and fail on checksum or
-network errors. No charts are vendored and there is no offline fallback. Saved
-plans contain the verified chart bytes; cluster image pulls still require
-reachable registries. Reliable internet access is an operating prerequisite.
+Run `make init` and `make validate` locally. For separately authorized canonical
+operations, inspect a fresh `make plan` and apply only the unchanged `PLAN_FILE`.
+Feature worktrees never own live state. Confirm real chart/CRD readiness after
+apply; a HelmChart object alone is not a running release.
 
-The CSI driver archive uses an immutable publisher commit because its original
-Pages URL was repacked without changing the chart version or unpacked contents.
-The reviewed checksum and deployed archive bytes remain unchanged.
+OpenTofu owns native RKE2 HelmChart objects; RKE2 owns the releases. Do not apply
+inspection exports or direct Helm writes alongside these owners. Private DNS
+owns only `rke2-coredns` HelmChartConfig, not its rendered ConfigMap or release.
+Keep the private forwarding resolver internal; mixed public/private resolvers
+can return intermittent negative answers. Follow [DNS checks](../SECRETS.md).
 
-## Private DNS routing
+Normal runtime has no synthetic applications or recovery-custody writer grants.
+[Secret-delivery fixtures](../examples/secret-delivery/README.md) use an explicitly
+invoked separate example root, only after CSI CRDs and Kata prerequisites exist.
+Consuming services own their own exact secret access through shared repository
+modules. [Bootstrap](../bootstrap/README.md) owns independent recovery access;
+actual values and independent custody stay outside state.
 
-Set optional `private_dns_forwarding` in protected runtime inputs to an exact
-private suffix (`zone`) and its existing internal IPv4 `resolver`. The enabled
-`secrets_platform` currently supplies this root's API authentication and trust.
-Do not mix public resolvers with internal resolvers for private-zone forwarding:
-public negative answers can produce intermittent resolution failures.
+## Removal and limits
 
-This root owns only the native `rke2-coredns` HelmChartConfig. RKE2 still owns
-the HelmChart and release; do not edit its rendered ConfigMap or install a second
-DNS server. The chart imports one mounted server-block file through `extraConfig`
-and `zoneFiles`, leaving its `servers` defaults, cluster discovery, public
-forwarding, image and availability settings unchanged. An existing chart config
-requires ownership review before adoption; do not force field ownership.
+Remove fixture consumers before CSI CRDs, then drain native releases before
+deleting their namespaces. Destroy runtime before the API/VMs. Namespaces, shared
+charts/auth mount and DNS config have destruction guards: explicitly review
+removal rather than bypassing state ownership. External OpenBao/warehouse services
+and stored values are not destroyed by this root.
 
-The interface was rendered against the RKE2-provided `rke2-coredns` chart
-`1.49.002`. Recheck that interface on RKE2 upgrades. After the approved canonical
-apply, wait for the native Helm rollout, verify every DNS backend returns the
-private address from both workers, and check cluster/public resolution. Then
-check failed consumer mounts retry successfully and the next plan converges.
-This changes cluster DNS configuration, not upstream DNS records, firewall rules,
-guest resolvers or OpenBao ownership. Disabling the input is destruction-guarded;
-review rollback explicitly rather than deleting the config out of band.
+Enabled plans download pinned charts over verified HTTPS and check their bytes.
+Offline mocked tests establish configuration behavior, not API/SSH authorization,
+network enforcement, chart readiness or warehouse ingestion. Native chart/Alloy
+inspection is separately available through the service Makefile.
 
-[decision]: ../../../docs/adrs/010-kubernetes-runtime-state-boundary.md
-[secrets]: ../SECRETS.md
+See [secrets](../SECRETS.md), [observability](../OBSERVABILITY.md) and
+[ADR 017](../../../docs/adrs/017-kubernetes-deployment-roots.md).

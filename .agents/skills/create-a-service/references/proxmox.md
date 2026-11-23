@@ -17,7 +17,7 @@ implementation reference.
    values in first-boot data. Its optional SSH introduction hook is isolated from
    VM replacement; its access root owns authorization, not credential values.
    Its full-control VM resource is not the default for every new clone.
-   `services/kubernetes/cloud-init.tf` demonstrates the Rocky/RKE2 alternative:
+   `services/kubernetes/infrastructure/cloud-init.tf` demonstrates the Rocky/RKE2 alternative:
    native distribution packages and signed `yum_repos`, with a bounded explicit
    install command preserving RKE2 repository exclusions. Workers request a reboot
    only when module availability requires it and retain the separate token gate.

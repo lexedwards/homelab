@@ -1,439 +1,58 @@
 # Kubernetes
 
-This OpenTofu root defines the Rocky Linux 10 amd64 RKE2 control-plane VM on
-`compute`, with one colocated etcd member and RKE2-managed Cilium, and an optional
-worker on each physical host. [Worker enrollment and runtime operations][workers]
-are separate from first-boot provisioning. VLAN service pools, application policy
-and NFS storage retain their explicit rollout boundaries. OpenBao workload-secret
-delivery has a separately enabled [API runtime root](runtime/README.md) alongside it.
-Durable rationale is in the [ADRs][adrs].
-
-[Observability](OBSERVABILITY.md) defines opt-in chart-managed metrics collection
-and native Cilium metrics enablement. Local configuration checks do not establish
-warehouse ingestion or authorize a rollout.
-
-[Workload network policy](NETWORK-POLICY.md) provides an explicitly scoped
-namespace baseline, synthetic examples and bounded direct-peer checks. It is not
-automatically applied by infrastructure provisioning.
-
-[Service exposure](SERVICE-EXPOSURE.md) describes opt-in private Cilium IPAM/L2
-outputs, the native RKE2 chart lifecycle and client-side qualification. Rendering
-the outputs does not deploy them or authorize a shared-datapath rollout.
-
-[Retained NFS storage](NFS.md) provides a pinned worker-only CSI chart and opt-in
-private StorageClass/qualification outputs. TrueNAS ownership, client restrictions,
-quota and backups remain an explicit operator boundary; local checks do not prove
-real-backend compatibility.
-
-[Mounted-secret delivery](SECRETS.md) has an opt-in OpenTofu-owned runtime root
-for native RKE2 charts, worker prerequisites, OpenBao Kubernetes auth and exact
-service access definitions. Its separate state preserves VM recovery when those
-APIs are unavailable. It preserves bootstrap and keeps actual values
-and credentials outside state/plans. Offline tools remain inspection helpers,
-not competing live owners. Enabling the layer requires separate reviewed applies.
-
-Local validation does not contact infrastructure. The deployed server passed
-DHCP-only first boot, healthy single-member etcd, control-plane scheduling
-restriction, and initialized-datastore guest reboot checks.
-The [worker](WORKERS.md), [policy](NETWORK-POLICY.md),
-[exposure](SERVICE-EXPOSURE.md), [NFS](NFS.md), and [secret](SECRETS.md) guides
-describe their qualification results and limits. Recorded results do not replace
-fresh health checks before maintenance.
-
-[Cluster storage and publication](artifacts/README.md) declares separate backup
-and configuration buckets for a stable friendly cluster name. Publisher access
-is exactly `kubeconfig.yaml` from the outset; UID/CA remain identity evidence.
-Publication never uses the backup bucket or places operator S3 credentials on the host.
-The VM installs fixed tools; enrollment metadata never changes those assets.
-
-[Guarded bootstrap and recovery](RECOVERY.md) adds an independent OpenBao
-authorization root and one automatic discovery procedure, without lifecycle
-switches in Terraform. With `bootstrap_access`, apply automatically introduces
-OpenBao access over verified SSH after VM/DNS creation. An empty host waits for
-that enrollment; uncertainty or missing backups for a known cluster cannot create
-a new one. External OpenBao and RustFS are accepted recovery dependencies; no
-local-only restore route is required. This path is not yet live-qualified;
-deployment and qualification must use canonical `main` after merge and approval.
-
-[Off-node etcd backups](BACKUP.md) provide a separately installed native CLI
-workflow, protected recovery-custody boundary and six-hour timer. They do not
-modify VM/bootstrap state. See [lifecycle runbooks][lifecycle] for maintenance,
-server-first upgrades, outage/recovery and future three-server expansion, with
-verified evidence distinguished from unrehearsed procedures and accepted risks.
-
-## Dependencies
-
-- Reviewed Rocky template, image provenance and a supported full-clone path;
-  this root does not own or update the image catalogue.
-- Available guest ID, disk capacity, a snippets-capable datastore and tagged
-  primary bridge on `compute`.
-- DHCP on the primary VLAN. A reservation is not needed before initial deployment;
-  reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
-  Reservations are lease management, not a cluster-persistence requirement.
-  Replacement may allocate a new MAC/address; the managed API DNS record follows
-  the discovered primary address while the API/registration name remains stable.
-- DHCP-provided DNS must resolve the private API name without cluster DNS.
-- Existing Technitium zone and service-owned API/worker A records that are not
-  already owned elsewhere. Optional worker PTR ownership needs an approved
-  existing reverse zone. The API name stays stable through future HA expansion.
-- OpenTofu 1.11+ for ephemeral enrollment credentials, Python 3, and yamllint.
-  Providers are pinned by the lock file.
-  Offline bootstrap filesystem checks also need Linux bubblewrap and enabled
-  unprivileged user namespaces; they make no network or RKE2 calls.
-  Optional chart inspection helpers additionally require PyYAML and Helm.
-- Scoped Proxmox and DNS API authentication over verified HTTPS, and an approved
-  node SSH identity loaded into the local SSH agent for snippet upload.
-
-## Local preparation
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
-chmod 600 terraform.tfvars
-make init
-make validate
-```
-
-Fill the commented required inputs privately before an online operation. The
-example deliberately contains no working guest IDs, VLANs, hostnames, addresses,
-datastore names, usernames or SSH keys. Optional sizing and pinned package values
-are declared in `variables.tf`; all other deployment choices are required inputs.
-Use ignored tfvars for stable configuration, or `TF_VAR_...` for declared inputs.
-Automatically loaded tfvars take precedence over environment-supplied root inputs.
-
-Authentication uses provider-native `PROXMOX_VE_API_TOKEN` and
-`TECHNITIUM_API_TOKEN`; do not put token literals in command history or tfvars.
-The Proxmox provider uses the SSH agent, not a private-key file variable. The
-Technitium provider enforces `skip_tls_verify = false`; private CA trust must be
-configured through its supported trust environment. Proxmox verification is also
-on unless a separately approved exception explicitly overrides it.
-
-### Independent qualification deployments
-
-`snippet_namespace` defaults to `null`, preserving all existing remote snippet
-filenames. A separate deployment on the same hosts must use a distinct namespace
-as well as disjoint VM IDs, DNS records and explicit private inputs. Workspaces
-isolate state, not remote filenames. The namespace prefixes both user-data and
-network-data filenames for the server and workers without changing their contents.
-Changing it on an existing deployment changes VM initialization references and
-may replace guests; it is not an in-place rollout mechanism.
-
-`control_plane_protection` defaults to `true`. Setting protection to `false`
-requires an approved saved-plan apply before replacing an already protected
-server. Restore protection after the approved operation. This input does not
-change worker protection or authorize destruction. Proxmox allocates MACs;
-cluster continuity depends on stable DNS and restored Kubernetes identity, not
-on retaining a server MAC or IP address.
-
-For retained guests, follow the [server-only ownership handoff](RECOVERY.md#retained-server-ownership-handoff)
-before generating a replacement plan. Never use a copied experimental root or
-import a VM into a second authoritative state.
-
-`make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
-checks and the repository's literal service-boundary check, including the runtime
-root, configuration-artifacts root and independent recovery-authorization root.
-`make test` checks worker DNS transformations:
-case-insensitive primary-MAC address selection, loopback/link-local filtering,
-and reversed IPv4 PTR names, with the DNS provider mocked. It also checks optional
-fixed installation's YAML/base64 composition and separate enrollment document.
-The snippet tests also check unchanged default filenames and namespace composition
-across server and worker user-data and network-data. These checks use mocked
-infrastructure providers, not a live deployment plan. Native variable and lifecycle validation
-retain responsibility for invalid inputs.
-
-These checks do not exercise RPM installation, kernel boot, SELinux policy,
-authenticated DNS publication or runtime readiness. No infrastructure is created
-or contacted. Init downloads providers but does not plan or deploy it.
-
-## Reviewed plan and deployment
-
-Only after separate authorization, verify template/key fingerprints, current
-guest-ID availability, snippets storage and DNS record ownership. Proxmox always
-manages the NIC MAC; this root provides no MAC override, generated-MAC convention
-or node-IP input.
-Use DHCP and reserve the observed lease upstream; do not guess a free IP.
-The initial DNS target is unknown until the guest agent reports its DHCP lease.
-
-```bash
-make plan
-tofu show deployment.tfplan
-make apply
-```
-
-These are online operations, not validation commands. Inspect the saved plan
-privately in this workflow before applying it; configuration changes invalidate
-that review. Apply only the inspected, unchanged plan. Keep state, plans, rendered
-cloud-init and local inputs protected and securely backed up. Sensitive markings
-redact normal output; they do not encrypt stored data.
-
-Run persistent plans/applies only from the canonical checkout on `main`, using
-its existing default-workspace state. Feature worktrees are for development and
-local validation, not a second deployment state.
-
-The server and future worker resources belong to one root/state with separate
-resource groups and operational procedures. The explicit server resource uses
-the full-control VM clone API because it must own cloud-init, protection,
-guest-agent, UEFI/Q35, Secure Boot and on-boot settings. Do not switch resource
-models or import a different owner without a reviewed migration.
-
-## First boot and readiness
-
-`cloud-init/network-data.yaml` supplies complete version-2 network-data through
-`initialization.network_data_file_id`. It enables DHCP on `ens18` without static
-addresses, routes, nameservers or MAC matching. NetworkManager accepts DNS from
-DHCP; Proxmox's host-resolver defaults are not injected into this custom document.
-The generated `ip_config` path is deliberately omitted. This is separate from
-user-data, not a post-boot command or a helper that rewrites network settings.
-
-`ens18` is the primary VirtIO interface in the reviewed Rocky/Q35 single-NIC
-layout. Revalidate this mapping if the image or PCI/NIC layout changes. Workers
-use separate primary network-data and a native secondary NetworkManager profile;
-see the [worker runbook][workers] for the renderer limitation, explicit secondary
-profile activation and module-availability-based reboot decision.
-
-The pinned HashiCorp cloudinit provider composes plain MIME user-data; network-data
-stays separate. `cloud-init/node-baseline.yaml.tftpl` is shared by the server and
-workers. It declares distribution packages, signed EL10
-repositories, the reviewed Rancher key, module/sysctl files and tmpfiles rules.
-Role templates retain identity, SSH, RKE2 configuration and activation gates.
-
-Cloud-init creates the approved non-root administrator, replaces that user's
-authorized-key file with the reviewed operator keys, disables root/password SSH
-and installs/enables the QEMU guest agent. It writes the API identity,
-internal CIDRs, server taint and managed-Cilium configuration before
-starting the cluster. No Kubernetes token, kubeconfig or private certificate is
-supplied to OpenTofu/cloud-init. The separately introduced AppRole obtains the
-existing or initial server token and application credentials from OpenBao.
-Discovery happens at runtime, not through VM-root operation variables.
-
-Native cloud-init installs the distribution kernel/module prerequisites, audit
-and SELinux tooling; workers also receive NFS client tools. The remaining
-root-only first-boot procedure:
-
-1. Requires Rocky 10 amd64 and SELinux enforcing; refuses an existing etcd data
-   directory rather than treating first boot as an upgrade/restore tool.
-2. Checks that the declared prerequisites are installed, then installs exact RKE2
-   server/common/SELinux version-release packages, overriding only the two native
-   repositories' RKE2 exclusions for that command. Cloud-init's package module
-   cannot supply those repository-specific overrides; keeping this bounded command
-   avoids weakening the persistent update policy.
-3. Uses the reviewed key from `config/rancher-signing-key.asc`; both package and
-   repository signature checks remain enabled. The key's
-   reviewed primary fingerprint is `C8CFF216455126E9B9C918BE925EA29AE257814A`.
-   SHA-256 is `7d2415f7fc532c365c8874bfad966566daaa0d04a9a5ba14d1db6080a9c12629`,
-   matching the previously pinned HTTPS publisher download. This is not an
-   independent release attestation. Repository key rotation fails closed and needs
-   a reviewed key-file update, not a new download trusted during boot.
-4. Disables guest swap, applies declared directory/file permissions with native
-   systemd-tmpfiles and preserves SELinux labels. Module-loading, forwarding and
-   NetworkManager exclusions are declared before installation, not written by the
-   procedure. It does not load newly installed modules into the template's old
-   running kernel, or disable SELinux or the guest firewall.
-5. Enables the RKE2 server and creates an installation marker only on success.
-   The systemd unit requires that marker. Cloud-init then reboots the guest into
-   the installed kernel. RKE2 first starts on the subsequent boot; its preflight
-   rejects non-enforcing mode or active swap, loads the required modules for the
-   running kernel, and applies the Kubernetes sysctl file. A missing module or
-   failed sysctl causes startup to fail rather than continuing without it.
-6. The fixed bootstrap pre-start gate preserves initialized data and rejects
-   incomplete resets. An empty host waits for separate enrollment, then discovers
-   whether to join, restore or create using the endpoint, independent identity and
-   S3 evidence. Missing or uncertain inputs never become new-cluster creation.
-
-The repository excludes RKE2 packages from ordinary DNF updates; only the explicit
-first-boot command clears those two repository exclusions while selecting exact
-versions. This is not an upgrade procedure: use the later reviewed server-first
-upgrade workflow, and never rerun first-boot provisioning against useful etcd data.
-OS kernel updates remain distinct and can require planned guest reboots.
-
-### Reserve the first lease after deployment
-
-Inspect `tofu output -json control_plane_dhcp_lease` locally after authorized apply.
-This explicitly reveals the private primary-NIC IP/MAC pair; keep it out of Git,
-tickets and public logs. Create the matching UniFi fixed DHCP reservation before
-accepting workloads or restarting/maintaining the server. Keep the existing IP;
-do not deliberately move the node as part of reservation creation.
-
-RKE2 discovers the node IP through its native address selection. No helper
-rewrites configuration, records an IP/MAC identity file or checks that pair on
-restart. Stable addressing is an upstream DHCP responsibility: if the lease
-changes, restore the original reservation and investigate before maintenance.
-Worker enrollment additionally verifies primary-interface/address selection;
-single-NIC server acceptance does not establish dual-NIC behavior.
-
-OpenTofu selects the guest-agent address by the managed primary NIC's MAC, not
-the first non-loopback/pod address, and publishes API DNS after VM address discovery.
-The API's stable DNS name remains in initial TLS SANs. Cilium uses that name with
-the configured API listener, not a rewritten node IP or the Kubernetes Service IP. The pinned
-RKE2-managed Cilium chart has no API-host default suitable for kube-proxy-free
-bootstrap. Its agent and operator use host networking and host DNS, so the
-external DNS record must resolve from the guest without CoreDNS/Cilium. The VM
-can report its DHCP address and RKE2 can start its API before Cilium is ready;
-DNS publication therefore does not depend on CNI readiness. Cilium may retry
-while DNS propagation completes. Verify this ordering during live qualification.
-With multiple usable addresses on the primary NIC, planning/apply fails rather
-than choosing one arbitrarily. DHCP discovery is not proof that a reservation is
-created, the IP cannot change, or cloud-init/cluster startup has completed.
-
-The guest-agent address output is sensitive and is **not** an API readiness claim.
-After separately authorized deployment/reboot, transfer the read-only checker to
-the guest and run it locally with protected kubeconfig access:
-
-```text
-sudo python3 check-control-plane.py --node-name <server-node-name> \
-  --expected-version <reviewed-rke2-version> \
-  --api-server '<private-verified-api-url>'
-```
-
-The checker defaults to a 300-second total observation bound and checks API
-readiness through the stable DNS/TLS identity, exactly one control-plane node,
-its expected Kubernetes version and NoSchedule taint, and Cilium rollout. It does
-not print API responses/command stderr or weaken certificate verification.
-`--timeout` accepts a positive number up to 900 seconds; `--kubectl` and
-`--kubeconfig` override the in-guest defaults. Exit 0 means those checks passed;
-nonzero means failure/timeout. It does **not** prove etcd member count, workload
-scheduling rejection, certificate renewal or application availability.
-
-Before accepting bootstrap, separately inspect actual single-member etcd
-membership using the installed RKE2 version's documented etcd administration
-procedure, and run the authorized untolerated-workload scheduling rejection
-check. A Ready API or one static etcd pod is not membership evidence. Record those
-results against the reviewed revision. Local tests and this checker alone do not
-establish bootstrap acceptance.
-
-## Ownership and network boundary
-
-This root owns its API A record, worker A records and explicitly enabled worker
-PTR records, not DNS zones. Each A record points to the node's observed primary
-DHCP address, never a workload service IP. Worker records use `api_dns.zone` and
-`api_dns.ttl`; see the [worker runbook][workers] for optional reverse-zone ownership
-and existing-record imports. `overwrite = false` preserves other RRset members;
-it does not detect conflicting records or competing state/DHCP owners. The
-private API FQDN remains in RKE2's initial TLS SAN list. DHCP reservations stay
-upstream; discovery and DNS publication do not create or prove their uniqueness.
-
-RKE2 alone owns the managed Cilium chart. Its pre-bootstrap `HelmChartConfig`
-selects kube-proxy replacement, VXLAN, Kubernetes IPAM and host-namespace-only
-socket load balancing for later Kata compatibility. The single server gets an
-explicit control-plane NoSchedule taint while critical components can tolerate it.
-Managed ingress options are disabled; no competing CNI, kube-proxy or application
-ingress controller is installed. Default bootstrap creates no LoadBalancer pools
-or L2 announcement policy. The separately enabled [service-exposure](SERVICE-EXPOSURE.md)
-outputs manage that runtime configuration without changing first-boot bytes.
-Ordinary pods are not attached directly to LAN VLANs.
-
-Keep VM infrastructure and workload lifecycle separate: this root authors the
-minimum bootstrap configuration; subsequent platform manifests are a separately
-invoked reviewed lifecycle, not an imperative remote-exec provisioner or an
-apply-everything Kubernetes provider. Changing cloud-init does not rerun it on an
-existing VM. Apply deliberate post-bootstrap configuration changes through their
-reviewed operating procedure instead of assuming snippet upload updated the guest.
-
-| Dependency | Required path |
-| --- | --- |
-| Administrators | SSH and Kubernetes API through the stable private identity |
-| Workers and additional servers | API and supervisor/registration listeners |
-| Node/CNI communication | RKE2/Cilium documented node paths, including kubelet and VXLAN where needed |
-| Additional etcd servers later | Server-only etcd peer/client listeners; not public/workload access |
-| First-boot outbound | Approved DNS/NTP, distribution/Rancher HTTPS package repos and release/container registries |
-
-Use existing routing/firewall ownership; do not expose these management ports to
-untrusted clients. Resolve exact listener values from protected configuration.
-First-boot failure must not be repaired by disabling firewall
-or SELinux globally. Use the linked policy/exposure procedures for their separate
-rollout and cross-worker checks.
-
-## Credentials, data and recovery
-
-After initial bootstrap, protect the generated secure server token through the
-reviewed out-of-band enrollment procedure: external OpenBao over verified HTTPS
-plus an independently accessible Proton Pass recovery copy. Do not print it in
-normal outputs, paste it into tickets, supply it as an OpenTofu variable or rely
-on an in-cluster controller. Retain the token material associated with retained
-snapshots; the newest token is not assumed sufficient for every recovery point.
-OpenBao HTTPS delivery precedes real secret enrollment. The separate API runtime
-root owns OpenBao workload authorization. NFS and service-exposure outputs have
-their own native deployment procedures. RKE2 owns scheduled off-node snapshots
-and retention; bootstrap completion enrolls its native S3 Secret from OpenBao.
-Alert delivery remains undecided.
-
-Irreplaceable control-plane data, bootstrap/certificate material and the token
-live on the VM OS disk. VM protection prevents ordinary destroy, not storage
-failure or data loss. Protection must be deliberately disabled in a reviewed
-change before destroy/replacement. VM destruction can delete its managed OS,
-EFI and cloud-init disks; it is not a recovery method once data matters.
-The source template remains separately owned; unreferenced disks are not opted
-into blanket deletion. Back up OpenTofu state independently and protect the
-corresponding RKE2 recovery material.
-
-The native backup defaults are six-hour snapshots, five local copies and 56
-remote copies in the dedicated off-node bucket, with verified TLS and independent
-token/credential custody. Override the native cron expression and retention counts
-in the external runtime profile; see [BACKUP.md](BACKUP.md). Count retention is not
-a guaranteed fourteen-day window, and versioned objects are not permanently purged.
-Approximately four hours is a planning recovery target, not an SLA or a qualified
-production restore duration. Earlier off-node backup evidence used the retired
-external timer; native scheduler integration needs its own approved live rollout
-and observed scheduled upload.
-An earlier isolated restore experiment failed and its implementation was retired;
-a later synthetic new-VM exercise restored the original cluster identity and an
-unchanged worker using a separate matching token. The maintained guarded bootstrap
-is locally checked but still needs live qualification from canonical `main`;
-that earlier proof does not qualify this implementation or production replacement. Do not
-call this server restore-qualified or assume a snapshot is a generic rollback path.
-Application-volume backup, storage HA and notification decisions are separate.
-
-## Restart, expansion and troubleshooting
-
-Use the [lifecycle runbooks][lifecycle] for operation ordering, prerequisites,
-stop/recovery decisions and post-maintenance checks. Documentation is not runtime
-authorization or evidence that an upgrade/outage exercise passed.
-
-Expect API/scheduling/reconciliation downtime for a single-server restart or
-`compute` outage. The initialized server passed guest-reboot checks; repeat
-identity/health checks after future maintenance without reconstructing etcd.
-Initial bootstrap failure may recreate only reviewed newly owned resources;
-after useful data exists, stop and agree a separately reviewed recovery plan.
-VM deletion, `cluster-reset` against production and unreviewed package downgrades
-are not implicit repair operations.
-
-### Recovering an earlier failed first boot
-
-Changing the cloud-init snippet does not repair an existing guest. Review recovery
-separately, preserving the VM, its current MAC/lease and canonical state. Proxmox
-allocates the MAC; reject an unexpected identity change or VM replacement.
-
-Adding or changing custom network-data can propose VM replacement through the
-provider's cloud-init lifecycle. It does not update an existing guest's active
-NetworkManager profile. Review a fresh canonical-main saved plan and its data,
-downtime and identity implications before authorizing rollout; do not recreate
-an initialized datastore without explicit approval for downtime and deletion of
-the current guest data.
-
-For a failure before RKE2 installation, first confirm there is no useful etcd
-data and that RKE2 is stopped. An authorized in-place recovery must keep the
-installer, preflight and rendered RKE2/Cilium configuration consistent.
-The installer remains first-boot-only: do not rerun cloud-init or use it to
-upgrade an initialized datastore. Inspect installation success, explicitly
-authorize the kernel reboot, then qualify API/DNS/Cilium, etcd membership,
-scheduling isolation and restart/rejoin. Neither a successful apply nor these
-local tests establish that a failed guest has recovered.
-
-### HA expansion
-
-The [one-to-three server design checklist](LIFECYCLE.md#future-one-to-three-server-expansion)
-preserves the existing server and stable API identity, covers the independent
-frontend and temporary two-member quorum risk, and defines review/stop points.
-It deploys no additional server or frontend and makes no current HA claim.
-
-### Troubleshooting
-
-For failures inspect `cloud-init status --long`, protected cloud-init logs,
-`systemctl status rke2-server`, and `journalctl -u rke2-server` in the guest.
-Check install-marker/reboot completion, repository/key/RPM versions, SELinux AVCs,
-DHCP/MAC/address correspondence and the managed Cilium Helm status. These logs
-may contain protected information; do not publish them wholesale. Do not rerun
-cloud-init or modify image-catalogue state as a troubleshooting shortcut.
-
-[adrs]: ../../docs/adrs/
-[workers]: WORKERS.md
-[lifecycle]: LIFECYCLE.md
+This directory is the service entry point, not an OpenTofu deployment root.
+Deploy from the owning subdirectory; the top-level Makefile only coordinates
+local preparation and checks.
+
+| Root | Owns | Requires a running Kubernetes API? |
+| --- | --- | --- |
+| [bootstrap](bootstrap/README.md) | External backup/configuration buckets and OpenBao bootstrap/value-enrollment authorization | No |
+| [infrastructure](infrastructure/README.md) | Proxmox VMs, DNS, immutable installation and verified-SSH enrollment | No for VM recovery planning |
+| [runtime](runtime/README.md) | API-managed telemetry, mounted workload secrets and private DNS forwarding | Yes |
+
+Each root has its own state. Keep bootstrap resources through VM replacement:
+destroying compute must not destroy snapshots or the independent token source.
+Native RKE2 owns snapshot scheduling, upload, count retention and membership reset.
+
+## Clean deployment
+
+1. Choose a new stable friendly cluster name and disjoint OpenBao record paths.
+   Confirm the previous owners are empty before reusing any VM/DNS identity.
+   Never copy obsolete tfvars, kubeconfigs or old state into a new owner.
+2. Apply bootstrap prerequisites from canonical `main` using an inspected plan.
+   Issue separate scoped backup/publisher credentials and enroll them, the initial
+   server token and runtime profile through protected out-of-band operations.
+   Preserve independent actual-token/credential custody; no values enter state.
+3. Provision infrastructure, establish the approved scoped SSH pin and introduce
+   bootstrap access. A fresh host waits without enrollment. The host discovers
+   create/join/restore; there is no manual mode switch or bypass of old history.
+4. Enroll any workers using [the worker procedure](WORKERS.md). Export non-secret
+   `runtime_connection` metadata and obtain the protected published kubeconfig.
+5. Configure/apply runtime features with that reviewed connection. Verify actual
+   releases, secret delivery, private DNS and warehouse ingestion as enabled.
+6. Verify a real native scheduled off-node snapshot and an actual download.
+   Qualify same-cluster restore separately before application adoption.
+
+An intentionally fresh cluster is not an existing-cluster restore. Existing
+identity or retained snapshot history blocks accidental creation. External
+OpenBao, RustFS, TrueNAS and the telemetry warehouse remain independently owned.
+
+## Local checks and optional tools
+
+Run `make init`, then `make validate` and `make test`. Init fetches providers but
+does not deploy. Tests use mocked providers or isolated local fixtures; passing
+checks do not establish live readiness. There is no service-root plan/apply target.
+
+[Script groups](scripts/README.md) distinguish guest runtime from operator tools
+and offline inspection. [Secret-delivery qualification](examples/secret-delivery/README.md)
+has a separate optional example root; it is never deployed by the three roots.
+
+Some platform integrations retain explicitly reviewed native-manifest workflows:
+[Kata/workers](WORKERS.md), [NFS](NFS.md), [service exposure](SERVICE-EXPOSURE.md)
+and [network policy](NETWORK-POLICY.md). They are not silently adopted into runtime.
+Consolidating their live ownership is a separate rollout, not a consequence of
+moving files.
+
+Operating guides: [recovery](RECOVERY.md), [backups](BACKUP.md),
+[lifecycle](LIFECYCLE.md), [secrets](SECRETS.md), [observability](OBSERVABILITY.md).
+See [ADR 017](../../docs/adrs/017-kubernetes-deployment-roots.md) for the boundary.

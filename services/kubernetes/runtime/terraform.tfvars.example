@@ -1,29 +1,32 @@
-# Copy to terraform.tfvars, fill runtime configuration, and never commit it.
-# Runtime-only definitions. Keep populated metadata private and actual values out.
+# Copy to terraform.tfvars, fill enabled feature inputs, and never commit it.
 # -----------------------------------------------------------------------------
-# Provider
+# Provider — Optional until a feature is enabled
 # -----------------------------------------------------------------------------
-# Inject VAULT_TOKEN through the provider's native environment channel, never tfvars.
-# Load the approved guest SSH identity into the operator's agent.
-# API/SSH-user/worker-cohort metadata comes from the infrastructure state.
-# OpenBao publishes its api_endpoint JSON output; never read the hosting state.
-# Required when secrets_platform is enabled:
-# openbao_endpoint_file =
-
+# Inject VAULT_TOKEN for secret-platform administration; never persist it here.
+# cluster_api = null
+# cluster_api = {
+#   kubeconfig_path =
+#   api_host        =
+#   ssh_user        = null
+#   workers         = []
+# }
+# API/SSH/cohort metadata comes from an inspected infrastructure output export,
+# not a state read. SSH user/workers are required only for the secret platform.
+# openbao_endpoint_file = null
+# Supply the absolute published OpenBao api_endpoint JSON file when enabling CSI.
 # -----------------------------------------------------------------------------
-# Core (optional until the cluster is enrolled)
+# Mounted workload secrets — Optional
 # -----------------------------------------------------------------------------
 # secrets_platform = null
 # secrets_platform = {
-#   kubeconfig_path =
-#   auth_mount      =
-#   api_audience    =
+#   auth_mount   =
+#   api_audience =
 #   workers = {
-#     # Both actual worker names: { node_uid = <verified>, host_key = <pinned public key> }
+#     # Each reviewed worker name maps to { node_uid = ..., host_key = ... }.
 #   }
 # }
 # -----------------------------------------------------------------------------
-# Private DNS (optional; requires enabled API runtime inputs)
+# Private DNS forwarding — Optional, independent of workload secrets
 # -----------------------------------------------------------------------------
 # private_dns_forwarding = null
 # private_dns_forwarding = {
@@ -31,12 +34,8 @@
 #   resolver =
 # }
 # -----------------------------------------------------------------------------
-# Observability (optional; credentials stay in the protected kubeconfig)
+# Observability — Optional, independent of workload secrets
 # -----------------------------------------------------------------------------
-# cluster_api = null
-# cluster_api = {
-#   kubeconfig_path =
-# }
 # observability = null
 # observability = {
 #   cluster_name        =
@@ -47,24 +46,4 @@
 #   node_ipv4_addresses = []
 #   api_ipv4_addresses  = []
 #   allow_plaintext     = false
-# }
-# -----------------------------------------------------------------------------
-# Qualification (optional; enable only after the platform CRDs are installed)
-# -----------------------------------------------------------------------------
-# secrets_qualification = null
-# secrets_qualification = {
-#   secret_path =
-#   replicas    = 0
-# }
-
-# -----------------------------------------------------------------------------
-# Recovery custody (optional administrative definitions, never populated values)
-# -----------------------------------------------------------------------------
-# recovery_custody = null
-# recovery_custody = {
-#   kv_v2_mount              =
-#   cluster_uid              =
-#   cluster_name             =
-#   server_token_hash        =
-#   backup_credential_sha256 =
 # }

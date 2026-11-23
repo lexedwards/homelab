@@ -1,8 +1,8 @@
 # OpenBao Mounted-Secret Authentication
 
-`runtime/secrets.tf` manages the cluster's CSI/provider platform, worker prerequisites,
-native OpenBao Kubernetes auth and optional owned qualification service in the
-adjacent API runtime root/state. The existing VM state and bootstrap are unchanged.
+`runtime/secrets.tf` manages the cluster's CSI/provider platform, worker prerequisites
+and native OpenBao Kubernetes auth. Synthetic consumers have a separate explicitly
+invoked [example root](examples/secret-delivery/README.md), not normal runtime inputs.
 This [state boundary][runtime-state] keeps VM recovery planning independent of
 an unavailable Kubernetes API or sealed OpenBao. Native RKE2
 Helm still owns the releases; OpenTofu owns their HelmChart API objects, not a
@@ -26,8 +26,8 @@ backend network-outage behavior remain unproven.
 Everything defaults off. First establish the cluster and enrolled workers using
 the existing infrastructure lifecycle. After separate review/authorization,
 enable `secrets_platform` in the canonical `services/kubernetes/runtime` root's
-private inputs. Its new protected state owns only API runtime configuration;
-the two existing infrastructure states are preserved, not copied or split.
+private inputs. Its protected state owns only API runtime configuration;
+infrastructure and bootstrap retain their separate owners.
 No persisted apply runs from a feature worktree.
 
 - OpenBao's service root exports `api_endpoint`, derived from its service-owned
@@ -37,19 +37,16 @@ No persisted apply runs from a feature worktree.
   absolute path as `openbao_endpoint_file`. Do not duplicate its hostname/port,
   import its service implementation, read its state or expose authentication.
   Republish the export after endpoint changes; consumers validate the JSON origin.
-- The runtime root reads only its own service's parent Kubernetes state's
-  `runtime_connection` output. Make that available through a
-  reviewed output-only parent apply first. It supplies the stable API origin,
-  SSH user and complete worker cohort, not credentials.
-  This same-service state access still exposes the whole protected provisioning
-  state, not only its output. Keep it protected and free of actual secret values.
-  Both infrastructure states remain authoritative. The parent root
-  has no Kubernetes or OpenBao API provider dependency.
-- Supply an explicit protected `kubeconfig_path`. The provider is pinned to the
+- Export infrastructure's `runtime_connection` privately and inspect it. Supply
+  its stable API origin, SSH user and complete worker cohort through runtime's
+  common `cluster_api`, alongside the protected `kubeconfig_path`. Runtime reads
+  no other root's whole state. The infrastructure root has no Kubernetes or
+  OpenBao provider dependency.
+- Supply an explicit protected `cluster_api.kubeconfig_path`. The provider is pinned to the
   cluster's existing API DNS name and verified TLS, and obtains the public API CA
   from the cluster's `kube-root-ca.crt` ConfigMap. The API audience remains a
   declared, verified cluster identity input, not a guessed hostname default.
-- Supply both workers' verified Node UIDs and pinned public SSH host keys. These
+- Supply the reviewed worker cohort's verified Node UIDs and pinned public SSH host keys. These
   are deployment metadata, not private keys. Worker addresses come from the
   authenticated Node API, not static IP/MAC overrides. Load the approved guest
   and Proxmox SSH identities into the operator's agent; no private-key/password
@@ -95,13 +92,13 @@ taint in canonical state; never destroy/re-enable it to work around a read denia
 
 ### Apply phases and qualification
 
-1. **Platform:** keep `secrets_qualification = null`. Review/apply the saved
+1. **Platform:** review/apply the saved
    platform plan from canonical `main` in `services/kubernetes/runtime`, using
-   that root's runtime state, never the parent VM plan/state. Wait for both
-   worker DaemonSets, node registrations, native releases and both driver CRDs.
+   that root's runtime state, never the infrastructure plan/state. Wait for both
+   driver/provider DaemonSets across the worker cohort, native releases and both CRDs.
    Creating HelmChart objects alone does not prove the releases are Ready.
-2. **Service definition:** set `secrets_qualification` to an approved exact
-   KV-v2 record path, initially with `replicas = 0`. Plan/apply separately after
+2. **Service definition:** use `examples/secret-delivery` with an approved exact
+   KV-v2 record path and `qualification.replicas = 0`. Plan/apply separately after
    the CRDs exist: `kubernetes_manifest` needs their schema during planning;
    `depends_on` cannot make a missing CRD available to an earlier plan. This
    creates the owned namespace/account, default-deny policy, read policy/auth
@@ -114,15 +111,15 @@ taint in canonical state; never destroy/re-enable it to work around a read denia
    but omits empty rule lists. With no rules it still denies both directions;
    omission matches the API representation and avoids manifest-provider
    inconsistent-result errors from empty-list-to-null normalization.
-3. **Value enrollment and consumers:** export `secrets_qualification_enrollment`
+3. **Value enrollment and consumers:** export the example root's `value_enrollment`
    privately. Use OpenBao's [protected credential helper][deployment-credentials]
    to mint a bounded value-writer and populate only its declared synthetic record
    through stdin. Issuer/admin credentials must never reach the pods.
-   Set `replicas = 2`, inspect a fresh plan and apply it from canonical `main`.
+   Set `qualification.replicas = 2`, inspect a fresh plan and apply it from canonical `main`.
    Perform the ordinary/Kata file-delivery, reload and identity checks below.
-4. **Park/dispose:** return replicas to zero through a reviewed OpenTofu apply,
-   not an out-of-band scale that the next apply would undo. Removing the optional
-   qualification declaration plans removal of only its owned definition/workloads,
+4. **Park/dispose:** return example replicas to zero through a reviewed OpenTofu apply,
+   not an out-of-band scale that the next apply would undo. Destroy the optional
+   qualification root through its owning state, removing only its definition/workloads,
    not the shared platform or stored OpenBao values. Value deletion needs its own
    approved disposition. Preserve the retained NFS claim and initialized cluster.
 
@@ -148,8 +145,8 @@ not mean the ordinary deployer can author or broaden its own permissions.
 Declare repository-level `modules/openbao-deployment-access` alongside the consuming service's
 authorization, using the same exact record paths. It defines only record-write
 permissions, a bounded token role and an optional delegated issuer policy; no
-credential or value is created by OpenTofu. The Kubernetes runtime root does this
-for its own qualification service and exports private enrollment metadata.
+credential or value is created by OpenTofu. The optional secret-delivery example
+root does this for its qualification service and exports private enrollment metadata.
 Writers can create/update those records but cannot read values/metadata, list,
 patch, delete, mint tokens, or edit auth roles/policies. Reader workloads retain
 only their exact record-read policy. Kubernetes workload/host administration can
@@ -198,8 +195,8 @@ Follow [ADR 002][ownership]. Each deployed object has one OpenTofu owner:
 | Operator | Protected value-enrollment workflow | Secret population and independent OpenBao recovery custody |
 
 The service caller declares its namespace and account in its own OpenTofu root;
-the access module does not create them. For the built-in qualification service,
-the runtime root declares `secrets-check` and `reader` and orders their creation
+the access module does not create them. For the optional qualification service,
+the example root declares `secrets-check` and `reader` and orders their creation
 before the access module. No manual namespace/account creation is required.
 Review existing object names before applying and stop on an ownership conflict.
 Do not let each service reconcile the shared platform resources.
@@ -267,7 +264,7 @@ or nested-field syntax is supported by this initial interface.
 From this service directory:
 
 ```bash
-python3 -B scripts/prepare-secret-auth.py \
+python3 -B scripts/secrets/prepare-secret-auth.py \
   --input /protected/location/auth.json \
   --output-dir /protected/location/prepared-auth
 ```
@@ -333,7 +330,7 @@ compatibility checks.
 
 Chart archives are not stored in Git. With the platform enabled, normal runtime
 planning downloads both pinned HTTPS release URLs from the blueprint annotations
-through `download-secret-chart.py`. A changed checksum, unavailable source or
+through `scripts/charts/download-chart.py`. A changed checksum, unavailable source or
 download failure stops planning. No cached or vendored fallback is used.
 OpenTofu embeds the verified bytes in native `chartContent`; a saved-plan apply
 uses those reviewed bytes rather than downloading a potentially different chart.
@@ -425,7 +422,7 @@ second driver/provider owner.
 ### Worker provider-directory preparation
 
 `terraform_data.secrets_provider_directory` runs the source-controlled
-`label-secrets-provider.py --apply` over agent-authenticated SSH with the pinned
+`scripts/secrets/prepare-provider-directory.py --apply` over agent-authenticated SSH with the pinned
 public host key. It checks the approved Node UID before execution and the
 capability-label resource rechecks the Node after preparation. Script/Node UID
 changes retrigger preparation. It is a bounded apply-time enrollment operation,
@@ -443,7 +440,7 @@ as root without flags. Do not rerun host changes or set capability labels outsid
 the owned lifecycle just to hide a failed plan:
 
 ```bash
-sudo python3 -B /protected/location/label-secrets-provider.py
+sudo python3 -B /protected/location/prepare-provider-directory.py
 ```
 
 It requires an enrolled Rocky 10 amd64 worker with active RKE2 agent, enforcing
@@ -521,4 +518,4 @@ disposition. Preserve the existing NFS witness claim and shared platform objects
 [ownership]: ../../docs/adrs/002-openbao-service-configuration-ownership.md
 [administrative-auth]: ../../docs/adrs/008-openbao-administrative-authorization.md
 [deployment-credentials]: ../../modules/openbao-deployment-access/README.md#protected-credential-operations
-[runtime-state]: ../../docs/adrs/010-kubernetes-runtime-state-boundary.md
+[runtime-state]: ../../docs/adrs/017-kubernetes-deployment-roots.md

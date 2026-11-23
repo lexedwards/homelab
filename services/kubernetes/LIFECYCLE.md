@@ -15,7 +15,7 @@ worker on each Proxmox host. The control plane is not highly available.
 | Backups | Earlier upload/custody evidence used a separate timer. The replacement integration delegates schedule, upload and retention to RKE2; native scheduled upload needs approved live verification. |
 | Worker maintenance | Replacement and planned drained reboot checks passed; do not repeat them merely to complete documentation. |
 | Control-plane recovery | An earlier failed experiment was retired. A later synthetic new-VM native restore preserved cluster identity and an unchanged worker, with a new server Node name. Maintained restore bootstrap and production replacement remain unqualified. |
-| Kubeconfig publication | Separate-bucket synthetic OpenBao enrollment, first publication, conditional refresh, administrator download and native timer recovery passed. Production rollout remains a separate operation; see the [artifact procedure](artifacts/README.md). |
+| Kubeconfig publication | Separate-bucket synthetic enrollment, first publication, conditional refresh and administrator download passed before retirement. A clean rebuild needs fresh acceptance; see the [bootstrap procedure](bootstrap/README.md). |
 | Server-first upgrade and bounded host-loss exercises | Procedures below are unrehearsed, not runtime acceptance evidence. |
 | Three-server expansion | Future design only; no extra server or HA frontend is deployed by this runbook. |
 
@@ -122,7 +122,7 @@ the change plan rather than treating this document as a new version pin.
 6. Before touching a worker, require the target server version, API readiness
    through the stable TLS endpoint, unchanged node/CA/etcd identities, healthy
    single-member etcd, retained taint and converged Cilium/Helm resources. The
-   read-only `scripts/check-control-plane.py` supports an explicit
+   read-only `scripts/checks/check-control-plane.py` supports an explicit
    `--expected-version`, but checks neither etcd membership nor application health.
 7. Upgrade one drained worker's exact agent/common/SELinux RPM set, restart
    `rke2-agent`, then complete the worker return-to-service checks above. Verify
