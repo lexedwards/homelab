@@ -151,6 +151,76 @@ Node using [BACKUP.md](BACKUP.md); its independent custody and retention gates a
 not bypassed by successful bootstrap. Application volumes and OpenBao/KMS loss
 recovery remain separate concerns.
 
+## Retained-server ownership handoff
+
+This is a separately approved state operation, not a VM replacement or permission
+to apply a copied root. Work from canonical `main`. Preserve the existing sole
+server owner until the handoff is approved. A second workspace cannot by itself
+isolate remote files: set a distinct `snippet_namespace` and review every VM ID,
+snippet path and DNS record before using a qualification workspace.
+
+For local state, prepare these exact inputs in a protected operator record:
+
+- Source state path, lineage, serial and hash, and the one server VM resource
+  address, provider and native VM ID.
+- Destination workspace/state path and its canonical address,
+  `proxmox_virtual_environment_vm.control_plane`. Verify the destination is not
+  production and owns no server. Include any workspace creation in the approval.
+- Backup paths for both states, exclusive access to both owners and a halt point
+  if either state changes after review. Keep default state locking enabled.
+- The complete list of resources that stay in the source, with their attributes
+  fingerprinted for comparison. Keep the worker and all original snippets there,
+  including any network-data file shared with the worker.
+
+`tofu state mv` supports a local source/destination state handoff. Its `-dry-run`
+must select exactly the approved server address. With the protected input paths
+and source address supplied privately, review this command before running it:
+
+```bash
+tofu state mv -dry-run \
+  -state="$SOURCE_STATE" -state-out="$DESTINATION_STATE" \
+  -backup="$SOURCE_BACKUP" -backup-out="$DESTINATION_BACKUP" \
+  "$SERVER_SOURCE_ADDRESS" proxmox_virtual_environment_vm.control_plane
+```
+
+Removing `-dry-run` performs the separately approved transfer. Verify that the
+installed CLI supports these local-state options. Do not use
+`state rm` followed by import, copy state into a second active owner, or suppress
+locking. Remote-backend migrations require their own backend-specific procedure;
+do not apply local-file instructions to them.
+
+After approval, preserve byte-exact copies of each existing state and transfer
+only the server VM address. Native command backups may normalize serialization;
+they do not replace those pre-operation copies.
+Freeze the old root against apply: its old configuration would otherwise attempt
+to recreate the removed server. Read back both states immediately. Require the
+same native VM ID under exactly one owner, unchanged worker/snippet attributes,
+unchanged production state, and the expected lineages/serials. Moving across two
+local files is not an atomic transaction; if interrupted, inspect both states and
+backups before any retry or apply. State backups are not datastore rollback.
+
+Only then generate a fresh saved plan from the canonical server-owning workspace
+with explicit qualification inputs and `workers = {}`. New namespaced snippets
+must not take ownership of the old worker's backing files. Review a same-slot
+server replacement as destroy-before-create when reusing its VM slot. Proxmox
+may allocate a new MAC and DHCP address. The existing managed API DNS record must
+follow the discovered replacement address before enrollment, preserving the
+API/registration name and its TLS SAN. Verify resolution from the worker and
+administrator paths without hosts-file or transport overrides. No preserved MAC
+or IP address is required for cluster persistence.
+
+Correct legacy test-fixture endpoint overrides before qualification through a
+separately reviewed and approved change. Replace an address-based runtime profile
+with the stable DNS name, reconcile any worker hosts-file override and verify
+that its registration configuration uses that name. Preserve worker identity,
+token and datastore; do not rebuild or re-enroll it to repair the fixture.
+Review any required explicit conditional kubeconfig refresh as well. Do not
+change maintained infrastructure to preserve a fixture's hard-coded address.
+
+The namespace and deletion-protection inputs do not bypass the independent
+SSH trust, stable DNS endpoint, custody, fresh snapshot, fencing or replacement
+approval gates. The exact replacement plan needs its own approval before apply.
+
 ## Validation
 
 `make validate` checks native configuration, shell/YAML and public CLI loading,

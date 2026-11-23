@@ -61,8 +61,26 @@ variable "template" {
   }
 }
 
+variable "snippet_namespace" {
+  description = "Optional remote snippet filename namespace for an independently owned deployment. Null preserves existing paths; a workspace alone does not isolate remote files."
+  type        = string
+  default     = null
+  sensitive   = true
+  validation {
+    condition     = var.snippet_namespace == null ? true : can(regex("^[a-z][a-z0-9-]{0,38}[a-z0-9]$", var.snippet_namespace))
+    error_message = "Use a 2–40 character lowercase name with letters, digits or hyphens and alphanumeric ends."
+  }
+}
+
+variable "control_plane_protection" {
+  description = "Proxmox deletion protection for the server. Disable only through a separately reviewed operation before an approved replacement; this does not authorize destruction."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
 variable "control_plane" {
-  description = "Initial server VM ID/name. Proxmox manages its NIC MAC; reserve the observed DHCP lease upstream."
+  description = "Initial server VM ID/name. Proxmox allocates its NIC MAC; the managed API DNS record follows its observed primary address."
   type = object({
     vm_id = number
     name  = string

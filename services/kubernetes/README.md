@@ -69,6 +69,9 @@ verified evidence distinguished from unrehearsed procedures and accepted risks.
   primary bridge on `compute`.
 - DHCP on the primary VLAN. A reservation is not needed before initial deployment;
   reserve the observed IP/MAC pair afterwards, before normal use or maintenance.
+  Reservations are lease management, not a cluster-persistence requirement.
+  Replacement may allocate a new MAC/address; the managed API DNS record follows
+  the discovered primary address while the API/registration name remains stable.
 - DHCP-provided DNS must resolve the private API name without cluster DNS.
 - Existing Technitium zone and service-owned API/worker A records that are not
   already owned elsewhere. Optional worker PTR ownership needs an approved
@@ -104,6 +107,27 @@ Technitium provider enforces `skip_tls_verify = false`; private CA trust must be
 configured through its supported trust environment. Proxmox verification is also
 on unless a separately approved exception explicitly overrides it.
 
+### Independent qualification deployments
+
+`snippet_namespace` defaults to `null`, preserving all existing remote snippet
+filenames. A separate deployment on the same hosts must use a distinct namespace
+as well as disjoint VM IDs, DNS records and explicit private inputs. Workspaces
+isolate state, not remote filenames. The namespace prefixes both user-data and
+network-data filenames for the server and workers without changing their contents.
+Changing it on an existing deployment changes VM initialization references and
+may replace guests; it is not an in-place rollout mechanism.
+
+`control_plane_protection` defaults to `true`. Setting protection to `false`
+requires an approved saved-plan apply before replacing an already protected
+server. Restore protection after the approved operation. This input does not
+change worker protection or authorize destruction. Proxmox allocates MACs;
+cluster continuity depends on stable DNS and restored Kubernetes identity, not
+on retaining a server MAC or IP address.
+
+For retained guests, follow the [server-only ownership handoff](RECOVERY.md#retained-server-ownership-handoff)
+before generating a replacement plan. Never use a copied experimental root or
+import a VM into a second authoritative state.
+
 `make validate` runs OpenTofu formatting/validation, YAML lint, shell syntax
 checks and the repository's literal service-boundary check, including the runtime
 root, configuration-artifacts root and independent recovery-authorization root.
@@ -111,9 +135,9 @@ root, configuration-artifacts root and independent recovery-authorization root.
 case-insensitive primary-MAC address selection, loopback/link-local filtering,
 and reversed IPv4 PTR names, with the DNS provider mocked. It also checks optional
 fixed installation's YAML/base64 composition and separate enrollment document.
-Those tests target only
-cloud-config composition with providers
-mocked, not a whole deployment plan. Native variable and lifecycle validation
+The snippet tests also check unchanged default filenames and namespace composition
+across server and worker user-data and network-data. These checks use mocked
+infrastructure providers, not a live deployment plan. Native variable and lifecycle validation
 retain responsibility for invalid inputs.
 
 These checks do not exercise RPM installation, kernel boot, SELinux policy,

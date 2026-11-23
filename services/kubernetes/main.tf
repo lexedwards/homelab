@@ -22,7 +22,8 @@ provider "technitium" {
 }
 
 locals {
-  compute = var.proxmox_nodes["compute"]
+  compute        = var.proxmox_nodes["compute"]
+  snippet_prefix = var.snippet_namespace == null ? "" : "${var.snippet_namespace}-"
   rke2_config = yamlencode({
     "node-name"             = var.control_plane.name
     "with-node-id"          = true
@@ -104,7 +105,7 @@ resource "proxmox_virtual_environment_file" "control_plane" {
   content_type = "snippets"
   source_raw {
     data      = data.cloudinit_config.control_plane.rendered
-    file_name = "kubernetes-control-plane-cloud-config.yaml"
+    file_name = "${local.snippet_prefix}kubernetes-control-plane-cloud-config.yaml"
   }
 }
 
@@ -114,7 +115,7 @@ resource "proxmox_virtual_environment_file" "control_plane_network" {
   content_type = "snippets"
   source_raw {
     data      = file("${path.module}/cloud-init/network-data.yaml")
-    file_name = "kubernetes-control-plane-network-config.yaml"
+    file_name = "${local.snippet_prefix}kubernetes-control-plane-network-config.yaml"
   }
 }
 
@@ -126,7 +127,7 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
   tags        = ["iac", "kubernetes", "control-plane"]
   started     = true
   on_boot     = true
-  protection  = true
+  protection  = var.control_plane_protection
   bios        = "ovmf"
   machine     = "q35"
   boot_order  = ["scsi0"]
