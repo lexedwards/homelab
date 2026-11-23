@@ -23,7 +23,7 @@ def restore(config, known, point, client, token):
         require(downloaded['size'] == point['size'], 'Snapshot size changed during download')
         recorded = dict(point, sha256=downloaded['sha256'])
         save(selected, recorded, exclusive=True)
-    require(not (DATA / 'server/db').exists(), 'Datastore appeared before reset; no overwrite')
+    require(not initialized(), 'Datastore appeared before reset; no overwrite')
     receipt = {'intent_sha256': digest({'identity': known, 'snapshot': recorded}), 'snapshot_sha256': recorded['sha256']}
     save(STATE / 'restore-started.json', receipt, exclusive=True)
     try:
@@ -48,7 +48,7 @@ def execute(enrollment, approle):
         require(not (STATE / 'restore-complete.json').exists(), 'Previously restored datastore is missing; no replay or creation')
         require(enrollment.exists(), 'Waiting for verified-SSH OpenBao enrollment; empty-datastore startup blocked')
         check_native()
-        require(not (DATA / 'server/db').exists() and not (DATA / 'server/tls').exists(), 'Partial local bootstrap material requires inspection')
+        require(not initialized(), 'Datastore appeared before discovery; no overwrite')
         with closing(BootstrapReader(private_json(enrollment), approle)) as reader:
             config = profile(reader.read('config_path'))
             require(config['cluster_name'] == reader.enrollment['cluster_name'], 'Runtime profile differs from the enrolled cluster name')

@@ -70,9 +70,13 @@ def lock_state():
 def initialized():
     path = DATA / 'server/db/etcd/member/snap/db'
     require(not any(p.is_symlink() for p in [path, *path.parents]), 'Datastore paths must not use symlinks')
-    if not (DATA / 'server/db/etcd').exists():
+    if not path.is_file():
+        db, tls = DATA / 'server/db', DATA / 'server/tls'
+        require(not tls.exists() and not tls.is_symlink(), 'Existing TLS material requires inspection; no overwrite')
+        for entry in [db, *db.rglob('*')] if db.exists() else []:
+            require(entry.is_dir() and not entry.is_symlink() and entry.stat().st_uid == 0 and not entry.stat().st_mode & 0o022,
+                    'Existing partial datastore requires inspection; no initialization or overwrite')
         return False
-    require(path.is_file(), 'Existing partial datastore requires inspection; no initialization or overwrite')
     return True
 
 
