@@ -18,6 +18,8 @@ DATA = Path('/var/lib/rancher/rke2')
 STATE = Path('/var/lib/kubernetes-bootstrap')
 CONFIG = Path('/etc/rancher/rke2/config.yaml')
 OVERLAY = CONFIG.with_name('config.yaml.d') / '90-bootstrap.yaml'
+SNAPSHOTS = OVERLAY.with_name('80-snapshots.yaml')
+SNAPSHOT_SECRET = 'rke2-etcd-snapshot-s3-config'
 TOKEN = Path('/etc/rancher/rke2/bootstrap-server-token')
 ACCESS = Path('/etc/rancher/rke2/bootstrap-access.json')
 APPROLE = Path('/etc/rancher/rke2/bootstrap-approle.json')
@@ -118,7 +120,7 @@ def access(value):
 
 
 def profile(value):
-    require(set(value) == {'cluster_name', 'api_server', 'registration_server', 'backup', 'publication'}, 'Unexpected runtime profile fields')
+    require(set(value) - {'snapshots'} == {'cluster_name', 'api_server', 'registration_server', 'backup', 'publication'}, 'Unexpected runtime profile fields')
     https_origin(value['api_server'])
     https_origin(value['registration_server'])
     require(urllib.parse.urlsplit(value['api_server']).hostname == urllib.parse.urlsplit(value['registration_server']).hostname,
@@ -128,7 +130,66 @@ def profile(value):
     name = cluster_name(value['cluster_name'])
     require(value['backup']['bucket'] == name + '-backups' and value['publication']['bucket'] == name + '-configuration',
             'Runtime storage must use the named cluster\'s two dedicated buckets')
+    snapshot_options(value)
     return value
+
+
+def snapshot_options(config):
+    defaults = {'etcd-snapshot-schedule-cron': '0 */6 * * *', 'etcd-snapshot-retention': 5, 'etcd-s3-retention': 56}
+    supplied = config.get('snapshots', {})
+    require(isinstance(supplied, dict) and not set(supplied) - set(defaults), 'Unexpected native snapshot settings')
+    value = defaults | supplied
+    require(isinstance(value['etcd-snapshot-schedule-cron'], str) and value['etcd-snapshot-schedule-cron'].strip() and
+            '\n' not in value['etcd-snapshot-schedule-cron'], 'Supply a native RKE2 snapshot cron expression')
+    require(all(type(value[k]) is int and value[k] >= 0 for k in ['etcd-snapshot-retention', 'etcd-s3-retention']),
+            'Native snapshot retention counts must be nonnegative integers')
+    return value
+
+
+def snapshot_configuration(config):
+    value = snapshot_options(config) | {'etcd-snapshot-compress': True, 'etcd-s3': True, 'etcd-s3-config-secret': SNAPSHOT_SECRET}
+    SNAPSHOTS.parent.mkdir(mode=0o700, exist_ok=True)
+    if SNAPSHOTS.exists():
+        require(set(private_json(SNAPSHOTS)) == set(value), 'Unrecognized native snapshot overlay; inspect before replacing')
+        if private_json(SNAPSHOTS) == value:
+            return False
+    save(SNAPSHOTS, value)
+    return True
+
+
+def snapshot_secret(config, pair):
+    import base64
+
+    require(set(pair) == {'access_key_id', 'secret_access_key'} and all(isinstance(v, str) and v for v in pair.values()),
+            'Unexpected application backup credential record')
+    fields = {'etcd-s3-endpoint': urllib.parse.urlsplit(config['backup']['endpoint']).netloc,
+              'etcd-s3-bucket': config['backup']['bucket'], 'etcd-s3-folder': 'snapshots',
+              'etcd-s3-region': config['backup']['region'], 'etcd-s3-bucket-lookup-type': 'path',
+              'etcd-s3-access-key': pair['access_key_id'], 'etcd-s3-secret-key': pair['secret_access_key'],
+              'etcd-s3-skip-ssl-verify': 'false', 'etcd-s3-insecure': 'false',
+              'etcd-s3-retention': str(snapshot_options(config)['etcd-s3-retention'])}
+    return {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'etcd.k3s.cattle.io/s3-config-secret',
+            'metadata': {'name': SNAPSHOT_SECRET, 'namespace': 'kube-system',
+                         'labels': {'app.kubernetes.io/managed-by': 'homelab-rke2-snapshots'}},
+            'data': {key: base64.b64encode(value.encode()).decode() for key, value in fields.items()}}
+
+
+def enroll_snapshot_secret(config, pair):
+    desired = snapshot_secret(config, pair)
+    cli = ['/var/lib/rancher/rke2/bin/kubectl', '--kubeconfig=/etc/rancher/rke2/rke2.yaml', '--request-timeout=15s']
+    result = subprocess.run(cli + ['-n', 'kube-system', 'get', 'secret', SNAPSHOT_SECRET, '--ignore-not-found', '-o', 'json'],
+                            capture_output=True, timeout=20)
+    require(result.returncode == 0, 'Cannot inspect native snapshot Secret ownership')
+    existing = json.loads(result.stdout) if result.stdout.strip() else None
+    if existing:
+        require(existing['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == 'homelab-rke2-snapshots',
+                'Native snapshot Secret belongs to another owner; no overwrite')
+        if existing.get('data') == desired['data'] and existing.get('type') == desired['type']:
+            return
+        desired['metadata']['resourceVersion'] = existing['metadata']['resourceVersion']
+    result = subprocess.run(cli + ['replace' if existing else 'create', '-f', '-'], input=json.dumps(desired).encode(),
+                            capture_output=True, timeout=20)
+    require(result.returncode == 0, 'Native snapshot Secret enrollment failed; credentials suppressed')
 
 
 def identity(value):
@@ -271,7 +332,7 @@ def latest_snapshot(client, config, known, token):
     require(known['token_hash'] == token_hash(token), 'Server token differs from independent cluster identity')
     candidates = []
     for key in keys:
-        match = re.fullmatch(r'snapshots/homelab-scheduled-([a-z0-9-]+)-([0-9]{10,})(\.zip)?', key or '')
+        match = re.fullmatch(r'snapshots/(?:etcd-snapshot|homelab-scheduled)-([a-z0-9-]+)-([0-9]{10,})(\.zip)?', key or '')
         if match:
             candidates.append((int(match[2]), key, match[1]))
     require(candidates, 'Known cluster has no usable backup; new-cluster creation is forbidden')
@@ -300,7 +361,9 @@ def configuration(role, config):
     require(not any(k in os.environ for k in ['RKE2_URL', 'RKE2_TOKEN', 'RKE2_TOKEN_FILE', 'RKE2_CONFIG_FILE', 'RKE2_DATA_DIR', 'RKE2_NODE_NAME']),
             'Unmanaged RKE2 environment overrides require inspection')
     OVERLAY.parent.mkdir(mode=0o700, exist_ok=True)
-    require(not any(path != OVERLAY for path in OVERLAY.parent.glob('*')), 'Unmanaged native configuration fragments')
+    require(not any(path not in [OVERLAY, SNAPSHOTS] for path in OVERLAY.parent.glob('*')), 'Unmanaged native configuration fragments')
+    if role != 'join':
+        snapshot_configuration(config)
     value = {'token-file': str(TOKEN)}
     if role == 'join':
         value['server'] = config['registration_server']

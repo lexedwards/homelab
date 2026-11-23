@@ -22,8 +22,9 @@ apply refuses a missing plan. Review policy/role ownership before creation.
 | `s3_secret_path` | Dedicated backup application `access_key_id`, `secret_access_key` |
 | `publication_secret_path` | Separate publisher `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
 
-The runtime profile contains `cluster_name`, `api_server`, `registration_server`, `backup` and
-`publication`. Each storage object contains only `endpoint`, `bucket`, `region`.
+The runtime profile contains `cluster_name`, `api_server`, `registration_server`,
+`backup` and `publication`, with an optional `snapshots` object. Each storage object
+contains only `endpoint`, `bucket`, `region`.
 Use the same published cluster DNS identity for API and registration, and different
 snapshot/configuration buckets named `<cluster-name>-backups` and
 `<cluster-name>-configuration`. Use the same stable friendly name in the storage
@@ -34,6 +35,18 @@ inventory; existing-cluster recovery needs listing and object/metadata retrieval
 under `snapshots/` in its dedicated bucket. Keep backup and publisher credentials application-scoped,
 not workstation operator credentials. Existing backup retention permissions remain
 owned by the backup workflow, not this OpenBao authorization root.
+
+`snapshots` accepts native `etcd-snapshot-schedule-cron`, `etcd-snapshot-retention`
+and `etcd-s3-retention` settings. Defaults are `0 */6 * * *`, `5` local and `56`
+remote snapshots. Omitted fields use those defaults; zero retention disables
+native pruning. RKE2 owns cron parsing and count-based retention, not an additional
+timer or age-pruning script. See [BACKUP.md](../BACKUP.md).
+
+After identity verification, completion enrolls the backup pair into RKE2's native
+S3 configuration Secret for normal snapshots. That Secret is not a recovery
+dependency: before the API exists, guarded restore still reads the matching
+server token and backup pair directly from external OpenBao. Keep independent
+token and credential custody; a snapshot cannot supply its own decryption token.
 
 `configuration_enrollment` grants a bounded writer access only to the runtime
 profile. `credential_enrollment.token` and `.backup` grant separate bounded writers

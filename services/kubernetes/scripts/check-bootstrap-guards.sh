@@ -105,7 +105,11 @@ cmp "$work/base.rendered" "$work/isolated.rendered"
 PYTHONPATH="$source_directory" python3 -B - <<'PY'
 import urllib.error
 import importlib.util
+import base64
+import json
 from pathlib import Path
+import tempfile
+from subprocess import CompletedProcess
 import kubernetes_recovery as recovery
 from kubernetes_object_store import OperationError
 
@@ -122,6 +126,79 @@ class Store:
         self.responses = iter(responses)
     def request(self, *args):
         return next(self.responses)
+    def head(self, path):
+        return 200, {'token_hash': recovery.token_hash('synthetic-password'), 'node_name': 'test-server',
+                     'size': '1024', 'etag': '"' + 'a' * 32 + '"'}
+
+for prefix in ['etcd-snapshot', 'homelab-scheduled']:
+    key = 'snapshots/' + prefix + '-test-server-1795425179.zip'
+    inventory = ('<ListBucketResult><Contents><Key>' + key + '</Key></Contents><IsTruncated>false</IsTruncated></ListBucketResult>').encode()
+    point = recovery.latest_snapshot(Store([(200, '', inventory)]), {'backup': {'bucket': 'test-cluster-backups'}},
+        {'token_hash': recovery.token_hash('synthetic-password')}, 'synthetic-password')
+    assert point['key'] == key and point['timestamp'] == 1795425179
+
+config = {'api_server': 'https://api.example.invalid:6443', 'registration_server': 'https://api.example.invalid:9345',
+          'backup': {'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1', 'bucket': 'test-cluster-backups'}}
+with tempfile.TemporaryDirectory() as directory:
+    original = recovery.CONFIG, recovery.OVERLAY, recovery.SNAPSHOTS, recovery.TOKEN
+    recovery.CONFIG = Path(directory) / 'config.yaml'
+    recovery.OVERLAY = Path(directory) / 'config.yaml.d/90-bootstrap.yaml'
+    recovery.SNAPSHOTS = recovery.OVERLAY.with_name('80-snapshots.yaml')
+    recovery.TOKEN = Path(directory) / 'server-token'
+    recovery.install_token('synthetic-password')
+    token_before = recovery.TOKEN.read_bytes()
+    recovery.CONFIG.write_text('{"with-node-id":true,"tls-san":["api.example.invalid"]}')
+    recovery.CONFIG.chmod(0o600)
+    recovery.configuration('restore', config)
+    native = json.loads(recovery.SNAPSHOTS.read_text())
+    assert native == {'etcd-snapshot-schedule-cron': '0 */6 * * *', 'etcd-snapshot-retention': 5,
+                      'etcd-s3-retention': 56, 'etcd-snapshot-compress': True, 'etcd-s3': True,
+                      'etcd-s3-config-secret': 'rke2-etcd-snapshot-s3-config'}
+    assert recovery.snapshot_configuration(config) is False
+    customised = dict(config, snapshots={'etcd-snapshot-schedule-cron': '0 */4 * * *',
+                                       'etcd-snapshot-retention': 6, 'etcd-s3-retention': 84})
+    assert recovery.snapshot_configuration(customised) is True
+    assert json.loads(recovery.SNAPSHOTS.read_text())['etcd-s3-retention'] == 84
+    recovery.install_token('synthetic-password')
+    refuses(lambda: recovery.install_token('different-password'), 'Existing server token differs')
+    assert recovery.TOKEN.read_bytes() == token_before
+    recovery.SNAPSHOTS.unlink()
+    recovery.OVERLAY.unlink()
+    recovery.configuration('join', config)
+    assert not recovery.SNAPSHOTS.exists()
+    recovery.CONFIG, recovery.OVERLAY, recovery.SNAPSHOTS, recovery.TOKEN = original
+
+pair = {'access_key_id': 'synthetic-access', 'secret_access_key': 'synthetic-secret'}
+desired = recovery.snapshot_secret(config, pair)
+assert desired['type'] == 'etcd.k3s.cattle.io/s3-config-secret'
+assert base64.b64decode(desired['data']['etcd-s3-bucket']) == b'test-cluster-backups'
+assert base64.b64decode(desired['data']['etcd-s3-retention']) == b'56'
+assert 'server_token' not in desired['data']
+original_run = recovery.subprocess.run
+requests = []
+existing = None
+def kubectl(arguments, **kwargs):
+    if 'get' in arguments:
+        return CompletedProcess(arguments, 0, stdout=json.dumps(existing).encode() if existing else b'')
+    assert arguments[-2:] == ['-f', '-']
+    requests.append((arguments[-3], json.loads(kwargs['input'])))
+    return CompletedProcess(arguments, 0, stdout=b'')
+try:
+    recovery.subprocess.run = kubectl
+    recovery.enroll_snapshot_secret(config, pair)
+    assert requests == [('create', desired)]
+    existing = dict(desired, metadata=dict(desired['metadata'], resourceVersion='7'))
+    recovery.enroll_snapshot_secret(config, pair)
+    assert len(requests) == 1
+    recovery.enroll_snapshot_secret(config, dict(pair, secret_access_key='renewed-synthetic-secret'))
+    assert requests[-1][0] == 'replace' and requests[-1][1]['metadata']['resourceVersion'] == '7'
+    existing = dict(existing, metadata={'name': recovery.SNAPSHOT_SECRET, 'resourceVersion': '8'})
+    refuses(lambda: recovery.enroll_snapshot_secret(config, pair), 'another owner')
+    assert len(requests) == 2
+finally:
+    recovery.subprocess.run = original_run
+refuses(lambda: recovery.snapshot_options(dict(config, snapshots={'etcd-s3-access-key': 'not-configuration'})), 'Unexpected native snapshot')
+refuses(lambda: recovery.snapshot_options(dict(config, snapshots={'etcd-s3-retention': -1})), 'nonnegative')
 
 spec = importlib.util.spec_from_file_location('publisher', Path(recovery.__file__).with_name('publish-kubeconfig.py'))
 publisher = importlib.util.module_from_spec(spec)
@@ -147,19 +224,6 @@ scope = {'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1', 'bucke
 issuer.publisher(scope)
 refuses(lambda: issuer.publisher(dict(scope, bucket='other-cluster-configuration')), 'dedicated named-cluster bucket')
 refuses(lambda: issuer.publisher(dict(scope, key='rke2/*/kubeconfig.yaml')), 'exact configuration key')
-spec = importlib.util.spec_from_file_location('backup', Path(recovery.__file__).with_name('etcd-backup.py'))
-backup = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(backup)
-target = {'endpoint': 'https://s3.example.invalid', 'region': 'us-east-1', 'bucket': 'test-cluster-backups',
-          'cluster_name': 'test-cluster', 'cluster_uid': publication['cluster_uid'], 'node_name': 'test-server'}
-def native(arguments, **kwargs):
-    from subprocess import CompletedProcess
-    assert '--s3-folder=snapshots' in arguments
-    assert '--s3-bucket=test-cluster-backups' in arguments
-    assert not any(target['cluster_uid'] in value for value in arguments)
-    return CompletedProcess(arguments, 0, stdout='{"items": []}')
-backup.Native(target, {'access_key_id': 'synthetic', 'secret_access_key': 'synthetic'}, runner=native)('ls')
-
 config = {'backup': {'bucket': 'backup'}}
 empty = (200, '', b'<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>')
 known = {'cluster_uid': '11111111-2222-4333-8444-555555555555',

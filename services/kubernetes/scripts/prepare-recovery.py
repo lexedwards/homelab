@@ -8,19 +8,18 @@ import subprocess
 import time
 
 from kubernetes_object_store import NativeS3, OperationError, https_origin, object_path, private_bytes, private_json, require
-from kubernetes_recovery import VERSION, check_native, token_hash
+from kubernetes_recovery import CONFIG, DATA, VERSION, check_native, latest_snapshot, token_hash
 
 
 def prepare(args):
-    spec = importlib.util.spec_from_file_location('etcd_backup', Path(__file__).with_name('etcd-backup.py'))
+    spec = importlib.util.spec_from_file_location('recovery_custody', Path(__file__).with_name('backup-recovery-custody.py'))
     backup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backup)
     target = backup.validate_target(private_json(args.config))
     https_origin(args.api_server)
     require(args.independent_copies_confirmed, 'Preparation needs independently recovered token/credential copies, not only live-host access')
-    require(Path(args.server_token_file).resolve() != backup.DATA / 'server/token', 'Use the independent matching server-token copy, not the live token')
+    require(Path(args.server_token_file).resolve() != DATA / 'server/token', 'Use the independent matching server-token copy, not the live token')
     check_native()
-    backup.verify_control_plane(target)
     pair = backup.validate_credentials(private_json(args.credentials_file))
     custody = private_json(args.custody_file)
     backup.validate_custody(target, pair, custody)
@@ -39,18 +38,18 @@ def prepare(args):
     output.mkdir(mode=0o700)
     with (output / 'preparation-started.json').open('x') as destination:
         json.dump({'started_at': int(time.time()), 'independent_copies_confirmed': True}, destination)
-    native = backup.Native(target, pair)
-    before = backup.inventory(native('ls'), target, time.time())
     started = time.time()
-    native('save')
-    after = backup.inventory(native('ls'), target, time.time())
-    fresh = [point for point in after if point['name'] not in {point['name'] for point in before} and point['timestamp'] >= started - 60]
-    require(len(fresh) == 1 and fresh[0]['token_hash'] == association, 'Fresh off-node snapshot does not match the independently recovered server token')
-    selected = fresh[0]
-    key = 'snapshots/' + selected['name']
+    result = subprocess.run(['/usr/bin/rke2', 'etcd-snapshot', 'save', '--config=' + str(CONFIG), '--name=etcd-snapshot', '--debug=false'],
+                            env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root', 'LANG': 'C'}, capture_output=True, timeout=450)
+    require(result.returncode == 0, 'Native snapshot save failed; inspect native status before retrying')
     client = NativeS3(target['endpoint'], target['region'], {'AWS_ACCESS_KEY_ID': pair['access_key_id'], 'AWS_SECRET_ACCESS_KEY': pair['secret_access_key']})
+    selected = latest_snapshot(client, {'backup': target}, {'token_hash': association}, token)
+    require(selected['timestamp'] >= started - 1, 'Native save did not produce a fresh matching off-node snapshot')
+    key = selected['key']
+    status, metadata = client.head(object_path(target['bucket'], key))
+    require(status == 200 and metadata['node_name'] == target['node_name'], 'Fresh snapshot source differs from the declared Node')
     snapshot = output / ('verified-snapshot.zip' if key.endswith('.zip') else 'verified-snapshot')
-    downloaded = client.download(object_path(target['bucket'], key), snapshot, args.max_snapshot_bytes)
+    downloaded = client.download(object_path(target['bucket'], key), snapshot, args.max_snapshot_bytes, headers=['If-Match: ' + selected['etag']])
     point = {
         'cluster_name': target['cluster_name'], 'cluster_uid': target['cluster_uid'], 'key': key, 'sha256': downloaded['sha256'], 'size': downloaded['size'],
         'token_hash': association, 'source_node': target['node_name'], 'timestamp': selected['timestamp'],

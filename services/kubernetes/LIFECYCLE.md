@@ -12,7 +12,7 @@ worker on each Proxmox host. The control plane is not highly available.
 
 | Area | Recorded position |
 | --- | --- |
-| Backups | Native off-node upload, independent credential custody, freshness/failure reporting and a natural six-hour timer run verified. |
+| Backups | Earlier upload/custody evidence used a separate timer. The replacement integration delegates schedule, upload and retention to RKE2; native scheduled upload needs approved live verification. |
 | Worker maintenance | Replacement and planned drained reboot checks passed; do not repeat them merely to complete documentation. |
 | Control-plane recovery | An earlier failed experiment was retired. A later synthetic new-VM native restore preserved cluster identity and an unchanged worker, with a new server Node name. Maintained restore bootstrap and production replacement remain unqualified. |
 | Kubeconfig publication | Separate-bucket synthetic OpenBao enrollment, first publication, conditional refresh, administrator download and native timer recovery passed. Production rollout remains a separate operation; see the [artifact procedure](artifacts/README.md). |
@@ -106,11 +106,12 @@ the change plan rather than treating this document as a new version pin.
    exclusions block ordinary RKE2 updates: override only the required reviewed
    exclusions for that exact transaction. Do not disable signature checks or use
    an unpinned install script. Review any target-minor repository change first.
-3. Review version-dependent tooling before starting. The backup helper rejects
+3. Review version-dependent tooling before starting. Recovery preparation rejects
    versions other than its maintained pin; enrollment and chart render checks
    also contain version assumptions. Prepare their compatible
    updates and checks without assuming they continue to work after an RPM change.
-   Preserve the timer's intended schedule and make failed/missed backup runs visible.
+   Preserve native snapshot scheduling/retention settings and inspect RKE2 backup
+   status and failed/missed uploads.
 4. Complete the common baseline and approved pre-upgrade snapshot/custody checks.
    Inventory server-resident workloads; cordon/drain evictable workloads as
    applicable. The server taint does not mean all system workloads are absent.
